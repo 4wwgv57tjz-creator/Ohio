@@ -24,6 +24,9 @@ Tips:
 - **Milepæler**: når du eier 10, 25, 50, 100 … av noe, dobles effekten.
 - **Forsyningskasser** faller ned med fallskjerm av og til. Trykk på dem for penger eller ×3 inntekt i 30 sekunder.
 - **Trykk-kraft** kan oppgraderes, så hvert trykk gir mer.
+- **Zoom mellom kapitlene** på kartet: trykk **−** (eller knip fingrene sammen) for å zoome ut og se kapitlene som
+  venter, med områdene du ikke har erobret ennå. Trykk **+** (eller knip helt inn på hjemområdet ditt) for å zoome inn
+  til kapitlene du allerede har erobret. Prikkene mellom knappene viser alle kapitlene – trykk på en for å hoppe dit.
 - **General Buckeye** (Ohio-nøtta med generalhatt) viser deg hva du skal gjøre i starten.
 - **Reisen** (Kart → Reisen, eller «Se hele reisen» på Base) viser hele spillet som et tre: alle 7 kapitler og
   60 områder, og hvor du er nå.
@@ -47,8 +50,9 @@ Tips:
   10 minutter, dobbel inntekt mens du var borte, og få tilbake soldatene etter et tap.
 - **Reklame mellom kampene**: høyst etter annenhver kamp og med minst 3 minutter mellom. Aldri i opplæringen eller de
   første 4 minuttene.
-- **Reklamefri**: fjerner reklamen mellom kampene, og alle «se reklame»-belønninger gis uten reklame. Finnes også i
-  en startpakke sammen med 500 edelstener og en kosmisk kasse.
+- **Reklamefri**: fjerner reklamen mellom kampene, og boost, dobbel offline-inntekt og gjenoppliving gis uten
+  reklame. Gratis kasser og edelstener krever fortsatt at man ser en reklame. Finnes også i en startpakke sammen med
+  500 edelstener og en kosmisk kasse.
 
 ## Tjen penger på spillet
 
@@ -118,7 +122,8 @@ Når universet er erobret kan du ta **prestisje**: du starter på nytt som en li
 
 - +50 % inntekt og hærstyrke for alltid (★2 gir +100 %, ★3 +150 % osv.)
 - +300 edelstener og en kosmisk kasse
-- du beholder trykk-kraften, skins, kasser, edelstener, venner og reklamefri
+- du beholder skins, kasser, edelstener, venner og reklamefri, mens bygninger, hær, trykk-kraft og erobrede områder
+  starter på nytt
 - eksklusive prestisje-skins som ikke finnes i kasser: Prestisjeflagg (★1), Prestisjekrone (★2), Stjernepalasset (★3) og
   Stjernehæren (★5)
 

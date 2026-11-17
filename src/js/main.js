@@ -139,6 +139,7 @@ function renderShellText() {
 }
 
 function setTab(name) {
+  if (name === 'map' && tab !== 'map' && S) mapEra = S.era; // kartet åpner alltid på kapittelet du er i
   tab = name;
   $$('.tabbar [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   $$('.screen').forEach((s) => { s.hidden = s.id !== 'scr-' + name; });
@@ -387,6 +388,21 @@ function doBuyTap() {
 }
 
 // ---------------- KART ----------------
+// Kartet kan zoomes ut og inn mellom kapitlene: inn = tidligere kapitler (erobret), ut = kommende (ikke låst opp).
+let mapEra = 0; // kapittelet kartet viser nå
+let mapEraBase = -1; // S.era da mapEra sist ble nullstilt (et nytt kapittel viser det nye kartet)
+let levelBusy = false; // en zoom-overgang mellom kapitler spilles
+let vbAnim = 0; // avbryter gamle kart-animasjoner
+const levelKind = (i) => (i < S.era ? 'past' : i > S.era ? 'future' : 'now');
+// Hvordan et kapittel henger sammen med det forrige: 'nest' = forrige kart ligger inni hjemområdet,
+// 'slide' = nabokart (Sør-Amerika ligger sør for Nord-Amerika), 'scale' = vanlig zoom uten fast punkt.
+const LEVEL_LINK = { usa: 'nest', na: 'nest', sa: 'slide', world: 'scale', solar: 'nest', galaxy: 'nest' };
+const SPACE_W = 1000, SPACE_H = 1300;
+const reducedMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const mapSize = (i) => (ERAS[i].space ? [SPACE_W, SPACE_H] : [MAPS[ERAS[i].map].w, MAPS[ERAS[i].map].h]);
+const mapSVG = (i) => (ERAS[i].space ? spaceMapSVG(i) : geoMapSVG(i));
+
 function mapToggle() {
   return `<div class="mode-switch" role="group">
     <button type="button" class="${mapView === 'map' ? 'on' : ''}" data-action="mapview" data-view="map">${ico('map')} ${t('map_view_map')}</button>
@@ -394,46 +410,83 @@ function mapToggle() {
   </div>`;
 }
 function renderMap() {
-  const era = ERAS[S.era];
-  const pr = E.eraProgress(S);
   if (mapView === 'tree') { renderTree(); return; }
-  $('#scr-map').innerHTML = `<div class="pad"><div class="screen-head"><div><div class="eyebrow">${t('chapter', { n: S.era + 1 })} · ${t('conquered_of', { a: pr.done, b: pr.total })}</div><h2 class="h2">${esc(L(era.title))}</h2></div>${mapToggle()}</div></div>
-  <div class="map-wrap ${era.space ? 'space' : ''}" id="map-wrap">
-    ${era.space ? spaceMapSVG(era) : geoMapSVG(era)}
-    ${era.space ? '' : `<button class="map-zoom" type="button" data-action="zoomout" aria-label="${t('zoom_out')}" hidden>${ico('zoomout')}</button>`}
-  </div>
-  <div class="pad stack">
-    <div class="card region-sheet" id="region-sheet">${sheetHTML()}</div>
-    <div class="region-list" id="region-list">${regionListHTML()}</div>
+  if (mapEraBase !== S.era || !ERAS[mapEra]) { mapEra = S.era; mapEraBase = S.era; }
+  $('#scr-map').innerHTML = `<div class="pad"><div class="screen-head" id="map-head">${mapHeadHTML()}</div></div>
+  <div class="${mapWrapClass()}" id="map-wrap"><div class="map-layer">${mapSVG(mapEra)}</div><div id="map-ui">${mapUiHTML()}</div></div>
+  <div class="pad stack" id="map-below">${mapBelowHTML()}</div>`;
+  setupMapGestures();
+}
+function mapWrapClass() { return `map-wrap lvl-${levelKind(mapEra)}${ERAS[mapEra].space ? ' space' : ''}`; }
+function mapHeadHTML() {
+  const kind = levelKind(mapEra);
+  let status;
+  if (kind === 'now') { const pr = E.eraProgress(S); status = t('conquered_of', { a: pr.done, b: pr.total }); }
+  else status = kind === 'past' ? t('lvl_conquered') : mapEra === S.era + 1 ? t('lvl_next') : t('lvl_locked');
+  return `<div><div class="eyebrow">${t('chapter', { n: mapEra + 1 })} · ${status}</div><h2 class="h2">${esc(L(ERAS[mapEra].title))}</h2></div>${mapToggle()}`;
+}
+function mapUiHTML() {
+  const kind = levelKind(mapEra);
+  const tag = kind === 'past' ? `<span class="map-tag past">${ico('check')} ${t('lvl_conquered')}</span>`
+    : kind === 'future' ? `<span class="map-tag future">${ico('lock')} ${mapEra === S.era + 1 ? t('lvl_next') : t('lvl_locked')}</span>` : '';
+  const zoomed = !ERAS[mapEra].space && viewBox && viewBox.v[2] < mapSize(mapEra)[0] * 0.98;
+  const dots = ERAS.map((e, i) => `<button type="button" class="zb-dot ${levelKind(i)}${i === mapEra ? ' on' : ''}" data-action="lvl" data-i="${i}" aria-label="${esc(t('chapter', { n: i + 1 }) + ': ' + L(e.title))}"${i === mapEra ? ' aria-current="true"' : ''}></button>`).join('');
+  return `${tag}<div class="zoom-bar" role="group" aria-label="${esc(t('zoom_levels'))}">
+    <button type="button" class="zb-btn" data-action="lvl-in" aria-label="${esc(t('zoom_in_lvl'))}" ${mapEra === 0 ? 'disabled' : ''}>${ico('plus')}</button>
+    <div class="zb-dots">${dots}</div>
+    <button type="button" class="zb-btn" data-action="lvl-out" aria-label="${esc(t('zoom_out_lvl'))}" ${mapEra === ERAS.length - 1 && !zoomed ? 'disabled' : ''}>${ico('minus')}</button>
   </div>`;
-  if (!era.space) setupMapGestures();
+}
+function mapBelowHTML() {
+  const kind = levelKind(mapEra);
+  const tip = kind === 'now' && S.tut >= 5 && !S.flags.mapZoom ? `<p class="map-tip">${ico('info')} <span>${t('map_zoom_tip')}</span></p>` : '';
+  return `${kind === 'now' ? tip : levelCardHTML(kind)}
+    <div class="card region-sheet" id="region-sheet">${sheetHTML()}</div>
+    <div class="region-list" id="region-list">${regionListHTML()}</div>`;
+}
+function levelCardHTML(kind) {
+  const text = kind === 'past' ? t('lvl_past_text', { n: regionsOfEra(mapEra).length })
+    : mapEra === S.era + 1 ? t('lvl_next_text', { c: L(ERAS[S.era].title) }) : t('lvl_future_text', { c: L(ERAS[mapEra - 1].title) });
+  return `<div class="level-card ${kind}"><span class="level-ico">${ico(kind === 'past' ? 'check' : 'lock')}</span><p>${esc(text)}</p>
+    <button type="button" class="btn btn-soft" data-action="lvl-now">${ico('map')} ${t('lvl_back', { n: S.era + 1 })}</button></div>`;
+}
+function updateMapChrome() {
+  const wrap = $('#map-wrap');
+  if (wrap) {
+    wrap.classList.toggle('space', !!ERAS[mapEra].space);
+    ['past', 'now', 'future'].forEach((k) => wrap.classList.toggle('lvl-' + k, levelKind(mapEra) === k));
+  }
+  const head = $('#map-head'); if (head) head.innerHTML = mapHeadHTML();
+  const ui = $('#map-ui'); if (ui) ui.innerHTML = mapUiHTML();
+  const below = $('#map-below'); if (below) below.innerHTML = mapBelowHTML();
 }
 
-function geoMapSVG(era) {
+function geoMapSVG(i) {
+  const era = ERAS[i];
   const m = MAPS[era.map];
+  const kind = levelKind(i);
+  // hjemområdet er hele det forrige kapittelet – ditt når du har kommet så langt
+  const homeOwn = i === 0 || levelKind(i - 1) !== 'future';
+  const own = (id) => (id === era.home ? homeOwn : kind === 'past' || !!S.conquered[id]);
   if (!viewBox || viewBox.map !== era.map) viewBox = { map: era.map, v: [0, 0, m.w, m.h] };
   const v = viewBox.v;
   let paths = '', labels = '';
   for (const [id, g] of Object.entries(m.regions)) {
-    const isHome = id === era.home;
     const r = REGION_BY_ID[id];
-    const own = isHome || (r && S.conquered[id]);
-    const fill = own ? 'var(--own)' : r ? r.color : '#ccc';
-    paths += `<path class="reg ${own ? 'own' : ''} ${selected === id ? 'sel' : ''}" data-id="${id}" d="${g.d}" style="fill:${fill}"/>`;
+    const o = own(id);
+    const fill = o ? 'var(--own)' : r ? r.color : '#ddd5c2';
+    paths += `<path class="reg${o ? ' own' : ''}${selected === id ? ' sel' : ''}" data-id="${id}" d="${g.d}" style="fill:${fill}"/>`;
   }
   for (const [id, g] of Object.entries(m.regions)) {
-    if (!g.l) continue;
     const isHome = id === era.home;
     const r = REGION_BY_ID[id];
-    const own = isHome || (r && S.conquered[id]);
+    if (!g.l || (!isHome && !r)) continue;
+    const o = own(id);
     const big = g.b[2] - g.b[0] > m.w * 0.13 && g.b[3] - g.b[1] > m.w * 0.06;
     const [x, y] = g.l;
-    const name = isHome ? (S.era === 0 ? S.name : '') : L(r.name);
-    if (own) labels += `<g class="pin" transform="translate(${x} ${y - (big && name ? 26 : 0)})">${A.burgee(-6, -20, 1.25)}<path d="M-6 -20v26" stroke="#2b2350" stroke-width="3"/></g>`;
-    else {
-      const ch = E.chanceFor(S, r);
-      labels += `<g class="pin" transform="translate(${x} ${y - (big ? 30 : 0)})">${pinInner(ch, 17)}</g>`;
-    }
+    const name = isHome ? (i === 0 ? S.name : '') : L(r.name);
+    if (o) labels += `<g class="pin" transform="translate(${x} ${y - (big && name ? 26 : 0)})">${A.burgee(-6, -20, 1.25)}<path d="M-6 -20v26" stroke="#2b2350" stroke-width="3"/></g>`;
+    else if (!isHome) labels += `<g class="pin" transform="translate(${x} ${y - (big ? 30 : 0)})">${pinInner(kind === 'future' ? 0 : E.chanceFor(S, r), 17)}</g>`;
     if (big && name) labels += `<text x="${x}" y="${y + 12}" text-anchor="middle" class="map-label">${esc(name)}</text>`;
   }
   return `<svg class="map" id="map-svg" viewBox="${v.join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(L(era.title))}">
@@ -451,33 +504,36 @@ function pinInner(ch, r) {
   return `<circle r="${r}" class="${chanceClass(ch)}"/>${inner}`;
 }
 function seeded(n) { let x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); }
-function spaceMapSVG(era) {
-  const W = 1000, H = 1300;
-  const regs = regionsOfEra(S.era);
+function spaceMapSVG(i) {
+  const W = SPACE_W, H = SPACE_H;
+  const era = ERAS[i];
+  const kind = levelKind(i);
+  const regs = regionsOfEra(i);
   const home = SPACE_HOMES[era.map];
+  const homeOwn = levelKind(i - 1) !== 'future';
   let stars = '';
-  for (let i = 0; i < 90; i++) stars += `<circle cx="${(seeded(i) * W).toFixed(0)}" cy="${(seeded(i + 500) * H).toFixed(0)}" r="${(1 + seeded(i + 900) * 2.6).toFixed(1)}" fill="#fff" opacity="${(0.35 + seeded(i + 77) * 0.6).toFixed(2)}"/>`;
+  for (let k = 0; k < 90; k++) stars += `<circle cx="${(seeded(k) * W).toFixed(0)}" cy="${(seeded(k + 500) * H).toFixed(0)}" r="${(1 + seeded(k + 900) * 2.6).toFixed(1)}" fill="#fff" opacity="${(0.35 + seeded(k + 77) * 0.6).toFixed(2)}"/>`;
   const pts = [home.pos, ...regs.map((r) => r.pos)];
   const route = 'M' + pts.map((p) => p.join(' ')).join('L');
-  const node = (pos, size, kind, cls, id, label, sub) => `<g class="node ${cls}" ${id ? `data-id="${id}"` : ''} transform="translate(${pos[0]} ${pos[1]})">
+  const flag = (size) => `<g transform="translate(${size * 0.4} ${-size * 0.5})">${A.burgee(0, -10, 1.3)}<path d="M0 -10v30" stroke="#2b2350" stroke-width="3"/></g>`;
+  const node = (pos, size, kindName, cls, id, label, sub) => `<g class="node ${cls}" ${id ? `data-id="${id}"` : ''} transform="translate(${pos[0]} ${pos[1]})">
     <circle r="${size * 0.62}" class="node-hit"/>
     ${cls.includes('sel') ? `<circle r="${size * 0.62 + 10}" class="node-ring"/>` : ''}
-    <g transform="scale(${(size / 60).toFixed(3)})">${A.planet(kind, { raw: true })}</g>
+    <g transform="scale(${(size / 60).toFixed(3)})">${A.planet(kindName, { raw: true })}</g>
     <text y="${size * 0.62 + 34}" text-anchor="middle" class="map-label space-label">${esc(label)}</text>
     ${sub}
   </g>`;
-  let nodes = node(home.pos, home.size, home.planet, 'own', '', L(home.name), `<g transform="translate(${home.size * 0.4} ${-home.size * 0.5})">${A.burgee(0, -10, 1.3)}<path d="M0 -10v30" stroke="#2b2350" stroke-width="3"/></g>`);
+  let nodes = node(home.pos, home.size, home.planet, `${homeOwn ? 'own' : ''}${selected === era.home ? ' sel' : ''}`, era.home, L(home.name), homeOwn ? flag(home.size) : '');
   for (const r of regs) {
-    const own = S.conquered[r.id];
-    const ch = E.chanceFor(S, r);
-    const sub = own
-      ? `<g transform="translate(${r.size * 0.4} ${-r.size * 0.5})">${A.burgee(0, -10, 1.3)}<path d="M0 -10v30" stroke="#2b2350" stroke-width="3"/></g>`
-      : `<g class="pin" transform="translate(${r.size * 0.5} ${-r.size * 0.45})">${pinInner(ch, 19)}</g>`;
+    const own = kind === 'past' || S.conquered[r.id];
+    const sub = own ? flag(r.size) : `<g class="pin" transform="translate(${r.size * 0.5} ${-r.size * 0.45})">${pinInner(kind === 'future' ? 0 : E.chanceFor(S, r), 19)}</g>`;
     nodes += node(r.pos, r.size, r.planet, (own ? 'own ' : '') + (selected === r.id ? 'sel' : ''), r.id, L(r.name), sub);
   }
   return `<svg class="map space-map" id="map-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(L(era.title))}">
-    <defs><radialGradient id="neb1"><stop offset="0" stop-color="#ff5dd6" stop-opacity=".35"/><stop offset="1" stop-color="#ff5dd6" stop-opacity="0"/></radialGradient>
+    <defs><radialGradient id="spacebg" gradientUnits="userSpaceOnUse" cx="300" cy="260" r="1150"><stop offset="0" stop-color="#4a2f9a"/><stop offset=".7" stop-color="#120c35"/></radialGradient>
+    <radialGradient id="neb1"><stop offset="0" stop-color="#ff5dd6" stop-opacity=".35"/><stop offset="1" stop-color="#ff5dd6" stop-opacity="0"/></radialGradient>
     <radialGradient id="neb2"><stop offset="0" stop-color="#56e0ff" stop-opacity=".3"/><stop offset="1" stop-color="#56e0ff" stop-opacity="0"/></radialGradient></defs>
+    <rect x="-1500" y="-1500" width="${W + 3000}" height="${H + 3000}" fill="url(#spacebg)"/>
     <circle cx="820" cy="300" r="320" fill="url(#neb1)"/><circle cx="160" cy="900" r="360" fill="url(#neb2)"/>
     ${stars}
     <path d="${route}" class="route"/>
@@ -486,17 +542,22 @@ function spaceMapSVG(era) {
 }
 
 function sheetHTML() {
-  const era = ERAS[S.era];
+  const era = ERAS[mapEra];
+  const kind = levelKind(mapEra);
   let id = selected;
-  if (!id || (!REGION_BY_ID[id] && id !== era.home)) id = E.nextTarget(S)?.id;
-  if (!id) return `<p class="muted">${S.finished ? t('universe_yours') : t('pick_region')}</p>`;
-  if (id === era.home) return `<div class="sheet-top"><div class="sheet-art">${A.mascot()}</div><div class="sheet-info"><div class="eyebrow">${t('home')}</div><h3>${esc(S.name)}</h3></div></div>`;
+  if (id && id !== era.home && REGION_BY_ID[id]?.era !== mapEra) id = null;
+  if (!id && kind === 'now') id = E.nextTarget(S)?.id;
+  if (!id) return `<p class="muted">${kind !== 'now' ? t('lvl_pick') : S.finished ? t('universe_yours') : t('pick_region')}</p>`;
+  if (id === era.home) return homeSheetHTML();
   const r = REGION_BY_ID[id];
-  const done = S.conquered[id];
   const inc = money(r.income * pm());
-  if (done) {
+  if (kind === 'past' || S.conquered[id]) {
     return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><div class="eyebrow">${ico('check')} ${t('conquered')}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
     <div class="reward-row">${ico('coin')} +${inc}/s</div>`;
+  }
+  if (kind === 'future') {
+    return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><div class="eyebrow">${ico('lock')} ${t('region_locked', { n: mapEra + 1 })}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
+    <div class="locked-stats"><span class="vs-foe">${ico('skull')}<b>${fmt(E.regionDef(S, r))}</b></span><span class="reward-row">${t('reward')}: ${ico('coin')} +${inc}/s</span></div>`;
   }
   const P = E.armyPower(S), D = E.regionDef(S, r), ch = E.winChance(P, D);
   return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
@@ -505,51 +566,67 @@ function sheetHTML() {
     <div class="sheet-foot"><div class="reward-row">${t('reward')}: ${ico('coin')} +${inc}/s</div>
     <button class="btn btn-attack" data-action="attack" data-id="${id}" ${ch <= 0 ? 'disabled' : ''}>${ico('swords')} ${t('attack')}</button></div>`;
 }
+// Hjemområdet på et kart er hele det forrige kapittelet – herfra kan man zoome inn til det
+function homeSheetHTML() {
+  if (mapEra === 0) return `<div class="sheet-top"><div class="sheet-art">${A.mascot()}</div><div class="sheet-info"><div class="eyebrow">${t('home')}</div><h3>${esc(S.name)}</h3></div></div>`;
+  const prev = mapEra - 1, pk = levelKind(prev);
+  const status = pk === 'past' ? t('home_done', { n: prev + 1 }) : pk === 'now' ? t('home_now', { n: prev + 1 }) : t('home_locked', { n: prev + 1 });
+  const title = esc(L(ERAS[prev].title));
+  return `<div class="sheet-top"><div class="sheet-art">${A.mascot()}</div><div class="sheet-info"><div class="eyebrow">${ico(pk === 'past' ? 'check' : pk === 'now' ? 'flag' : 'lock')} ${status}</div><h3>${title}</h3></div></div>
+    <button type="button" class="btn btn-soft zoom-into" data-action="lvl-in">${ico('plus')} ${t('zoom_into', { c: title })}</button>`;
+}
 
 function regionListHTML() {
-  const regs = regionsOfEra(S.era).slice().sort((a, b) => a.def - b.def);
+  const kind = levelKind(mapEra);
+  const regs = regionsOfEra(mapEra).slice().sort((a, b) => a.def - b.def);
   return regs.map((r) => {
-    const done = S.conquered[r.id];
-    const ch = E.chanceFor(S, r);
-    return `<button type="button" class="region-row ${done ? 'done' : ''} ${selected === r.id ? 'sel' : ''}" data-action="select" data-id="${r.id}">
+    const done = kind === 'past' || !!S.conquered[r.id];
+    const locked = !done && kind === 'future';
+    const ch = done || locked ? 0 : E.chanceFor(S, r);
+    const tail = done ? `<span class="rinc">+${money(r.income * pm())}/s</span>${ico('check')}`
+      : `<span class="rdef">${ico('skull')}${fmt(E.regionDef(S, r))}</span>${locked ? `<span class="rlock">${ico('lock')}</span>` : `<span class="rchance ${chanceClass(ch)}">${pct(ch)}</span>`}`;
+    return `<button type="button" class="region-row${done ? ' done' : ''}${locked ? ' locked' : ''}${selected === r.id ? ' sel' : ''}" data-action="select" data-id="${r.id}">
       <span class="swatch" style="background:${done ? 'var(--own)' : r.color}"></span>
-      <span class="rname">${esc(L(r.name))}</span>
-      ${done ? `<span class="rinc">+${money(r.income * pm())}/s</span>${ico('check')}` : `<span class="rdef">${ico('skull')}${fmt(E.regionDef(S, r))}</span><span class="rchance ${chanceClass(ch)}">${pct(ch)}</span>`}
+      <span class="rname">${esc(L(r.name))}</span>${tail}
     </button>`;
   }).join('');
 }
 
 function selectRegion(id) {
   selected = id;
-  const era = ERAS[S.era];
+  const era = ERAS[mapEra];
   $$('#map-svg .reg, #map-svg .node').forEach((p) => p.classList.toggle('sel', p.dataset.id === id));
-  if (era.space) { const w = $('#map-wrap'); if (w) w.innerHTML = spaceMapSVG(era); }
-  $('#region-sheet').innerHTML = sheetHTML();
+  if (era.space && !levelBusy) { const l = $('#map-wrap .map-layer'); if (l) { l.innerHTML = spaceMapSVG(mapEra); setupMapGestures(); } }
+  const sh = $('#region-sheet');
+  if (sh) sh.innerHTML = sheetHTML();
   $$('#region-list .region-row').forEach((b) => b.classList.toggle('sel', b.dataset.id === id));
   if (!era.space) zoomToRegion(id);
   sfx.click();
   updateTutorial();
 }
 
-// ----- zoom og panorering -----
+// ----- zoom og panorering innenfor ett kart -----
 function setViewBox(v) {
-  const m = MAPS[ERAS[S.era].map];
-  const minW = m.w * 0.22;
-  let [x, y, w, h] = v;
-  const ratio = m.h / m.w;
-  w = Math.max(minW, Math.min(m.w, w)); h = w * ratio;
-  x = Math.max(-w * 0.15, Math.min(m.w - w * 0.85, x));
-  y = Math.max(-h * 0.15, Math.min(m.h - h * 0.85, y));
+  if (!viewBox || ERAS[mapEra].space) return;
+  const [mw, mh] = mapSize(mapEra);
+  let [x, y, w] = v;
+  w = Math.max(mw * 0.22, Math.min(mw, w));
+  const h = w * (mh / mw);
+  if (w >= mw * 0.999) { x = 0; y = 0; }
+  x = Math.max(-w * 0.15, Math.min(mw - w * 0.85, x));
+  y = Math.max(-h * 0.15, Math.min(mh - h * 0.85, y));
   viewBox.v = [x, y, w, h];
   const svg = $('#map-svg');
   if (svg) svg.setAttribute('viewBox', viewBox.v.map((n) => n.toFixed(1)).join(' '));
-  const zb = $('.map-zoom');
-  if (zb) zb.hidden = w >= m.w * 0.98;
+  const zb = $('#map-ui [data-action="lvl-out"]');
+  if (zb) zb.disabled = mapEra >= ERAS.length - 1 && w >= mw * 0.98;
 }
 function animateViewBox(target, ms = 380) {
-  const from = viewBox.v.slice();
+  if (!viewBox) return;
+  const from = viewBox.v.slice(), map = viewBox.map, id = ++vbAnim;
   const t0 = performance.now();
   const step = (now) => {
+    if (id !== vbAnim || levelBusy || !viewBox || viewBox.map !== map) return;
     const k = Math.min(1, (now - t0) / ms);
     const e = 1 - Math.pow(1 - k, 3);
     setViewBox(from.map((f, i) => f + (target[i] - f) * e));
@@ -558,7 +635,9 @@ function animateViewBox(target, ms = 380) {
   requestAnimationFrame(step);
 }
 function zoomToRegion(id) {
-  const m = MAPS[ERAS[S.era].map];
+  const era = ERAS[mapEra];
+  if (era.space) return;
+  const m = MAPS[era.map];
   const g = m.regions[id];
   if (!g) return;
   const [x0, y0, x1, y1] = g.b;
@@ -567,70 +646,229 @@ function zoomToRegion(id) {
   const h = w * (m.h / m.w);
   animateViewBox([(x0 + x1) / 2 - w / 2, (y0 + y1) / 2 - h / 2, w, h]);
 }
+
+// ----- zoom mellom kapitler -----
+// Rammen rundt det største stykket av et område (så Alaska og småøyer ikke drar rammen ut)
+const mainBoxCache = {};
+function mainBox(key, d) {
+  if (mainBoxCache[key]) return mainBoxCache[key];
+  const rings = [];
+  let ring = null, x = 0, y = 0;
+  for (const [, c, args] of d.matchAll(/([MmLlZz])([^MmLlZz]*)/g)) {
+    if (c === 'Z' || c === 'z') { if (ring && ring.length) [x, y] = ring[0]; continue; }
+    const n = (args.match(/-?\d*\.?\d+(?:e-?\d+)?/g) || []).map(Number);
+    for (let i = 0; i + 1 < n.length; i += 2) {
+      const abs = c === 'M' || c === 'L';
+      x = abs ? n[i] : x + n[i]; y = abs ? n[i + 1] : y + n[i + 1];
+      if (i === 0 && (c === 'M' || c === 'm')) { ring = []; rings.push(ring); }
+      ring.push([x, y]);
+    }
+  }
+  let best = null, bestA = -1;
+  for (const p of rings) {
+    let a = 0;
+    for (let i = 0; i < p.length; i++) { const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % p.length]; a += x1 * y2 - x2 * y1; }
+    if (Math.abs(a) > bestA) { bestA = Math.abs(a); best = p; }
+  }
+  const xs = best.map((q) => q[0]), ys = best.map((q) => q[1]);
+  return (mainBoxCache[key] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+}
+// Hvor det forrige kapittelets kart ligger på kart nr. i
+function homeBox(i) {
+  const era = ERAS[i];
+  if (era.space) { const h = SPACE_HOMES[era.map], r = h.size * 0.7; return [h.pos[0] - r, h.pos[1] - r, h.pos[0] + r, h.pos[1] + r]; }
+  return mainBox(era.id, MAPS[era.map].regions[era.home].d);
+}
+// Et utsnitt med kartets egne proporsjoner som rommer boksen b
+function fitBox(b, i, pad = 1.12) {
+  const [w, h] = mapSize(i);
+  const ratio = h / w;
+  let bw = (b[2] - b[0]) * pad, bh = (b[3] - b[1]) * pad;
+  if (bh > bw * ratio) bw = bh / ratio; else bh = bw * ratio;
+  return [(b[0] + b[2]) / 2 - bw / 2, (b[1] + b[3]) / 2 - bh / 2, bw, bh];
+}
+const readViewBox = (svg) => (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+// Glidende zoom: bredden endres jevnt (logaritmisk) og midtpunktet følger med, så målet blir stående i ro
+function tweenViewBox(svg, from, to, ms) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const ratio = to[3] / to[2];
+    const c0 = [from[0] + from[2] / 2, from[1] + from[3] / 2], c1 = [to[0] + to[2] / 2, to[1] + to[3] / 2];
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / ms);
+      const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+      const w = from[2] * Math.pow(to[2] / from[2], e);
+      const f = Math.abs(to[2] - from[2]) < 1e-6 ? e : (w - from[2]) / (to[2] - from[2]);
+      const cx = c0[0] + (c1[0] - c0[0]) * f, cy = c0[1] + (c1[1] - c0[1]) * f, h = w * ratio;
+      svg.setAttribute('viewBox', `${(cx - w / 2).toFixed(2)} ${(cy - h / 2).toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`);
+      if (k < 1) requestAnimationFrame(step); else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+async function goLevel(to) {
+  if (!S || levelBusy) return;
+  to = Math.max(0, Math.min(ERAS.length - 1, to));
+  if (to === mapEra) return;
+  const from = mapEra;
+  const wrap = $('#map-wrap');
+  const oldLayer = wrap && $('.map-layer', wrap);
+  const oldSvg = oldLayer && $('svg', oldLayer);
+  if (!S.flags.mapZoom) { S.flags.mapZoom = 1; persist(); }
+  vbAnim++;
+  sfx.click();
+  if (!oldSvg || reducedMotion() || tab !== 'map' || mapView !== 'map') { mapEra = to; selected = null; viewBox = null; renderMap(); return; }
+  levelBusy = true;
+  const out = to > from;
+  const big = Math.max(from, to);
+  const link = Math.abs(to - from) === 1 ? LEVEL_LINK[ERAS[big].id] || 'scale' : 'scale';
+  try {
+    oldLayer.classList.add('zooming');
+    // zoom inn: kameraet flyr inn i hjemområdet før kartet byttes ut med det mindre kartet
+    if (link === 'nest' && !out) await tweenViewBox(oldSvg, readViewBox(oldSvg), fitBox(homeBox(big), big), 520);
+    const bord = wrap.offsetHeight - wrap.clientHeight;
+    const h0 = wrap.offsetHeight;
+    mapEra = to; selected = null; viewBox = null;
+    oldSvg.removeAttribute('id');
+    const layer = document.createElement('div');
+    layer.className = 'map-layer zooming';
+    layer.innerHTML = mapSVG(to);
+    if (out) oldLayer.before(layer); else oldLayer.after(layer);
+    wrap.classList.add('lvl-anim');
+    wrap.style.height = h0 + 'px';
+    const h1 = layer.offsetHeight + bord;
+    const svg = $('svg', layer);
+    const full = [0, 0, ...mapSize(to)];
+    // zoom ut: det større kartet starter inni hjemområdet (der vi nettopp var) og trekker seg tilbake
+    const start = link === 'nest' && out ? fitBox(homeBox(to), to) : null;
+    if (start) svg.setAttribute('viewBox', start.join(' '));
+    updateMapChrome();
+    const D = link === 'nest' ? (out ? 760 : 320) : 540;
+    const set = (el, tr, op) => { el.style.transform = tr; el.style.opacity = op; };
+    if (link === 'slide') { set(oldLayer, 'translateY(0)', 1); set(layer, `translateY(${out ? h0 : -h1}px)`, 1); }
+    else if (link === 'scale') { set(oldLayer, 'scale(1)', 1); set(layer, out ? 'scale(1.5)' : 'scale(.65)', 0); }
+    else if (!out) set(layer, 'scale(.97)', 0);
+    void wrap.offsetHeight;
+    const ease = `${D}ms cubic-bezier(.45,0,.2,1)`;
+    wrap.style.transition = `height ${ease}`;
+    wrap.style.height = h1 + 'px';
+    oldLayer.style.transition = layer.style.transition = `transform ${ease}, opacity ${ease}`;
+    if (link === 'slide') { set(oldLayer, `translateY(${out ? -h0 : h1}px)`, 1); set(layer, 'translateY(0)', 1); }
+    else if (link === 'scale') { set(oldLayer, out ? 'scale(.65)' : 'scale(1.5)', 0); set(layer, 'scale(1)', 1); }
+    else if (out) { oldLayer.style.transition = 'opacity 260ms ease'; oldLayer.style.opacity = 0; }
+    else set(layer, 'scale(1)', 1);
+    if (start) await tweenViewBox(svg, start, full, D); else await sleep(D + 30);
+    oldLayer.remove();
+    layer.removeAttribute('style');
+    wrap.classList.remove('lvl-anim');
+    wrap.style.height = ''; wrap.style.transition = '';
+    if (!ERAS[to].space) { svg.setAttribute('viewBox', full.join(' ')); viewBox = { map: ERAS[to].map, v: full }; }
+    requestAnimationFrame(() => layer.classList.remove('zooming'));
+    setupMapGestures();
+  } catch (err) {
+    console.warn('zoom', err);
+    renderMap();
+  } finally {
+    levelBusy = false;
+  }
+}
+
 function setupMapGestures() {
   const svg = $('#map-svg');
   if (!svg) return;
+  const space = !!ERAS[mapEra].space;
+  const [mw] = mapSize(mapEra);
+  const minW = mw * 0.22;
   const pts = new Map();
-  let start = null, moved = false;
-  const toUnits = () => { const r = svg.getBoundingClientRect(); const v = viewBox.v; return Math.max(v[2] / r.width, v[3] / r.height); };
+  let start = null, moved = false, fired = false;
+  // skjermpunkt → kartkoordinater for et gitt utsnitt (kartet kan være sentrert med marg på sidene)
+  const mapPt = (v, cx, cy) => {
+    const r = svg.getBoundingClientRect();
+    const k = Math.max(v[2] / r.width, v[3] / r.height);
+    return [(cx - r.left - (r.width - v[2] / k) / 2) * k + v[0], (cy - r.top - (r.height - v[3] / k) / 2) * k + v[1], k];
+  };
+  const onHome = (cx, cy) => {
+    const el = document.elementFromPoint(cx, cy);
+    const reg = el && el.closest && el.closest('[data-id]');
+    return !!reg && svg.contains(reg) && reg.dataset.id === ERAS[mapEra].home;
+  };
+  const jump = (d) => { if (fired) return; fired = true; goLevel(mapEra + d); };
+  const snapshot = () => ({ v: viewBox && !space ? viewBox.v.slice() : null, pts: new Map([...pts].map(([k, p]) => [k, { ...p }])) });
   svg.addEventListener('pointerdown', (e) => {
-    svg.setPointerCapture?.(e.pointerId);
+    if (levelBusy) return;
+    if (e.isPrimary) pts.clear();
+    if (!space) { try { svg.setPointerCapture(e.pointerId); } catch { /* pekeren er allerede borte */ } }
+    if (pts.size === 0) { fired = false; moved = false; }
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    moved = false;
-    start = { v: viewBox.v.slice(), pts: new Map([...pts].map(([k, p]) => [k, { ...p }])), target: e.target };
+    start = snapshot();
   });
   svg.addEventListener('pointermove', (e) => {
-    if (!pts.has(e.pointerId) || !start) return;
+    if (!pts.has(e.pointerId) || !start || fired || levelBusy) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const k = toUnits();
     if (pts.size === 1) {
+      if (space) return;
       const p0 = start.pts.get(e.pointerId);
       if (!p0) return;
       const dx = e.clientX - p0.x, dy = e.clientY - p0.y;
       if (Math.hypot(dx, dy) > 8) moved = true;
-      if (moved && start.v[2] < MAPS[ERAS[S.era].map].w * 0.98) setViewBox([start.v[0] - dx * k, start.v[1] - dy * k, start.v[2], start.v[3]]);
+      const k = mapPt(start.v, 0, 0)[2];
+      if (moved && start.v[2] < mw * 0.98) setViewBox([start.v[0] - dx * k, start.v[1] - dy * k, start.v[2], start.v[3]]);
     } else if (pts.size === 2) {
       moved = true;
       const [a, b] = [...pts.values()];
       const [a0, b0] = [...start.pts.values()];
       if (!a0 || !b0) return;
       const d0 = Math.hypot(a0.x - b0.x, a0.y - b0.y), d1 = Math.hypot(a.x - b.x, a.y - b.y);
-      if (d0 < 10) return;
-      const scale = d0 / d1;
-      const r = svg.getBoundingClientRect();
-      const mx = ((a0.x + b0.x) / 2 - r.left) * k + start.v[0], my = ((a0.y + b0.y) / 2 - r.top) * k + start.v[1];
-      const w = start.v[2] * scale, h = start.v[3] * scale;
-      setViewBox([mx - (mx - start.v[0]) * scale, my - (my - start.v[1]) * scale, w, h]);
+      if (d0 < 10 || d1 < 1) return;
+      const scale = d0 / d1; // over 1 = fingrene nærmer seg hverandre = zoom ut
+      const cx = (a0.x + b0.x) / 2, cy = (a0.y + b0.y) / 2;
+      if (space) { if (scale > 1.35) jump(1); else if (scale < 0.72) jump(-1); return; }
+      const wantW = start.v[2] * scale;
+      // knip forbi hele kartet → neste kapittel; knip helt inn på hjemområdet → forrige kapittel
+      if (wantW > mw * 1.3 && mapEra < ERAS.length - 1) { jump(1); return; }
+      if (wantW < minW * 0.68 && mapEra > 0 && onHome(cx, cy)) { jump(-1); return; }
+      const [mx, my] = mapPt(start.v, cx, cy);
+      setViewBox([mx - (mx - start.v[0]) * scale, my - (my - start.v[1]) * scale, start.v[2] * scale, start.v[3] * scale]);
     }
   });
   const end = (e) => {
     if (!pts.has(e.pointerId)) return;
     pts.delete(e.pointerId);
-    if (!moved && pts.size === 0 && start) {
+    if (!space && !moved && !fired && !levelBusy && pts.size === 0 && start) {
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const reg = el && el.closest && el.closest('[data-id]');
       if (reg && svg.contains(reg)) selectRegion(reg.dataset.id);
     }
     if (pts.size === 0) start = null;
-    else start = { v: viewBox.v.slice(), pts: new Map([...pts].map(([k, p]) => [k, { ...p }])) };
+    else start = snapshot();
   };
   svg.addEventListener('pointerup', end);
   svg.addEventListener('pointercancel', end);
+  if (space) svg.addEventListener('pointerleave', end);
+  let wheelAcc = 0, wheelT = 0;
   svg.addEventListener('wheel', (e) => {
+    if (space && !e.ctrlKey) return; // romkartet: vanlig musehjul ruller siden
     e.preventDefault();
-    const r = svg.getBoundingClientRect();
-    const k = toUnits();
-    const mx = (e.clientX - r.left) * k + viewBox.v[0], my = (e.clientY - r.top) * k + viewBox.v[1];
-    const s = e.deltaY > 0 ? 1.15 : 1 / 1.15;
-    const [x, y, w, h] = viewBox.v;
-    setViewBox([mx - (mx - x) * s, my - (my - y) * s, w * s, h * s]);
+    if (levelBusy) return;
+    const now = performance.now();
+    if (now - wheelT > 400) wheelAcc = 0;
+    wheelT = now;
+    // knip på styreplate (ctrl + hjul) forbi grensen bytter kapittel; vanlig musehjul gjør det ikke
+    const over = (d) => { wheelAcc += e.deltaY; if (Math.abs(wheelAcc) > 120) { wheelAcc = 0; goLevel(mapEra + d); } };
+    if (space) { over(e.deltaY > 0 ? 1 : -1); return; }
+    const v = viewBox.v;
+    const zoomOut = e.deltaY > 0;
+    if (e.ctrlKey && zoomOut && v[2] >= mw * 0.98 && mapEra < ERAS.length - 1) { over(1); return; }
+    if (e.ctrlKey && !zoomOut && v[2] <= minW * 1.02 && mapEra > 0 && onHome(e.clientX, e.clientY)) { over(-1); return; }
+    const [mx, my] = mapPt(v, e.clientX, e.clientY);
+    const s = zoomOut ? 1.15 : 1 / 1.15;
+    setViewBox([mx - (mx - v[0]) * s, my - (my - v[1]) * s, v[2] * s, v[3] * s]);
   }, { passive: false });
-  // space-kart: trykk på noder
-  setViewBox(viewBox.v);
+  if (!space) setViewBox(viewBox.v);
 }
-// Romkart: enkel trykk-håndtering
+// Romkart: trykk på planetene
 document.addEventListener('click', (e) => {
-  const node = e.target.closest && e.target.closest('.space-map .node[data-id]');
+  const node = !levelBusy && e.target.closest && e.target.closest('.space-map .node[data-id]');
   if (node) selectRegion(node.dataset.id);
 });
 
@@ -855,7 +1093,6 @@ function prestigeRewardsHTML(level) {
       <li>${ico('boost')} ${t('pr_mult', { p: Math.round(E.PRESTIGE_BONUS * level * 100) })}</li>
       <li>${ico('gem')} ${t('pr_gems', { n: r.gems })}</li>
       <li>${ico('crate')} ${t('pr_crate', { c: esc(L(C.CRATE_BY_ID[r.crate].name)) })}</li>
-      <li>${ico('tap')} ${t('pr_tap')}</li>
       <li>${ico('star')} ${t('pr_star')}</li>
       ${skin ? `<li class="pr-skin"><span class="pr-skin-art">${skinPreview(skin)}</span><span>${t('pr_skin', { s: esc(L(skin.name)) })}</span></li>` : ''}
     </ul>
@@ -964,7 +1201,8 @@ function gemAdsLeft() {
   return Math.max(0, AD_GEMS_PER_DAY - (S.ads.gemCount || 0));
 }
 const productPrice = (id) => esc(L(M.PRODUCT_BY_ID[id].price));
-const adBtn = (action, disabled) => `<button type="button" class="btn btn-ad" data-action="${action}" ${disabled ? 'disabled' : ''}>${ico(S.adFree ? 'gift' : 'ad')} ${S.adFree ? t('claim') : t('watch')}</button>`;
+// always = belønningen krever reklame også for reklamefri-kjøpere (gratis kasser og edelstener)
+const adBtn = (action, disabled, always = false) => { const free = S.adFree && !always; return `<button type="button" class="btn btn-ad" data-action="${action}" ${disabled ? 'disabled' : ''}>${ico(free ? 'gift' : 'ad')} ${free ? t('claim') : t('watch')}</button>`; };
 
 function renderShop() {
   $('#scr-shop').innerHTML = `<div class="pad stack">
@@ -982,10 +1220,10 @@ function storeHTML() {
   const freeLeft = (S.ads.freeCrateAt || 0) - now;
   const gemLeft = gemAdsLeft();
   return `
-  ${M.adsEnabled() ? `<div class="section-title">${S.adFree ? t('free_rewards_adfree') : t('free_rewards')}</div>
+  ${M.adsEnabled() ? `<div class="section-title">${t('free_rewards')}</div>
   <div class="offer-list">
-    <div class="offer"><div class="offer-art">${A.crateArt('wood')}</div><div class="offer-body"><b>${t('free_crate')}</b><span>${freeLeft > 0 ? t('ready_in', { t: duration(freeLeft / 1000) }) : S.adFree ? t('free_crate_desc_adfree') : t('free_crate_desc')}</span></div>${adBtn('ad-crate', freeLeft > 0)}</div>
-    <div class="offer"><div class="offer-art gem-art">${ico('gem')}</div><div class="offer-body"><b>+${AD_GEMS} ${t('gems')}</b><span>${t('left_today', { n: gemLeft })}</span></div>${adBtn('ad-gems', gemLeft <= 0)}</div>
+    <div class="offer"><div class="offer-art">${A.crateArt('wood')}</div><div class="offer-body"><b>${t('free_crate')}</b><span>${freeLeft > 0 ? t('ready_in', { t: duration(freeLeft / 1000) }) : t('free_crate_desc')}</span></div>${adBtn('ad-crate', freeLeft > 0, true)}</div>
+    <div class="offer"><div class="offer-art gem-art">${ico('gem')}</div><div class="offer-body"><b>+${AD_GEMS} ${t('gems')}</b><span>${t('left_today', { n: gemLeft })}</span></div>${adBtn('ad-gems', gemLeft <= 0, true)}</div>
   </div>` : ''}
   <div class="section-title">${t('loot_crates')}</div>
   <div class="crate-list">${C.CRATES.map((c) => `<div class="crate-card crate-${c.id}">
@@ -1194,9 +1432,9 @@ async function buyProduct(id) {
 let adSoundWas = null;
 function onAdStart() { adSoundWas = S ? S.settings.sound : null; setSound(false); M.gameplayStop(); }
 function onAdEnd() { if (adSoundWas !== null) setSound(adSoundWas); adSoundWas = null; M.gameplayStart(); }
-async function watchAd(placement, reward) {
+async function watchAd(placement, reward, { always = false } = {}) {
   unlockAudio();
-  if (S.adFree) { reward(); persist(); return true; }
+  if (S.adFree && !always) { reward(); persist(); return true; }
   const res = await M.rewardedAd(placement);
   if (res === 'ok') {
     S.ads.watched = (S.ads.watched || 0) + 1;
@@ -1666,7 +1904,16 @@ function onAction(e) {
     }
     case 'attack': startBattle(btn.dataset.id); break;
     case 'select': selectRegion(btn.dataset.id); break;
-    case 'zoomout': { const m = MAPS[ERAS[S.era].map]; animateViewBox([0, 0, m.w, m.h]); break; }
+    case 'lvl-in': goLevel(mapEra - 1); break;
+    case 'lvl-out': {
+      // først helt ut på dette kartet, så videre til neste kapittel
+      const [mw, mh] = mapSize(mapEra);
+      if (!levelBusy && !ERAS[mapEra].space && viewBox && viewBox.v[2] < mw * 0.98) { sfx.click(); animateViewBox([0, 0, mw, mh]); break; }
+      goLevel(mapEra + 1);
+      break;
+    }
+    case 'lvl': goLevel(Number(btn.dataset.i)); break;
+    case 'lvl-now': goLevel(S.era); break;
     case 'battle-done': battleDone(btn); break;
     case 'era-next': eraNext(btn); break;
     case 'era-done': if (E.eraComplete(S) && modalCount === 0) showEraComplete(); break;
@@ -1759,11 +2006,11 @@ function onAction(e) {
     case 'restore': toast(t('restore_done')); break;
     case 'ad-crate':
       if (Date.now() < (S.ads.freeCrateAt || 0)) break;
-      watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; C.addCrate(S, 'wood'); persist(); updateBadges(); if (tab === 'shop') renderShop(); gotCrateModal('wood'); });
+      watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; C.addCrate(S, 'wood'); persist(); updateBadges(); if (tab === 'shop') renderShop(); gotCrateModal('wood'); }, { always: true });
       break;
     case 'ad-gems':
       if (gemAdsLeft() <= 0) break;
-      watchAd('gems', () => { gemAdsLeft(); S.ads.gemCount++; S.gems += AD_GEMS; toast(t('gems_toast', { n: AD_GEMS }), 'boost'); sfx.coin(); updateHUD(); renderShop(); });
+      watchAd('gems', () => { gemAdsLeft(); S.ads.gemCount++; S.gems += AD_GEMS; toast(t('gems_toast', { n: AD_GEMS }), 'boost'); sfx.coin(); updateHUD(); renderShop(); }, { always: true });
       break;
     case 'ad-boost':
       watchAd('boost', () => { S.adBoostUntil = Date.now() + E.AD_BOOST_SECS * 1000; toast(t('boost_toast'), 'boost'); sfx.milestone(); lastSig.boost = null; updateHUD(); });
@@ -1791,7 +2038,7 @@ function onAction(e) {
     }
     case 'mapview': mapView = btn.dataset.view; sfx.click(); renderMap(); if (mapView === 'tree') scrollTreeToHere(); else $('#scr-map').scrollTop = 0; break;
     case 'open-tree': mapView = 'tree'; setTab('map'); scrollTreeToHere(); break;
-    case 'tree-go': mapView = 'map'; selected = btn.dataset.id; renderMap(); $('#scr-map').scrollTop = 0; zoomToRegion(selected); break;
+    case 'tree-go': mapView = 'map'; mapEra = S.era; selected = btn.dataset.id; renderMap(); $('#scr-map').scrollTop = 0; zoomToRegion(selected); break;
     case 'install':
       if (installEvt) { installEvt.prompt(); installEvt.userChoice?.finally(() => { installEvt = null; }); closeModal(btn); }
       break;

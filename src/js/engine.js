@@ -238,7 +238,7 @@ export function nextTarget(s) {
 export const PRESTIGE_GEMS = 300;
 export const PRESTIGE_BONUS = 0.5; // +50 % inntekt og hærstyrke per stjerne (se prestigeMult)
 export function prestigeRewards(level) {
-  return { level, mult: 1 + PRESTIGE_BONUS * level, gems: PRESTIGE_GEMS, crate: 'cosmic', skin: PRESTIGE_SKINS[level] || null, keepTap: true };
+  return { level, mult: 1 + PRESTIGE_BONUS * level, gems: PRESTIGE_GEMS, crate: 'cosmic', skin: PRESTIGE_SKINS[level] || null };
 }
 export const canPrestige = (s) => !!s.finished;
 export function prestigeReset(s) {
@@ -251,7 +251,6 @@ export function prestigeReset(s) {
   n.social = s.social; n.flags = s.flags;
   n.stats.lifetimeBase = (s.stats.lifetimeBase || 0) + (s.totalEarned || 0);
   const r = prestigeRewards(n.prestige);
-  n.tapLevel = s.tapLevel || 0; // trykk-kraften beholdes
   n.gems = (n.gems || 0) + r.gems;
   addCrate(n, r.crate);
   if (r.skin) n.skins.owned[r.skin] = Date.now();
