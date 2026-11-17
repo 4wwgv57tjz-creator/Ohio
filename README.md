@@ -26,13 +26,17 @@ Tips:
 - **Trykk-kraft** kan oppgraderes, så hvert trykk gir mer.
 - **General Buckeye** (Ohio-nøtta med generalhatt) viser deg hva du skal gjøre i starten.
 - **Reisen** (Kart → Reisen, eller «Se hele reisen» på Base) viser hele spillet som et tre: alle 7 kapitler og
-  60 områder, hvor du er nå, og hvor lang tid som er igjen (ca. 2 timer totalt for en aktiv spiller).
+  60 områder, og hvor du er nå.
+- **Topp** (egen fane) er leaderboardet: konkurrer mot venner og alle andre, legg til venner med vennekode og logg
+  inn med Facebook eller Apple.
 
 ## Butikk, skins, lootkasser og reklame
 
 - **Skins** i fire kategorier: hær (farger på alle enhetene), flagg (spillerflagget og fargen på erobret land på
   kartet), hovedkvarter og hatter til General Buckeye. 39 skins fordelt på fem sjeldenhetsgrader: Vanlig,
   Sjelden, Episk, Legendarisk og Mytisk. Skins er bare utseende – de gir ingen fordel i kamp.
+- **Mine ting** (Butikk → Mine ting) viser kassene og skinsene du eier. Kjøpte kasser havner her, så du kan åpne dem
+  med en gang eller spare dem til senere. Du får også en gullkasse hver gang du fullfører et kapittel.
 - **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
   Sjansene vises i spillet («Se sjansene»). Legendarisk eller bedre er garantert minst hvert 20. skin, nye skins
   prioriteres, og duplikater blir til edelstener.
@@ -43,7 +47,7 @@ Tips:
 - **Reklame mellom kampene**: høyst etter annenhver kamp og med minst 3 minutter mellom. Aldri i opplæringen eller de
   første 4 minuttene.
 - **Reklamefri**: fjerner reklamen mellom kampene, og alle «se reklame»-belønninger gis uten reklame. Finnes også i
-  en startpakke sammen med edelstener og et episk skin.
+  en startpakke sammen med 500 edelstener og en kosmisk kasse.
 
 ## Tjen penger på spillet
 
@@ -113,6 +117,39 @@ automatisk på enheten.
 
 Språk: norsk (standard) og engelsk, valgbart i innstillingene.
 
+## Leaderboard, venner og innlogging
+
+Topp-fanen har to lister: **Venner** og **Alle**. Poengene er hvor mange områder du har erobret totalt (også i nye
+runder). Hver spiller har en vennekode (f.eks. `OHIO-7K3QPZ`) som kan deles; skriv inn koden til en venn for å legge
+dem til. Alle kan spille som gjest, og logge inn med **Facebook** eller **Apple** for å beholde plassen og vennene på
+alle enheter (en gjestekonto kobles til innloggingen, så ingenting går tapt). Listen viser bare navnet på bygda –
+aldri navnet fra Facebook eller Apple. Innstillinger har «Logg ut» og «Slett nettprofil» (Apple krever at brukere kan
+slette kontoen sin).
+
+Uten oppsett kjører dette i **demo-modus**: listen viser eksempelspillere, og venner lagres bare på enheten. Ekte
+innlogging og felles liste bruker [Firebase](https://firebase.google.com/) (gratis for små spill):
+
+1. Lag et prosjekt på [console.firebase.google.com](https://console.firebase.google.com/) og legg til en *Web app*.
+2. Kopier `apiKey`, `authDomain`, `projectId` og `appId` inn i `online.config.json`, og sett `"provider": "firebase"`.
+3. **Authentication → Sign-in method**: slå på *Anonymous*, *Facebook* og *Apple*.
+   - Facebook: lag en app på [developers.facebook.com](https://developers.facebook.com/), legg inn App ID og App Secret i
+     Firebase, og lim inn lenken Firebase viser under «Valid OAuth Redirect URIs» i Facebook-appen.
+   - Apple: krever Apple Developer Program (99 dollar i året). Lag en *Services ID* med «Sign in with Apple», registrer
+     domenet og lenken Firebase viser, og legg inn Team ID, Key ID og nøkkelen i Firebase.
+4. **Authentication → Settings → Authorized domains**: legg til domenet der spillet ligger (f.eks. `brukernavn.github.io`).
+5. **Firestore Database**: opprett databasen og legg inn reglene fra `firebase/firestore.rules` (kopier dem inn i
+   konsollen, eller kjør `npx firebase-tools deploy --only firestore:rules --project <prosjekt-id>` fra `firebase/`).
+6. Kjør `npm run build` og publiser `docs/`.
+
+Reglene sørger for at hver spiller bare kan skrive sin egen rad, med begrensninger på poeng og felt. Poengene sendes fra
+spillerens enhet, så noen som virkelig vil jukse kan fortsatt prøve; helt juksesikre lister krever at serveren regner ut
+poengene. Facebook krever at brukere er minst 13 år.
+
+**Test mot Firebase-emulatoren** (uten ekte prosjekt): kjør `SOCIAL_EMULATOR=1 npm run build`, start emulatoren med
+`npx firebase-tools emulators:start --only auth,firestore --project demo-ohio` fra mappa `firebase/`, og kjør
+`node tools/test-online.cjs`. Testen spiller med to spillere, legger dem til som venner, logger inn med Facebook og
+Apple (falske testkontoer), bytter enhet, logger ut, og sjekker at reglene stopper juks.
+
 ## Spill på mobilen
 
 Den ferdige appen ligger i mappa [`docs/`](docs/). Den enkleste måten å få en lenke du kan åpne på telefonen,
@@ -146,6 +183,7 @@ src/
   js/mapdata.js   forenklede kart (generert fra kartdata)
   js/cosmetics.js skins, sjeldenhet og lootkasser (sjanser og garanti)
   js/monetize.js  reklame (demo, AdSense, CrazyGames, Poki) og kjøp
+  js/social*.js   leaderboard, venner og innlogging (demo og Firebase)
   js/i18n.js      tekster og tallformatering
   js/audio.js     lydeffekter med Web Audio
   css/style.css   tegneserietemaet
@@ -158,6 +196,8 @@ assets/           fonter (med lisenser) og app-ikoner
 docs/             ferdig bygget app (dette er det som publiseres)
 builds/           ferdige versjoner for CrazyGames og Poki
 monetize.config.json  valg av reklame og kjøp
+online.config.json    valg av leaderboard/innlogging (demo eller Firebase)
+firebase/         sikkerhetsregler og emulatoroppsett for Firebase
 ```
 
 Kommandoer (Node 18+):
@@ -167,7 +207,7 @@ npm install          # henter byggeverktøy og kartdata
 npm run build        # bygger docs/ (PWA), builds/crazygames, builds/poki og dist/artifact.html
 npm run maps         # lager src/js/mapdata.js på nytt
 npm run sim          # balanserer spillet på nytt og skriver src/js/balance.js
-CHECK=1 npm run sim  # beholder tallene og oppdaterer bare tidsestimatene (brukes i «Reisen»)
+CHECK=1 npm run sim  # beholder tallene og viser hvor lang tid hvert område tar
 ```
 
 Balansen er laget med en simulator: den spiller spillet med en fornuftig strategi (1,5 trykk per sekund) og

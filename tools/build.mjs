@@ -2,7 +2,8 @@
 //   docs/                 – installerbar mobil-webapp (PWA) for GitHub Pages. Reklame/kjøp styres av monetize.config.json
 //   dist/artifact.html    – samme spill som ett HTML-fragment (for claude.ai Artifact, alltid demo-reklame)
 //   builds/crazygames/, builds/poki/ – egne versjoner for spillportaler (med portalens reklame-SDK, uten kjøp)
-// Kjør: npm run build
+// Leaderboard/innlogging styres av online.config.json («demo» eller «firebase»).
+// Kjør: npm run build        (SOCIAL_EMULATOR=1 lager også dist/emulator/ for testing mot Firebase-emulatoren)
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as esbuild from 'esbuild';
@@ -16,7 +17,13 @@ const DESC = 'Et fargerikt tycoon-krigsspill: start som en liten bygd i Ohio og 
 
 // 1) JavaScript – bygges én gang per reklame-/kjøpsoppsett
 const userCfg = existsSync(p('monetize.config.json')) ? JSON.parse(read('monetize.config.json')) : {};
-const bundle = async (cfg) => (await esbuild.build({
+const onlineCfg = existsSync(p('online.config.json')) ? JSON.parse(read('online.config.json')) : { provider: 'demo' };
+if (onlineCfg.provider === 'firebase' && !(onlineCfg.firebase && onlineCfg.firebase.apiKey && onlineCfg.firebase.projectId)) {
+  console.warn('online.config.json: Firebase mangler apiKey/projectId – bruker demo-leaderboard.');
+  onlineCfg.provider = 'demo';
+}
+const DEMO_SOCIAL = { provider: 'demo', loginProviders: onlineCfg.loginProviders || ['facebook', 'apple'] };
+const bundle = async (cfg, social = onlineCfg) => (await esbuild.build({
   entryPoints: [p('src/js/main.js').pathname],
   bundle: true,
   minify: true,
@@ -24,11 +31,11 @@ const bundle = async (cfg) => (await esbuild.build({
   target: ['es2020', 'safari14'],
   write: false,
   legalComments: 'none',
-  define: { __MONETIZE__: JSON.stringify(cfg) },
+  define: { __MONETIZE__: JSON.stringify(cfg), __SOCIAL__: JSON.stringify(social), __SOCIAL_PROVIDER__: JSON.stringify(social.provider === 'firebase' ? 'firebase' : 'demo') },
 })).outputFiles[0].text;
 const js = await bundle(userCfg);
 const demoCfg = { ...userCfg, ads: { ...(userCfg.ads || {}), provider: 'demo' }, payments: { provider: 'demo' } };
-const jsDemo = await bundle(demoCfg);
+const jsDemo = await bundle(demoCfg, DEMO_SOCIAL);
 
 // 2) CSS + innebygde fonter
 const font = (file) => readFileSync(p('assets/fonts/' + file)).toString('base64');
@@ -151,3 +158,12 @@ const kb = (s) => (Buffer.byteLength(s) / 1024).toFixed(0) + ' KB';
 console.log(`JS ${kb(js)} · CSS ${kb(css)} · fonter ${kb(fontCss)}`);
 console.log(`docs/index.html ${kb(pwa)} · dist/artifact.html ${kb(fragment)} · versjon ${hash}`);
 console.log(`Reklame i docs/: ${(userCfg.ads && userCfg.ads.provider) || 'demo'} · kjøp: ${(userCfg.payments && userCfg.payments.provider) || 'demo'} · portalversjoner i builds/crazygames og builds/poki`);
+
+// 6) Testversjon mot Firebase-emulatoren (kun ved SOCIAL_EMULATOR=1)
+if (process.env.SOCIAL_EMULATOR) {
+  const emu = { provider: 'firebase', loginProviders: ['facebook', 'apple'], firebase: { apiKey: 'demo-key', authDomain: 'localhost', projectId: 'demo-ohio', appId: 'demo-app' }, emulator: { auth: 'http://127.0.0.1:9099', host: '127.0.0.1', firestorePort: 8080 } };
+  const code = await bundle(demoCfg, emu);
+  mkdirSync(p('dist/emulator/'), { recursive: true });
+  writeFileSync(p('dist/emulator/index.html'), `<!doctype html><html lang="nb"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${TITLE} (emulator)</title><style>${fontCss}${css}</style></head><body>${loading}<script>${safe(code)}</script></body></html>`);
+  console.log('Skrev dist/emulator/index.html (Firebase-emulator)');
+}

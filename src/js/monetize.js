@@ -29,7 +29,7 @@ export const PRODUCTS = [
   { id: 'gems_l', gems: 1400, price: { nb: '99 kr', en: '$9.99' } },
   { id: 'gems_xl', gems: 3600, price: { nb: '199 kr', en: '$19.99' }, tag: 'best' },
   { id: 'adfree', adFree: true, gems: 200, price: { nb: '39 kr', en: '$3.99' } },
-  { id: 'starter', adFree: true, gems: 500, skinRarity: 'epic', price: { nb: '59 kr', en: '$5.99' }, once: true },
+  { id: 'starter', adFree: true, gems: 500, crate: 'cosmic', price: { nb: '59 kr', en: '$5.99' }, once: true },
 ];
 export const PRODUCT_BY_ID = Object.fromEntries(PRODUCTS.map((p) => [p.id, p]));
 

@@ -111,13 +111,31 @@ function rollRarity(odds, rnd) {
   return 'common';
 }
 
-// Åpner en kasse. Trekker edelstener (med mindre den er gratis) og returnerer det spilleren fikk.
+// Kasser spilleren eier, men ikke har åpnet ennå
+export const EMPTY_INV = { wood: 0, gold: 0, cosmic: 0 };
+export const crateCount = (s, id) => (s.crates && s.crates.inv && s.crates.inv[id]) || 0;
+export const cratesOwned = (s) => CRATES.reduce((a, c) => a + crateCount(s, c.id), 0);
+export function addCrate(s, id, n = 1) {
+  s.crates = s.crates || { opened: 0, pity: 0 };
+  s.crates.inv = { ...EMPTY_INV, ...(s.crates.inv || {}) };
+  s.crates.inv[id] = (s.crates.inv[id] || 0) + n;
+}
+// Kjøper en kasse for edelstener og legger den i «Mine ting»
+export function buyCrate(s, crateId) {
+  const c = CRATE_BY_ID[crateId];
+  if (!c || (s.gems || 0) < c.price) return false;
+  s.gems -= c.price;
+  addCrate(s, crateId);
+  return true;
+}
+
+// Åpner en kasse fra «Mine ting» (eller gratis) og returnerer det spilleren fikk.
 export function openCrate(s, crateId, { free = false, rnd = Math.random } = {}) {
   const c = CRATE_BY_ID[crateId];
   if (!c) return null;
   if (!free) {
-    if ((s.gems || 0) < c.price) return null;
-    s.gems -= c.price;
+    if (crateCount(s, crateId) <= 0) return null;
+    s.crates.inv[crateId]--;
   }
   s.crates = s.crates || { opened: 0, pity: 0 };
   const rolls = [];

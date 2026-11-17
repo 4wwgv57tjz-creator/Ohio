@@ -1,6 +1,6 @@
 // Spillmotor – ren logikk uten DOM, slik at den kan testes og simuleres i Node.
 import { BUILDINGS, UNITS, REGIONS, ERAS, REGION_BY_ID, BUILDING_BY_ID, UNIT_BY_ID, regionsOfEra } from './data.js';
-import { newCosmetics, restoreCosmetics } from './cosmetics.js';
+import { newCosmetics, restoreCosmetics, EMPTY_INV } from './cosmetics.js';
 
 export const SAVE_VERSION = 1;
 export const B_GROWTH = 1.15; // prisøkning per bygning
@@ -42,7 +42,9 @@ export function newState(name = '') {
     finished: false,
     gems: START_GEMS,
     skins: newCosmetics(),
-    crates: { opened: 0, pity: 0 },
+    crates: { opened: 0, pity: 0, inv: { ...EMPTY_INV } },
+    social: { code: '', friends: [] },
+    flags: {},
     adFree: false,
     adBoostUntil: 0,
     ads: { lastInterstitial: 0, battlesSince: 0, freeCrateAt: 0, gemDay: '', gemCount: 0, watched: 0 },
@@ -60,6 +62,10 @@ export function restore(data) {
   for (const k of ['buildings', 'units', 'conquered', 'damage']) s[k] = { ...(data[k] || {}) };
   s.skins = restoreCosmetics(data.skins);
   s.crates = { ...base.crates, ...(data.crates || {}) };
+  s.crates.inv = { ...EMPTY_INV, ...((data.crates && data.crates.inv) || {}) };
+  s.social = { ...base.social, ...(data.social || {}) };
+  s.social.friends = Array.isArray(s.social.friends) ? s.social.friends.slice(0, 200) : [];
+  s.flags = { ...(data.flags || {}) };
   s.ads = { ...base.ads, ...(data.ads || {}) };
   s.purchases = Array.isArray(data.purchases) ? data.purchases.slice(-50) : [];
   s.adFree = !!data.adFree;
@@ -235,6 +241,8 @@ export function prestigeReset(s) {
   n.settings = { ...s.settings };
   n.tut = 99;
   n.gems = s.gems; n.skins = s.skins; n.crates = s.crates; n.adFree = s.adFree; n.ads = s.ads; n.purchases = s.purchases;
+  n.social = s.social; n.flags = s.flags;
+  n.stats.lifetimeBase = (s.stats.lifetimeBase || 0) + (s.totalEarned || 0);
   return n;
 }
 
@@ -244,4 +252,13 @@ export function restoreUnits(s, lost) {
   for (const [id, k] of Object.entries(lost || {})) { s.units[id] = (s.units[id] || 0) + k; n += k; }
   s.stats.unitsLost = Math.max(0, s.stats.unitsLost - n);
   return n;
+}
+
+// Til leaderboardet: antall erobrede områder totalt (også fra tidligere runder) og alt du har tjent
+export function lifetimeEarned(s) { return (s.stats.lifetimeBase || 0) + (s.totalEarned || 0); }
+export function scoreEntry(s) {
+  const score = Math.max(s.stats.won || 0, (s.social && s.social.best) || 0);
+  if (s.social) s.social.best = score;
+  const lifetime = lifetimeEarned(s);
+  return { name: String(s.name || '').slice(0, 22), score, lifetime, era: s.era, prestige: s.prestige || 0, rank: score + Math.min(0.999, Math.log10(lifetime + 1) / 100) };
 }

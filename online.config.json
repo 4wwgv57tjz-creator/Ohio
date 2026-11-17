@@ -1,0 +1,10 @@
+{
+  "provider": "demo",
+  "firebase": {
+    "apiKey": "",
+    "authDomain": "",
+    "projectId": "",
+    "appId": ""
+  },
+  "loginProviders": ["facebook", "apple"]
+}

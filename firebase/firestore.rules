@@ -1,0 +1,29 @@
+rules_version = '2';
+// Regler for leaderboard og venner. Alle kan lese listen; hver spiller kan bare skrive sin egen rad.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function validPlayer(d) {
+      return d.keys().hasOnly(['name', 'score', 'lifetime', 'era', 'prestige', 'rank', 'code', 'provider', 'friends', 'updatedAt'])
+        && d.name is string && d.name.size() <= 24
+        && d.score is number && d.score >= 0 && d.score < 100000
+        && d.lifetime is number && d.lifetime >= 0
+        && d.era is number && d.era >= 0 && d.era <= 6
+        && d.prestige is number && d.prestige >= 0 && d.prestige < 1000
+        && d.rank is number && d.rank >= 0
+        && (!('friends' in d) || (d.friends is list && d.friends.size() <= 200))
+        && (!('provider' in d) || d.provider in ['guest', 'facebook', 'apple']);
+    }
+    match /players/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null && request.auth.uid == uid && validPlayer(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+    match /codes/{code} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid && code.matches('^[A-Z0-9]{6}$');
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}

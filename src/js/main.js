@@ -3,6 +3,8 @@ import * as E from './engine.js';
 import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, regionsOfEra, SPACE_HOMES } from './data.js';
 import * as C from './cosmetics.js';
 import * as M from './monetize.js';
+import { initSocial, social, onSocialChange, LOGIN_PROVIDERS } from './social.js';
+import { formatCode } from './social-common.js';
 import { MAPS } from './mapdata.js';
 import * as A from './art.js';
 import { t, L, fmt, money, duration, setLang, getLang } from './i18n.js';
@@ -23,6 +25,9 @@ let shopView = 'store';
 let skinCat = 'army';
 let mapView = 'map';
 let lastBattle = null;
+let topView = 'friends';
+let showAllSkins = false;
+let boardCache = { kind: '', rows: null, at: 0 };
 const AD_GEMS = 30;
 const AD_GEMS_PER_DAY = 8;
 const FREE_CRATE_COOLDOWN = 30 * 60 * 1000;
@@ -69,7 +74,7 @@ function enemyArtFor(r, i = 0) {
 
 // ---------------- skall og tema ----------------
 function buildShell() {
-  const tabs = [['base', 'base'], ['build', 'build'], ['army', 'army'], ['map', 'map'], ['shop', 'shop']];
+  const tabs = [['base', 'base'], ['build', 'build'], ['army', 'army'], ['map', 'map'], ['shop', 'shop'], ['top', 'trophy']];
   $('#app').innerHTML = `
   <header class="hud">
     <div class="hud-card">
@@ -148,6 +153,7 @@ function renderTab() {
   else if (tab === 'build') renderList('b');
   else if (tab === 'army') renderList('u');
   else if (tab === 'shop') renderShop();
+  else if (tab === 'top') renderTop();
   else renderMap();
   updateBadges();
 }
@@ -169,7 +175,7 @@ function updateBadges() {
   $('#tab-build .badge').hidden = !(S.era > 0 && (S.seenBuild ?? 0) < S.era);
   $('#tab-army .badge').hidden = !(S.era > 0 && (S.seenArmy ?? 0) < S.era);
   const freeCrate = Date.now() >= (S.ads.freeCrateAt || 0) && M.adsEnabled();
-  $('#tab-shop .badge').hidden = !(S.tut >= 5 && (freeCrate || (S.gems || 0) >= C.CRATES[0].price));
+  $('#tab-shop .badge').hidden = !(S.tut >= 5 && (freeCrate || C.cratesOwned(S) > 0 || (S.gems || 0) >= C.CRATES[0].price));
 }
 
 // ---------------- BASE ----------------
@@ -722,6 +728,7 @@ function showBattleResult(ov, r, res) {
 }
 
 function battleDone(btn) {
+  social()?.submit(true).catch?.(() => {});
   const ov = btn.closest('.battle');
   const eraDone = ov && ov.dataset.era === '1';
   ov?.remove();
@@ -812,10 +819,11 @@ function showEraComplete() {
   sfx.fanfare();
   M.happytime();
   if (!next) { S.finished = true; persist(); showFinal(); return; }
+  if (!S.flags['eraCrate' + S.era]) { S.flags['eraCrate' + S.era] = true; C.addCrate(S, 'gold'); persist(); }
   const unlocks = [...BUILDINGS, ...UNITS].filter((it) => it.era === S.era + 1);
   const m = openModal(`<div class="modal-mascot">${A.mascot()}</div>
     <h2 class="big-title">${esc(L(cur.won))}</h2>
-    <p class="result-reward gems center-row">${ico('gem')} ${t('gems_won', { n: E.gemsForEra(S.era) })}</p>
+    <p class="result-reward gems center-row">${ico('gem')} ${t('gems_won', { n: E.gemsForEra(S.era) })} · ${ico('crate')} 1 × ${esc(L(C.CRATE_BY_ID.gold.name))}</p>
     <p class="speech">${esc(L(next.intro))}</p>
     <div class="unlock-title">${t('era_unlocked')}</div>
     <div class="unlock-grid">${unlocks.map((it) => `<div class="unlock"><div class="unlock-art">${itemArt(it)}</div><span>${esc(L(it.name))}</span></div>`).join('')}</div>
@@ -885,6 +893,7 @@ function showSettings() {
     <label class="field-label" for="rename">${t('village_name')}</label>
     <div class="rename-row"><input id="rename" class="text-input" maxlength="22" value="${esc(S.name)}"><button type="button" class="btn btn-soft" data-action="rename">${t('save_name')}</button></div>
     ${canInstall ? `<div class="install-box"><b>${ico('download')} ${t('install')}</b><p>${installEvt ? '' : ios ? t('install_ios') : t('install_other')}</p>${installEvt ? `<button type="button" class="btn btn-gold" data-action="install">${t('install_btn')}</button>` : ''}</div>` : ''}
+    ${socialSettingsHTML()}
     <div class="stats-box"><b>${ico('shop')} ${t('store_section')}</b>
       <p class="small">${S.adFree ? '✓ ' + t('adfree_active') : M.isDemoAds() ? t('ads_demo_mode') : t('ads_live_mode', { p: M.CONFIG.ads.provider })}</p>
       ${M.paymentsEnabled() ? `<button type="button" class="link-btn" data-action="restore">${t('restore_purchases')}</button>` : ''}
@@ -918,9 +927,9 @@ function renderShop() {
     <div class="screen-head"><div><div class="eyebrow">${t('shop_title')}</div><div class="big-num">${ico('gem')}${fmt(S.gems || 0)}</div></div>
       <div class="mode-switch" role="group">
         <button type="button" class="${shopView === 'store' ? 'on' : ''}" data-action="shopview" data-view="store">${t('shop_store')}</button>
-        <button type="button" class="${shopView === 'skins' ? 'on' : ''}" data-action="shopview" data-view="skins">${t('shop_skins')}</button>
+        <button type="button" class="${shopView === 'mine' ? 'on' : ''}" data-action="shopview" data-view="mine">${t('shop_mine')}${C.cratesOwned(S) ? ` <span class="count-dot">${C.cratesOwned(S)}</span>` : ''}</button>
       </div></div>
-    ${shopView === 'store' ? storeHTML() : skinsHTML()}
+    ${shopView === 'store' ? storeHTML() : mineHTML()}
   </div>`;
 }
 
@@ -940,8 +949,9 @@ function storeHTML() {
     <div class="crate-card-body"><b>${esc(L(c.name))}</b>
       <span>${c.items === 1 ? t('crate_items_1') : t('crate_items_n', { n: c.items })}${c.guarantee ? ' · ' + t('crate_guarantee', { r: esc(L(C.RARITY[c.guarantee].name)) }) : ''}</span>
       <button type="button" class="link-btn" data-action="odds" data-id="${c.id}">${ico('info')} ${t('see_odds')}</button></div>
-    <button type="button" class="buy-btn gem-btn ${S.gems >= c.price ? '' : 'cant'}" data-action="crate" data-id="${c.id}"><span class="lbl">${t('open')}</span><span class="price">${ico('gem')}${c.price}</span></button>
+    <button type="button" class="buy-btn gem-btn ${S.gems >= c.price ? '' : 'cant'}" data-action="crate" data-id="${c.id}"><span class="lbl">${t('buy')}</span><span class="price">${ico('gem')}${c.price}</span></button>
   </div>`).join('')}</div>
+  ${C.cratesOwned(S) ? `<button type="button" class="btn btn-soft" data-action="shopview" data-view="mine">${ico('crate')} ${t('you_have_crates', { n: C.cratesOwned(S) })}</button>` : ''}
   <p class="pity-note">${ico('star')} ${t('pity', { n: Math.max(1, C.PITY - (S.crates.pity || 0)) })}</p>
   ${E.baseIncome(S) > 0 ? `<div class="section-title">${t('time_skips')}</div>
   <div class="offer-list">${TIME_SKIPS.map((k) => `<div class="offer"><div class="offer-art ffwd-art">${ico('ffwd')}</div>
@@ -961,7 +971,7 @@ function paidHTML() {
   </div>`}
   ${S.purchases.includes('starter') ? '' : `<div class="starter-card"><span class="tag">${t('one_time')}</span>
     <div class="starter-art">${A.crateArt('cosmic')}</div>
-    <div class="starter-body"><b>${t('starter_name')}</b><span>${t('starter_desc')}</span></div>
+    <div class="starter-body"><b>${t('starter_name')}</b><span>${t('starter_desc2')}</span></div>
     <button type="button" class="btn btn-gold" data-action="iap" data-id="starter">${productPrice('starter')}</button></div>`}
   <div class="section-title">${t('buy_gems')}</div>
   <div class="gem-grid">${packs.map((p) => `<button type="button" class="gem-pack" data-action="iap" data-id="${p.id}">
@@ -969,12 +979,21 @@ function paidHTML() {
   <p class="demo-note">${ico('info')} ${t('demo_store_note')}</p>`;
 }
 
-function skinsHTML() {
+function mineHTML() {
   const total = C.SKINS.length, own = C.ownedCount(S);
-  const list = C.SKINS.filter((k) => k.cat === skinCat).sort((a, b) => C.RARITY[a.rarity].rank - C.RARITY[b.rarity].rank);
+  const list = C.SKINS.filter((k) => k.cat === skinCat && (showAllSkins || S.skins.owned[k.id])).sort((a, b) => C.RARITY[a.rarity].rank - C.RARITY[b.rarity].rank);
+  const crates = C.CRATES.filter((c) => C.crateCount(S, c.id) > 0);
   return `
+  <div class="section-title">${t('my_crates')}</div>
+  ${crates.length ? `<div class="crate-list">${crates.map((c) => `<div class="crate-card crate-${c.id} owned">
+    <div class="crate-card-art">${A.crateArt(c.id)}<span class="count">×${C.crateCount(S, c.id)}</span></div>
+    <div class="crate-card-body"><b>${esc(L(c.name))}</b><span>${c.items === 1 ? t('crate_items_1') : t('crate_items_n', { n: c.items })}${c.guarantee ? ' · ' + t('crate_guarantee', { r: esc(L(C.RARITY[c.guarantee].name)) }) : ''}</span>
+      <button type="button" class="link-btn" data-action="odds" data-id="${c.id}">${ico('info')} ${t('see_odds')}</button></div>
+    <button type="button" class="buy-btn" data-action="open-crate" data-id="${c.id}"><span class="lbl">${t('open')}</span><span class="price">×${C.crateCount(S, c.id)}</span></button>
+  </div>`).join('')}</div>` : `<div class="empty-card">${A.crateArt('wood')}<p>${t('no_crates')}</p><button type="button" class="btn btn-gold" data-action="shopview" data-view="store">${t('to_store')}</button></div>`}
+  <div class="section-title">${t('my_skins')}</div>
   <div class="progress"><div class="progress-fill" style="width:${(own / total) * 100}%"></div><span>${t('collection', { a: own, b: total })}</span></div>
-  <div class="chip-row" role="group">${C.CATEGORIES.map((c) => `<button type="button" class="chip ${c.id === skinCat ? 'on' : ''}" data-action="skincat" data-cat="${c.id}">${esc(L(c.name))}</button>`).join('')}</div>
+  <div class="chip-row" role="group">${C.CATEGORIES.map((c) => `<button type="button" class="chip ${c.id === skinCat ? 'on' : ''}" data-action="skincat" data-cat="${c.id}">${esc(L(c.name))} <small>${C.SKINS.filter((k) => k.cat === c.id && S.skins.owned[k.id]).length}</small></button>`).join('')}</div>
   <div class="skin-grid">${list.map((k) => {
     const owned = !!S.skins.owned[k.id];
     const on = S.skins.equipped[k.cat] === k.id;
@@ -985,8 +1004,8 @@ function skinsHTML() {
       <span class="skin-state">${on ? ico('check') + t('equipped') : owned ? t('equip') : ico('lock') + t('locked')}</span>
     </button>`;
   }).join('')}</div>
-  <p class="demo-note">${t('skins_cosmetic')}</p>
-  <button type="button" class="btn btn-gold big" data-action="shopview" data-view="store">${t('get_more_skins')}</button>`;
+  <button type="button" class="btn btn-soft" data-action="toggle-allskins">${showAllSkins ? t('show_owned') : t('show_all_skins', { n: total - own })}</button>
+  <p class="demo-note">${t('skins_cosmetic')}</p>`;
 }
 
 function showOdds(id) {
@@ -1008,6 +1027,24 @@ function buyTimeSkip(id) {
   sfx.coin();
   toast('+' + money(amount), 'gold');
   updateHUD(); persist(); renderShop();
+}
+
+// ----- kjøpe kasse til «Mine ting» -----
+function gotCrateModal(crateId, n = 1) {
+  const c = C.CRATE_BY_ID[crateId];
+  sfx.crate();
+  const m = openModal(`<div class="got-crate">${A.crateArt(c.id)}</div>
+    <h2 class="big-title">${t('got_crate', { c: esc(L(c.name)) })}</h2>
+    <p class="speech">${t('got_crate_text', { n: C.cratesOwned(S) })}</p>
+    <div class="row2"><button type="button" class="btn btn-gold" data-got="open">${t('open_now')}</button><button type="button" class="btn btn-soft" data-got="later">${t('save_later')}</button></div>`, 'got-modal');
+  m.querySelector('[data-got="open"]').addEventListener('click', (e) => { closeModal(e.target); openCrateFlow(crateId); });
+  m.querySelector('[data-got="later"]').addEventListener('click', (e) => { closeModal(e.target); if (tab === 'shop') renderShop(); updateBadges(); });
+}
+function buyCrateFlow(crateId) {
+  if (!C.buyCrate(S, crateId)) { sfx.nope(); toast(t('not_enough_gems')); return; }
+  persist(); updateHUD(); updateBadges();
+  if (tab === 'shop') renderShop();
+  gotCrateModal(crateId);
 }
 
 // ----- åpne kasse -----
@@ -1082,7 +1119,7 @@ function confirmPurchase(p) {
     const lines = [];
     if (p.adFree) lines.push(`<li>${ico('adfree')} ${t('adfree_name')}</li>`);
     if (p.gems) lines.push(`<li>${ico('gem')} ${fmt(p.gems)} ${t('gems')}</li>`);
-    if (p.skinRarity) lines.push(`<li>${ico('palette')} ${rarityChip(p.skinRarity)} skin</li>`);
+    if (p.crate) lines.push(`<li>${ico('crate')} 1 × ${esc(L(C.CRATE_BY_ID[p.crate].name))}</li>`);
     const m = openModal(`<div class="modal-head"><h2 class="h2">${t('confirm_purchase')}</h2></div>
       <ul class="iap-lines">${lines.join('')}</ul>
       <p class="demo-warning">${ico('info')} ${t('demo_purchase_text')}</p>
@@ -1099,17 +1136,14 @@ async function buyProduct(id) {
   if (!ok) return;
   if (p.gems) S.gems += p.gems;
   if (p.adFree) S.adFree = true;
-  if (p.skinRarity) {
-    const pool = C.SKINS.filter((k) => k.rarity === p.skinRarity && !S.skins.owned[k.id]);
-    if (pool.length) { const k = pool[Math.floor(Math.random() * pool.length)]; S.skins.owned[k.id] = Date.now(); toast(t('new_skin') + ' ' + L(k.name), 'gold'); }
-    else S.gems += C.RARITY[p.skinRarity].refund;
-  }
+  if (p.crate) { C.addCrate(S, p.crate); S.flags.starterCrate = true; }
   S.purchases.push(id);
   persist();
   sfx.fanfare();
   toast(t('purchase_done'), 'gold');
   updateHUD(); updateBadges();
   renderTab();
+  if (p.crate) gotCrateModal(p.crate);
 }
 
 // ----- reklame -----
@@ -1188,7 +1222,6 @@ function boostCardHTML() {
 }
 
 // ---------------- REISEN (hele spillet som et tre) ----------------
-const roughTime = (secs) => duration(secs >= 90 ? Math.round(secs / 60) * 60 : secs);
 function wrapLabel(name, max = 15) {
   if (name.length <= max) return [name];
   const words = name.split(' ');
@@ -1200,8 +1233,6 @@ function wrapLabel(name, max = 15) {
 function treeHTML() {
   const total = REGIONS.length;
   const done = REGIONS.filter((r) => S.conquered[r.id]).length;
-  const totalSecs = REGIONS.reduce((a, r) => a + r.time, 0);
-  const leftSecs = REGIONS.filter((r) => !S.conquered[r.id]).reduce((a, r) => a + r.time, 0);
   const W = 360, X = 180, FR = 40, CH = 96;
   const rows = [];
   rows.push({ kind: 'top', h: 96 });
@@ -1244,14 +1275,13 @@ function treeHTML() {
     } else if (row.kind === 'chapter') {
       const e = row.e, era = ERAS[e], cy = row.y;
       const pr = E.eraProgress(S, e);
-      const secs = regionsOfEra(e).reduce((a, r) => a + r.time, 0);
       const state = pr.done === pr.total ? 'done' : e === S.era ? 'now' : e < S.era ? 'done' : 'locked';
       const art = e <= 4 ? A.hq(era.hq) : A.planet(e === 5 ? 'saturn' : 'mothership');
       const ny = cy - 26;
       svg += `<circle cx="${X}" cy="${ny}" r="34" fill="${state === 'locked' ? '#ece8f4' : '#fff'}" stroke="#2b2350" stroke-width="3.4"/>`;
       svg += art.replace('<svg ', `<svg x="${X - 27}" y="${ny - 27}" width="54" height="54" ${state === 'locked' ? 'opacity=".35" ' : ''}`);
       const title = L(era.title);
-      const meta = `${t('about_time', { t: roughTime(secs) })} · ${state === 'done' ? '✓ ' + t('ch_done') : state === 'now' ? t('ch_now') + ` ${pr.done}/${pr.total}` : t('ch_locked')}`;
+      const meta = state === 'done' ? '✓ ' + t('ch_done') : state === 'now' ? t('ch_now') + ` · ${pr.done}/${pr.total}` : `${t('ch_locked')} · ${pr.total} ${t('areas')}`;
       const pw = Math.min(330, Math.max(150, title.length * 10.8 + 34, meta.length * 6.6 + 30));
       const py = ny + 42;
       svg += `<rect x="${X - pw / 2}" y="${py}" width="${pw}" height="58" rx="14" fill="${state === 'locked' ? '#f4f1fa' : state === 'now' ? '#fff6cf' : '#fff'}" stroke="#2b2350" stroke-width="3"/>`;
@@ -1273,11 +1303,9 @@ function treeHTML() {
   }
   return `<div class="card tree-summary">
       <div class="eyebrow">${t('tree_title')}</div>
-      <div class="tree-big">${t('tree_total', { t: roughTime(totalSecs) })}</div>
-      <p class="small">${t('tree_counts', { c: ERAS.length, r: total })}</p>
+      <div class="tree-big">${t('tree_counts', { c: ERAS.length, r: total })}</div>
       <div class="progress"><div class="progress-fill" style="width:${(done / total) * 100}%"></div><span>${t('tree_progress', { p: Math.round((done / total) * 100) })} · ${done}/${total}</span></div>
-      <p class="small">${t('tree_played', { a: roughTime(S.stats.playTime), b: roughTime(leftSecs) })}</p>
-      <p class="small muted">${t('tree_note')}</p>
+      <p class="small">${t('tree_where', { ch: S.era + 1, n: ERAS.length })}</p>
     </div>
     <div class="tree-wrap"><svg class="tree" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('tree_title'))}">${svg}</svg></div>`;
 }
@@ -1293,6 +1321,138 @@ function scrollTreeToHere() {
     const a = here.getBoundingClientRect(), b = scr.getBoundingClientRect();
     scr.scrollTop += a.top - b.top - scr.clientHeight / 2;
   });
+}
+
+
+// ---------------- TOPPLISTE OG VENNER ----------------
+const fbLogo = '<svg viewBox="0 0 24 24" class="brand" aria-hidden="true"><path fill="#fff" d="M13.5 22v-8.2h2.8l.4-3.3h-3.2V8.4c0-.9.3-1.6 1.6-1.6h1.7V3.9c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3v2.4H7.3v3.3h2.8V22z"/></svg>';
+const appleLogo = '<svg viewBox="0 0 24 24" class="brand" aria-hidden="true"><path fill="#fff" d="M16.4 12.7c0-2.5 2.1-3.7 2.2-3.8-1.2-1.7-3-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.2zM13.9 5.3c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg>';
+const providerBadge = (p) => (p === 'facebook' ? `<span class="pbadge fb">${fbLogo}</span>` : p === 'apple' ? `<span class="pbadge apple">${appleLogo}</span>` : '');
+const providerName = (p) => (p === 'facebook' ? 'Facebook' : p === 'apple' ? 'Apple' : t('guest'));
+
+function renderTop() {
+  const so = social();
+  const st = so ? so.state() : { ready: false, demo: true, signedIn: false, provider: 'guest', code: '' };
+  $('#scr-top').innerHTML = `<div class="pad stack">
+    <div class="screen-head"><div><div class="eyebrow">${t('top_eyebrow')}</div><h2 class="h2">${t('top_title')}</h2></div>
+      <div class="mode-switch" role="group">
+        <button type="button" class="${topView === 'friends' ? 'on' : ''}" data-action="topview" data-view="friends">${t('top_friends')}</button>
+        <button type="button" class="${topView === 'global' ? 'on' : ''}" data-action="topview" data-view="global">${t('top_global')}</button>
+      </div></div>
+    <div class="card profile-card">
+      <div class="profile-row"><div class="avatar">${A.mascot()}</div>
+        <div class="profile-info"><b>${esc(S.name)}</b><span>${st.signedIn ? t('signed_in_with', { p: providerName(st.provider) }) : t('playing_as_guest')}</span></div>
+        ${providerBadge(st.provider)}</div>
+      ${st.signedIn ? '' : `<div class="login-buttons">${LOGIN_PROVIDERS.map((p) => `<button type="button" class="btn-login ${p === 'facebook' ? 'fb' : 'apple'}" data-action="login" data-p="${p}">${p === 'facebook' ? fbLogo : appleLogo}<span>${p === 'facebook' ? t('login_facebook') : t('login_apple')}</span></button>`).join('')}
+        <p class="small muted">${t('login_why')}</p></div>`}
+      <div class="friend-code"><span>${t('your_code')}</span><b id="my-code">${st.code ? formatCode(st.code) : '…'}</b>
+        <button type="button" class="btn btn-soft" data-action="copy-code" ${st.code ? '' : 'disabled'}>${t('copy')}</button></div>
+    </div>
+    ${topView === 'friends' ? `<div class="add-friend"><label class="field-label" for="friend-code">${t('add_friend_label')}</label>
+      <div class="rename-row"><input id="friend-code" class="text-input" maxlength="12" placeholder="OHIO-ABC123" autocomplete="off" autocapitalize="characters">
+      <button type="button" class="btn btn-gold" data-action="add-friend">${t('add_friend')}</button></div></div>` : ''}
+    <div class="board" id="board"><p class="muted center">${t('loading')}</p></div>
+    ${st.demo ? `<p class="demo-note">${ico('info')} ${t('social_demo_note')}</p>` : ''}
+    ${st.error && !st.demo ? `<p class="demo-note">${ico('info')} ${t('social_error')}</p>` : ''}
+  </div>`;
+  loadBoard();
+}
+async function loadBoard() {
+  const so = social();
+  const el = $('#board');
+  if (!so || !el) return;
+  const kind = topView;
+  let rows = boardCache.kind === kind && Date.now() - boardCache.at < 20000 ? boardCache.rows : null;
+  if (!rows) {
+    try { rows = await so.board(kind); boardCache = { kind, rows, at: Date.now() }; } catch (e) { rows = []; console.warn(e); }
+  }
+  if (tab !== 'top' || topView !== kind || !$('#board')) return;
+  const onlyMe = rows.length <= 1;
+  $('#board').innerHTML = `${rows.map((r) => `<div class="board-row ${r.me ? 'me' : ''} ${r.place && r.place <= 3 ? 'p' + r.place : ''}">
+      <span class="place">${r.place ?? '–'}</span>
+      <span class="who"><b>${esc(r.name || '?')}${r.me ? ` <em>(${t('you_lower')})</em>` : ''}</b>
+        <small>${t('chapter', { n: (r.era || 0) + 1 })}${r.prestige ? ` · ${'★'.repeat(Math.min(5, r.prestige))}` : ''}${r.demo ? ` · ${t('example')}` : ''}</small></span>
+      ${providerBadge(r.provider)}
+      <span class="score">${ico('flag')}${fmt(r.score)}</span>
+      ${kind === 'friends' && !r.me ? `<button type="button" class="icon-btn small-x" data-action="remove-friend" data-id="${esc(r.id)}" aria-label="${t('remove_friend')}">${ico('close')}</button>` : ''}
+    </div>`).join('')}
+    ${kind === 'friends' && onlyMe ? `<div class="empty-card">${A.mascot()}<p>${t('no_friends')}</p></div>` : ''}
+    <p class="small muted center">${t('score_explain')}</p>`;
+}
+async function doLogin(p) {
+  const so = social();
+  if (!so) return;
+  unlockAudio();
+  if (so.demo) {
+    const m = openModal(`<div class="modal-head"><h2 class="h2">${p === 'facebook' ? t('login_facebook') : t('login_apple')}</h2></div>
+      <p class="speech">${t('demo_login_text', { p: providerName(p) })}</p>
+      <div class="row2"><button type="button" class="btn btn-gold" data-dl="yes">${t('demo_login_try')}</button><button type="button" class="btn btn-soft" data-dl="no">${t('cancel')}</button></div>`, 'login-modal');
+    m.querySelector('[data-dl="yes"]').addEventListener('click', async (e) => { closeModal(e.target); await so.login(p); persist(); toast(t('login_done', { p: providerName(p) }), 'gold'); renderTop(); });
+    m.querySelector('[data-dl="no"]').addEventListener('click', (e) => closeModal(e.target));
+    return;
+  }
+  const res = await so.login(p);
+  if (res.ok) { if (!res.redirect) { toast(t('login_done', { p: providerName(p) }), 'gold'); sfx.fanfare(); } }
+  else if (res.error !== 'auth/popup-closed-by-user' && res.error !== 'auth/cancelled-popup-request') toast(t('login_failed'));
+  boardCache = { kind: '', rows: null, at: 0 };
+  persist();
+  renderTop();
+}
+async function doLogout(btn) {
+  if (btn && btn.closest('.modal')) closeModal(btn);
+  await social()?.logout();
+  persist();
+  toast(t('logged_out'));
+  if (tab === 'top') renderTop();
+}
+async function doDeleteOnline(btn) {
+  if (btn && btn.closest('.modal')) closeModal(btn);
+  const res = await social()?.deleteAccount();
+  persist();
+  toast(res && res.ok ? t('online_deleted') : t('login_failed'));
+  if (tab === 'top') renderTop();
+}
+function copyCode() {
+  const code = $('#my-code')?.textContent || '';
+  if (!code || code === '…') return;
+  const done = () => toast(t('copied', { c: code }), 'gold');
+  try {
+    navigator.clipboard.writeText(code).then(done, () => { selectText($('#my-code')); toast(code); });
+  } catch { selectText($('#my-code')); toast(code); }
+}
+function selectText(el) {
+  if (!el) return;
+  try { const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); } catch { /* */ }
+}
+async function addFriendFlow() {
+  const input = $('#friend-code');
+  const res = await social()?.addFriend(input ? input.value : '');
+  if (!res) return;
+  if (res.ok) {
+    sfx.recruit();
+    toast(t('friend_added', { n: res.friend ? res.friend.name : '' }), 'gold');
+    persist();
+    boardCache = { kind: '', rows: null, at: 0 };
+    renderTop();
+  } else {
+    sfx.nope();
+    toast(t('friend_err_' + (['bad_code', 'self', 'already', 'not_found'].includes(res.error) ? res.error : 'other')));
+  }
+}
+async function removeFriendFlow(id) {
+  await social()?.removeFriend(id);
+  persist();
+  boardCache = { kind: '', rows: null, at: 0 };
+  renderTop();
+}
+function socialSettingsHTML() {
+  const so = social();
+  if (!so) return '';
+  const st = so.state();
+  return `<div class="stats-box"><b>${ico('trophy')} ${t('online_section')}</b>
+    <p class="small">${st.signedIn ? t('signed_in_with', { p: providerName(st.provider) }) : t('playing_as_guest')}${st.code ? ` · ${t('your_code')} ${formatCode(st.code)}` : ''}</p>
+    ${st.signedIn ? `<div class="row2"><button type="button" class="btn btn-soft" data-action="logout">${t('logout')}</button><button type="button" class="btn btn-danger" data-action="delete-online">${t('delete_online')}</button></div>` : `<button type="button" class="link-btn" data-action="tab" data-tab="top">${t('login_from_top')}</button>`}
+  </div>`;
 }
 
 // ---------------- små effekter ----------------
@@ -1434,7 +1594,7 @@ function frame(now) {
     liveAcc += dt; saveAcc += dt; badgeAcc += dt;
     if (liveAcc >= 0.12) { liveAcc = 0; updateLive(); }
     if (badgeAcc >= 1) { badgeAcc = 0; updateBadges(); if (S.tut === 2) updateTutorial(); }
-    if (saveAcc >= 5) { saveAcc = 0; persist(); }
+    if (saveAcc >= 5) { saveAcc = 0; persist(); social()?.submit().catch?.(() => {}); }
     maybeCrate(Date.now());
   }
   requestAnimationFrame(frame);
@@ -1536,14 +1696,24 @@ function onAction(e) {
       break;
     }
     case 'skin-locked': sfx.nope(); toast(t('skin_locked_toast')); break;
-    case 'crate': openCrateFlow(btn.dataset.id); break;
+    case 'crate': buyCrateFlow(btn.dataset.id); break;
+    case 'open-crate': openCrateFlow(btn.dataset.id); break;
+    case 'toggle-allskins': showAllSkins = !showAllSkins; sfx.click(); renderShop(); break;
+    case 'topview': topView = btn.dataset.view; sfx.click(); renderTop(); break;
+    case 'login': doLogin(btn.dataset.p); break;
+    case 'logout': doLogout(btn); break;
+    case 'delete-online': doDeleteOnline(btn); break;
+    case 'copy-code': copyCode(); break;
+    case 'add-friend': addFriendFlow(); break;
+    case 'remove-friend': removeFriendFlow(btn.dataset.id); break;
+    case 'refresh-board': boardCache = { kind: '', rows: null, at: 0 }; renderTop(); break;
     case 'odds': showOdds(btn.dataset.id); break;
     case 'skip': buyTimeSkip(btn.dataset.id); break;
     case 'iap': buyProduct(btn.dataset.id); break;
     case 'restore': toast(t('restore_done')); break;
     case 'ad-crate':
       if (Date.now() < (S.ads.freeCrateAt || 0)) break;
-      watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; openCrateFlow('wood', { free: true }); });
+      watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; C.addCrate(S, 'wood'); persist(); updateBadges(); if (tab === 'shop') renderShop(); gotCrateModal('wood'); });
       break;
     case 'ad-gems':
       if (gemAdsLeft() <= 0) break;
@@ -1585,7 +1755,7 @@ function onAction(e) {
 
 function onVisibility() {
   if (!S) return;
-  if (document.hidden) { persist(); return; }
+  if (document.hidden) { persist(); social()?.submit(true).catch?.(() => {}); return; }
   const away = (Date.now() - (S.lastSeen || Date.now())) / 1000;
   lastFrame = performance.now();
   if (away > 60 && modalCount === 0) checkOffline();
@@ -1611,8 +1781,17 @@ function boot(hotData) {
   applyTheme();
   renderShellText();
   M.initMonetization({ demoAd, confirmPurchase, onAdStart, onAdEnd }).then(() => M.gameplayStart());
+  onSocialChange(() => { boardCache = { kind: '', rows: null, at: 0 }; if (tab === 'top') renderTop(); });
+  initSocial(() => S, E.scoreEntry);
   if (!S) showIntro();
   else {
+    if (S.purchases.includes('starter') && !S.flags.starterCrate) {
+      // startpakken ga tidligere ikke kassen den lovet – gi den nå
+      C.addCrate(S, 'cosmic');
+      S.flags.starterCrate = true;
+      persist();
+      setTimeout(() => toast(t('starter_fix'), 'gold'), 1200);
+    }
     applySkins();
     setSound(S.settings.sound);
     setTab('base');
@@ -1633,6 +1812,7 @@ function boot(hotData) {
       offline: (secs) => { S.lastSeen = Date.now() - secs * 1000; checkOffline(); },
       crate: () => { nextCrate = 0; },
       gems: (n) => { S.gems += n; updateHUD(); },
+      social: () => social(),
       playtime: (secs) => { S.stats.playTime = secs; },
     };
   }

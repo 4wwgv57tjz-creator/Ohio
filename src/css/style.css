@@ -468,8 +468,8 @@ main { flex: 1; position: relative; min-height: 0; }
   position: relative;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
   padding: 8px var(--gutter-r) 10px var(--gutter-l);
   background: var(--paper);
   border-top: 3px solid var(--ink);
@@ -1009,3 +1009,60 @@ main { flex: 1; position: relative; min-height: 0; }
 .hud-stat + .hud-stat { border-top: 2px solid #e7e2f3; }
 .hud-stat .ico { width: 17px; height: 17px; margin-top: -2px; flex: none; }
 @media (max-width: 370px) { #hud-money { font-size: 21px; } .hud-stat { font-size: 14px; padding-right: 7px; } }
+
+/* 6 faner */
+.tab { font-size: 11.5px; padding-left: 0; padding-right: 0; min-height: 54px; }
+.tab .ico { width: 26px; height: 26px; }
+.tab .tab-label { white-space: nowrap; }
+@media (max-width: 370px) { .tab { font-size: 10.5px; } .tab .ico { width: 24px; height: 24px; } }
+
+/* Mine ting */
+.count-dot { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; margin-left: 2px; background: var(--red); color: #fff; border: 2px solid var(--ink); border-radius: 999px; font-size: 11px; }
+.crate-card.owned { background: linear-gradient(135deg, #fff, #f0fff0); }
+.crate-card-art { position: relative; }
+.crate-card-art .count { position: absolute; right: -6px; bottom: -6px; min-width: 30px; height: 24px; padding: 2px 6px 0; background: var(--gold); border: 3px solid var(--ink); border-radius: 999px; font-family: var(--font-display); font-size: 13px; text-align: center; line-height: 17px; }
+.empty-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px; background: rgba(255, 255, 255, 0.75); border: 3px dashed var(--ink); border-radius: var(--r); text-align: center; }
+.empty-card svg { width: 72px; height: 72px; }
+.empty-card p { margin: 0; font-weight: 600; font-size: 14px; }
+.chip small { opacity: 0.7; font-weight: 700; }
+.got-crate { width: 130px; height: 130px; margin: 0 auto; animation: crate-wobble 0.9s ease-in-out infinite; }
+.got-crate svg { width: 100%; height: 100%; }
+
+/* topp-liste */
+.profile-card { display: flex; flex-direction: column; gap: 12px; }
+.profile-row { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 56px; height: 56px; flex: none; background: #fff6cf; border: 3px solid var(--ink); border-radius: 50%; overflow: hidden; }
+.avatar svg { width: 100%; height: 100%; }
+.profile-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.profile-info b { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-info span { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+.login-buttons { display: flex; flex-direction: column; gap: 8px; }
+.btn-login { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 8px 16px; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 4px 0 var(--ink); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+.btn-login:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn-login.fb { background: #1877f2; }
+.btn-login.apple { background: #000; }
+.btn-login .brand { width: 22px; height: 22px; flex: none; }
+.pbadge { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--ink); border-radius: 50%; }
+.pbadge.fb { background: #1877f2; }
+.pbadge.apple { background: #000; }
+.pbadge .brand { width: 14px; height: 14px; }
+.friend-code { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; background: #f4f0ff; border: 2.5px dashed var(--ink); border-radius: 14px; }
+.friend-code span { flex-basis: 100%; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.friend-code b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-display); font-weight: 400; font-size: 21px; letter-spacing: 1px; padding-top: 3px; white-space: nowrap; user-select: text; -webkit-user-select: text; }
+.friend-code .btn { min-height: 38px; padding: 4px 14px; font-size: 14px; }
+.add-friend .text-input { text-transform: uppercase; letter-spacing: 1px; }
+.board { display: flex; flex-direction: column; gap: 8px; }
+.board-row { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 10px; background: var(--card); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 3px 0 var(--ink); }
+.board-row.me { background: #fff6cf; }
+.board-row .place { flex: none; width: 34px; height: 34px; display: grid; place-items: center; background: #efeaf8; border: 2.5px solid var(--ink); border-radius: 50%; font-family: var(--font-display); font-size: 15px; padding-top: 2px; }
+.board-row.p1 .place { background: #ffd23f; }
+.board-row.p2 .place { background: #d6dde8; }
+.board-row.p3 .place { background: #e8a46b; }
+.board-row .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.board-row .who b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-row .who em { font-style: normal; color: var(--ink-soft); font-weight: 600; }
+.board-row .who small { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+.board-row .score { display: flex; align-items: center; gap: 4px; font-family: var(--font-display); font-size: 18px; padding-top: 3px; }
+.board-row .score .ico { width: 20px; height: 20px; margin-top: -3px; }
+.icon-btn.small-x { width: 32px; height: 32px; box-shadow: 0 2px 0 var(--ink); }
+.icon-btn.small-x .ico { width: 16px; height: 16px; }
