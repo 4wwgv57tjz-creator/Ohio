@@ -1,0 +1,22 @@
+{
+  "name": "take-over-the-world-ohio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Take over the world Ohio – et fargerikt tycoon-krigsspill for mobil",
+  "type": "module",
+  "scripts": {
+    "maps": "node tools/build-maps.mjs",
+    "build": "node tools/build.mjs",
+    "sim": "node tools/simulate.mjs",
+    "dev": "node tools/build.mjs && npx --yes http-server docs -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "d3-geo": "3.1.1",
+    "esbuild": "0.24.0",
+    "polygon-clipping": "0.15.7",
+    "polylabel": "2.1.0",
+    "topojson-client": "3.1.0",
+    "us-atlas": "3.0.1",
+    "world-atlas": "2.0.2"
+  }
+}
