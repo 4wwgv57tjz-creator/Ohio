@@ -31,7 +31,7 @@ export function createFirebaseBackend(cfg, { getState, scoreOf, emit }) {
   let lastSubmit = 0;
   let lastSig = '';
 
-  const rowFrom = (id, d, me) => ({ id, name: d.name || '?', score: d.score || 0, era: d.era || 0, prestige: d.prestige || 0, provider: d.provider || 'guest', me });
+  const rowFrom = (id, d, me) => ({ id, name: d.name || '?', score: d.score || 0, era: d.era || 0, prestige: d.prestige || 0, flag: d.flag || 'flag_ohio', provider: d.provider || 'guest', me });
 
   async function ensureProfile(user) {
     const ref = doc(db, 'players', user.uid);
@@ -158,7 +158,7 @@ export function createFirebaseBackend(cfg, { getState, scoreOf, emit }) {
       e.era = Math.max(e.era, pr.era || 0);
       e.prestige = Math.max(e.prestige, pr.prestige || 0);
       e.rank = e.score + Math.min(0.999, Math.log10(e.lifetime + 1) / 100);
-      const sig = JSON.stringify([e.name, e.score, e.era, e.prestige, Math.floor(Math.log10(e.lifetime + 1) * 10)]);
+      const sig = JSON.stringify([e.name, e.score, e.era, e.prestige, e.flag, Math.floor(Math.log10(e.lifetime + 1) * 10)]);
       if (!force && (sig === lastSig || Date.now() - lastSubmit < 30000)) return;
       lastSig = sig;
       lastSubmit = Date.now();

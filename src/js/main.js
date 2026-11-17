@@ -122,6 +122,8 @@ function applySkins() {
   if (cm) cm.outerHTML = A.mascot();
 }
 const hqFx = () => C.equippedSkin(S, 'hq').fx || '';
+const pBadge = (n, cls = '') => (n > 0 ? `<span class="pstar ${cls}" title="${t('prestige_level', { n })}">★${n > 1 ? n : ''}</span>` : '');
+const rowFlag = (id) => A.flagSvg('row-flag', (C.SKIN_BY_ID[id] && C.SKIN_BY_ID[id].design) || 'ohio');
 const rarityChip = (r) => `<span class="rarity r-${r}">${esc(L(C.RARITY[r].name))}</span>`;
 function skinPreview(k) {
   if (k.cat === 'army') return A.unitArt('soldier', 'me', k);
@@ -203,7 +205,8 @@ function paradeHTML() {
 function targetCardHTML() {
   if (S.finished) {
     return `<div class="tc-head"><div class="tc-art">${A.logo()}</div><div class="tc-info"><div class="eyebrow">${t('final_title')}</div><h3>${t('universe_yours')}</h3><p class="flavor">${t('final_text')}</p></div></div>
-    <div class="tc-actions"><button class="btn btn-gold" data-action="prestige">${ico('star')} ${t('play_again')}</button></div>`;
+    ${prestigeRewardsHTML(S.prestige + 1)}
+    <div class="tc-actions one"><button class="btn btn-gold" data-action="prestige-ask">${ico('star')} ${t('take_prestige', { n: S.prestige + 1 })}</button></div>`;
   }
   const r = E.nextTarget(S);
   if (!r) return `<div class="tc-head"><div class="tc-art">${A.mascot()}</div><div class="tc-info"><h3>${esc(L(ERAS[S.era].won))}</h3></div></div>
@@ -245,7 +248,7 @@ function renderBase() {
   </div>
   <div class="stage ${era.space ? 'space' : ''}" id="stage">
     ${backdrop(era)}
-    <div class="village-sign">${A.flagSvg('sign-flag')}<span>${esc(S.name)}</span></div>
+    <div class="village-sign">${A.flagSvg('sign-flag')}<span>${esc(S.name)}</span>${pBadge(S.prestige, 'small')}</div>
     <button class="hq hq-fx-${hqFx()}" id="hq" type="button" aria-label="${t('tap_hint')}">${A.hq(era.hq)}</button>
     <div class="tap-hint" id="tap-hint">${t('tap_hint')} <b id="tap-val">+${money(E.tapValue(S))}</b></div>
     <div class="parade" id="parade">${paradeHTML()}</div>
@@ -806,6 +809,7 @@ function startGame() {
 }
 function showEraIntro(e) {
   const era = ERAS[e];
+  if (S && S.seenIntro < e) { S.seenIntro = e; persist(); }
   openModal(`<div class="modal-mascot">${A.mascot()}</div>
     <div class="eyebrow center">${t('chapter', { n: e + 1 })}</div>
     <h2 class="big-title">${esc(L(era.title))}</h2>
@@ -842,6 +846,21 @@ function eraNext(btn) {
   updateHUD();
 }
 
+function prestigeRewardsHTML(level) {
+  const r = E.prestigeRewards(level);
+  const skin = r.skin ? C.SKIN_BY_ID[r.skin] : null;
+  return `<div class="prestige-box">
+    <div class="prestige-head">${pBadge(level, 'big')}<b>${t('prestige_level', { n: level })}</b></div>
+    <ul class="prestige-list">
+      <li>${ico('boost')} ${t('pr_mult', { p: Math.round(E.PRESTIGE_BONUS * level * 100) })}</li>
+      <li>${ico('gem')} ${t('pr_gems', { n: r.gems })}</li>
+      <li>${ico('crate')} ${t('pr_crate', { c: esc(L(C.CRATE_BY_ID[r.crate].name)) })}</li>
+      <li>${ico('tap')} ${t('pr_tap')}</li>
+      <li>${ico('star')} ${t('pr_star')}</li>
+      ${skin ? `<li class="pr-skin"><span class="pr-skin-art">${skinPreview(skin)}</span><span>${t('pr_skin', { s: esc(L(skin.name)) })}</span></li>` : ''}
+    </ul>
+  </div>`;
+}
 function showFinal() {
   const st = S.stats;
   const m = openModal(`<div class="final-logo">${A.logo()}</div>
@@ -852,21 +871,45 @@ function showFinal() {
       <div><b>${fmt(st.won)}</b><span>${t('stat_won')}</span></div>
       <div><b>${fmt(st.taps)}</b><span>${t('stat_taps')}</span></div>
     </div>
-    <button type="button" class="btn btn-gold big" data-action="prestige">${ico('star')} ${t('final_again')}<small>${t('final_again_sub')}</small></button>
+    ${prestigeRewardsHTML(S.prestige + 1)}
+    <button type="button" class="btn btn-gold big" data-action="prestige-ask">${ico('star')} ${t('take_prestige', { n: S.prestige + 1 })}</button>
     <button type="button" class="btn btn-soft" data-action="close">${t('final_stay')}</button>`, 'celebrate');
   confetti(m, 90);
 }
+function askPrestige(btn) {
+  if (!E.canPrestige(S)) return;
+  if (btn && btn.closest('.modal')) closeModal(btn);
+  const n = S.prestige + 1;
+  openModal(`<div class="modal-head"><h2 class="h2">${t('take_prestige', { n })}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <p class="speech">${t('prestige_confirm')}</p>
+    <div class="keep-box"><b>${t('prestige_keep_title')}</b><p>${t('prestige_keep')}</p></div>
+    ${prestigeRewardsHTML(n)}
+    <button type="button" class="btn btn-gold big" data-action="prestige">${ico('star')} ${t('prestige_go', { n })}</button>
+    <button type="button" class="btn btn-soft" data-action="close">${t('cancel')}</button>`, 'prestige-modal');
+}
 function doPrestige(btn) {
+  if (!E.canPrestige(S)) return;
   if (btn) closeModal(btn);
   S = E.prestigeReset(S);
-  selected = null; viewBox = null;
+  selected = null; viewBox = null; mapView = 'map';
   persist();
   applySkins();
   applyTheme();
   setTab('base');
   updateHUD();
+  updateBadges();
   sfx.fanfare();
-  showEraIntro(0);
+  M.happytime();
+  social()?.submit(true).catch?.(() => {});
+  const r = E.prestigeRewards(S.prestige);
+  const skin = r.skin ? C.SKIN_BY_ID[r.skin] : null;
+  const m = openModal(`<div class="prestige-star-big">★${S.prestige > 1 ? `<small>${S.prestige}</small>` : ''}</div>
+    <h2 class="big-title">${t('prestige_done', { n: S.prestige })}</h2>
+    <p class="speech">${t('prestige_done_text', { p: Math.round(E.PRESTIGE_BONUS * S.prestige * 100) })}</p>
+    ${skin ? `<div class="loot-card r-prestige small-card"><span class="loot-new">${t('new_skin')}</span><div class="loot-art">${skinPreview(skin)}</div>${rarityChip('prestige')}<h3>${esc(L(skin.name))}</h3></div>` : ''}
+    <p class="result-reward gems center-row">${ico('gem')} +${r.gems} · ${ico('crate')} 1 × ${esc(L(C.CRATE_BY_ID[r.crate].name))}</p>
+    <button type="button" class="btn btn-gold big" data-action="close">${t('lets_go')}</button>`, 'celebrate', () => showEraIntro(0));
+  confetti(m, 80);
 }
 
 function checkOffline() {
@@ -907,6 +950,7 @@ function showSettings() {
         <span>${t('stat_units_lost')}</span><b>${fmt(st.unitsLost)}</b>
         <span>${t('stat_crates')}</span><b>${fmt(st.crates)}</b>
         ${st.wins ? `<span>${t('stat_wins')}</span><b>${fmt(st.wins)}</b>` : ''}
+        <span>${t('stat_prestige')}</span><b>${S.prestige ? pBadge(S.prestige) : '–'}</b>
       </div></div>
     <div class="danger-zone" id="danger"><button type="button" class="btn btn-danger" data-action="reset">${t('reset')}</button></div>
     <p class="credits">${t('credits')}</p>`, 'settings');
@@ -1001,7 +1045,7 @@ function mineHTML() {
       <span class="skin-art">${skinPreview(k)}</span>
       <span class="skin-name">${esc(L(k.name))}</span>
       ${rarityChip(k.rarity)}
-      <span class="skin-state">${on ? ico('check') + t('equipped') : owned ? t('equip') : ico('lock') + t('locked')}</span>
+      <span class="skin-state">${on ? ico('check') + t('equipped') : owned ? t('equip') : k.prestige ? ico('lock') + t('prestige_unlock', { n: k.prestige }) : ico('lock') + t('locked')}</span>
     </button>`;
   }).join('')}</div>
   <button type="button" class="btn btn-soft" data-action="toggle-allskins">${showAllSkins ? t('show_owned') : t('show_all_skins', { n: total - own })}</button>
@@ -1012,7 +1056,7 @@ function showOdds(id) {
   const c = C.CRATE_BY_ID[id];
   openModal(`<div class="modal-head"><h2 class="h2">${t('odds_title', { c: esc(L(c.name)) })}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
     <div class="odds-art">${A.crateArt(c.id)}</div>
-    <div class="odds-list">${C.RARITIES.map((r) => `<div class="odds-row r-${r.id}">${rarityChip(r.id)}<div class="odds-bar"><i style="width:${Math.max(1.5, c.odds[r.id])}%"></i></div><b>${String(c.odds[r.id]).replace('.', getLang() === 'nb' ? ',' : '.')} %</b></div>`).join('')}</div>
+    <div class="odds-list">${C.RARITIES.filter((r) => (c.odds[r.id] || 0) > 0).map((r) => `<div class="odds-row r-${r.id}">${rarityChip(r.id)}<div class="odds-bar"><i style="width:${Math.max(1.5, c.odds[r.id])}%"></i></div><b>${String(c.odds[r.id]).replace('.', getLang() === 'nb' ? ',' : '.')} %</b></div>`).join('')}</div>
     ${c.guarantee ? `<p class="small center">${t('odds_guarantee', { r: esc(L(C.RARITY[c.guarantee].name)) })}</p>` : ''}
     <p class="small center">${t('odds_note')}</p>
     <p class="small center">${t('odds_pity', { n: C.PITY })}</p>`, 'odds-modal');
@@ -1066,7 +1110,7 @@ function openCrateFlow(crateId, { free = false } = {}) {
   const close = () => { ov.remove(); modalCount = Math.max(0, modalCount - 1); updateHUD(); updateBadges(); if (tab === 'shop') renderShop(); updateTutorial(); };
   const reveal = (it) => {
     const rank = C.RARITY[it.rarity].rank;
-    [sfx.coin, sfx.crate, sfx.milestone, sfx.fanfare, sfx.fanfare][rank]();
+    ([sfx.coin, sfx.crate, sfx.milestone, sfx.fanfare, sfx.fanfare][rank] || sfx.fanfare)();
     if (S.settings.vibrate) buzz(rank >= 3 ? 60 : 20);
     const last = idx === items.length - 1;
     ov.querySelector('.crate-stage').innerHTML = `<div class="crate-rays r-${it.rarity}"></div>
@@ -1341,7 +1385,7 @@ function renderTop() {
       </div></div>
     <div class="card profile-card">
       <div class="profile-row"><div class="avatar">${A.mascot()}</div>
-        <div class="profile-info"><b>${esc(S.name)}</b><span>${st.signedIn ? t('signed_in_with', { p: providerName(st.provider) }) : t('playing_as_guest')}</span></div>
+        <div class="profile-info"><b>${A.flagSvg('row-flag')}${esc(S.name)}${pBadge(S.prestige)}</b><span>${st.signedIn ? t('signed_in_with', { p: providerName(st.provider) }) : t('playing_as_guest')}</span></div>
         ${providerBadge(st.provider)}</div>
       ${st.signedIn ? '' : `<div class="login-buttons">${LOGIN_PROVIDERS.map((p) => `<button type="button" class="btn-login ${p === 'facebook' ? 'fb' : 'apple'}" data-action="login" data-p="${p}">${p === 'facebook' ? fbLogo : appleLogo}<span>${p === 'facebook' ? t('login_facebook') : t('login_apple')}</span></button>`).join('')}
         <p class="small muted">${t('login_why')}</p></div>`}
@@ -1370,8 +1414,9 @@ async function loadBoard() {
   const onlyMe = rows.length <= 1;
   $('#board').innerHTML = `${rows.map((r) => `<div class="board-row ${r.me ? 'me' : ''} ${r.place && r.place <= 3 ? 'p' + r.place : ''}">
       <span class="place">${r.place ?? '–'}</span>
-      <span class="who"><b>${esc(r.name || '?')}${r.me ? ` <em>(${t('you_lower')})</em>` : ''}</b>
-        <small>${t('chapter', { n: (r.era || 0) + 1 })}${r.prestige ? ` · ${'★'.repeat(Math.min(5, r.prestige))}` : ''}${r.demo ? ` · ${t('example')}` : ''}</small></span>
+      <span class="row-flag-wrap">${rowFlag(r.flag)}</span>
+      <span class="who"><b><span class="nm">${esc(r.name || '?')}</span>${pBadge(r.prestige)}${r.me ? ` <em>(${t('you_lower')})</em>` : ''}</b>
+        <small>${t('chapter', { n: (r.era || 0) + 1 })}${r.demo ? ` · ${t('example')}` : ''}</small></span>
       ${providerBadge(r.provider)}
       <span class="score">${ico('flag')}${fmt(r.score)}</span>
       ${kind === 'friends' && !r.me ? `<button type="button" class="icon-btn small-x" data-action="remove-friend" data-id="${esc(r.id)}" aria-label="${t('remove_friend')}">${ico('close')}</button>` : ''}
@@ -1685,6 +1730,7 @@ function onAction(e) {
       break;
     }
     case 'prestige': doPrestige(btn.closest('.modal') ? btn : null); break;
+    case 'prestige-ask': askPrestige(btn); break;
     case 'shopview': shopView = btn.dataset.view; sfx.click(); renderShop(); $('#scr-shop').scrollTop = 0; break;
     case 'skincat': skinCat = btn.dataset.cat; sfx.click(); renderShop(); break;
     case 'equip': {
@@ -1695,7 +1741,7 @@ function onAction(e) {
       }
       break;
     }
-    case 'skin-locked': sfx.nope(); toast(t('skin_locked_toast')); break;
+    case 'skin-locked': { const k = C.SKIN_BY_ID[btn.dataset.id]; sfx.nope(); toast(k && k.prestige ? t('skin_locked_prestige', { n: k.prestige }) : t('skin_locked_toast')); break; }
     case 'crate': buyCrateFlow(btn.dataset.id); break;
     case 'open-crate': openCrateFlow(btn.dataset.id); break;
     case 'toggle-allskins': showAllSkins = !showAllSkins; sfx.click(); renderShop(); break;
@@ -1792,6 +1838,7 @@ function boot(hotData) {
       persist();
       setTimeout(() => toast(t('starter_fix'), 'gold'), 1200);
     }
+    for (const [lvl, id] of Object.entries(C.PRESTIGE_SKINS)) if ((S.prestige || 0) >= Number(lvl) && !S.skins.owned[id]) S.skins.owned[id] = Date.now();
     applySkins();
     setSound(S.settings.sound);
     setTab('base');

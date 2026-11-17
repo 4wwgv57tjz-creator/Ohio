@@ -27,7 +27,7 @@ async function startPlayer(browser, name, wins) {
   await p.click('[data-action="intro-start"]');
   await p.click('.era-intro [data-action="close"]');
   await p.waitForFunction(() => window.__ohio && window.__ohio.social() && window.__ohio.social().state().code, null, { timeout: 20000 });
-  await p.evaluate((w) => { const S = window.__ohio.state(); S.stats.won = w; S.tut = 9; return window.__ohio.social().submit(true); }, wins);
+  await p.evaluate((w) => { const S = window.__ohio.state(); S.stats.won = w; S.tut = 9; if (w > 15) { S.prestige = 2; S.skins.owned.flag_norway = 1; S.skins.equipped.flag = 'flag_norway'; } return window.__ohio.social().submit(true); }, wins);
   const st = await p.evaluate(() => window.__ohio.social().state());
   log(`${name}: gjest=${!st.signedIn} kode=${st.code}`);
   return { ctx, p, code: st.code };
@@ -108,7 +108,7 @@ async function emulatorLogin(page, button) {
 
     // Hva som faktisk ligger i databasen (admin-tilgang i emulatoren)
     const all = await rest('GET', `${FS}/players`, null, 'owner');
-    log('Databasen:', JSON.stringify((all.j.documents || []).map((d) => ({ name: d.fields.name?.stringValue, score: d.fields.score?.integerValue ?? d.fields.score?.doubleValue, provider: d.fields.provider?.stringValue, friends: (d.fields.friends?.arrayValue?.values || []).length }))));
+    log('Databasen:', JSON.stringify((all.j.documents || []).map((d) => ({ name: d.fields.name?.stringValue, score: d.fields.score?.integerValue ?? d.fields.score?.doubleValue, flag: d.fields.flag?.stringValue, prestige: d.fields.prestige?.integerValue, provider: d.fields.provider?.stringValue, friends: (d.fields.friends?.arrayValue?.values || []).length }))));
 
     // Sikkerhetsregler: en ny bruker prøver å jukse
     const u = await rest('POST', `${AUTH}/accounts:signUp?key=demo-key`, { returnSecureToken: true });
@@ -119,6 +119,8 @@ async function emulatorLogin(page, button) {
     log('skrive andres rad:', (await rest('PATCH', `${FS}/players/${other}`, fsDoc(valid), tok)).status, '(forventet 403)');
     log('juksepoeng 999999:', (await rest('PATCH', `${FS}/players/${me}`, fsDoc({ ...valid, score: 999999 }), tok)).status, '(forventet 403)');
     log('ukjent felt:', (await rest('PATCH', `${FS}/players/${me}`, fsDoc({ ...valid, admin: 'ja' }), tok)).status, '(forventet 403)');
+    log('gyldig flagg:', (await rest('PATCH', `${FS}/players/${me}`, fsDoc({ ...valid, flag: 'flag_norway', prestige: 2 }), tok)).status, '(forventet 200)');
+    log('ugyldig flagg:', (await rest('PATCH', `${FS}/players/${me}`, fsDoc({ ...valid, flag: '<script>alert(1)</script>' }), tok)).status, '(forventet 403)');
     log('stjele vennekode:', (await rest('PATCH', `${FS}/codes/ABCDEF`, fsDoc({ uid: other }), tok)).status, '(forventet 403)');
     log('uten innlogging:', (await rest('PATCH', `${FS}/players/${me}`, fsDoc(valid))).status, '(forventet 403)');
   } catch (e) {

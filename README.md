@@ -32,9 +32,10 @@ Tips:
 
 ## Butikk, skins, lootkasser og reklame
 
-- **Skins** i fire kategorier: hær (farger på alle enhetene), flagg (spillerflagget og fargen på erobret land på
-  kartet), hovedkvarter og hatter til General Buckeye. 39 skins fordelt på fem sjeldenhetsgrader: Vanlig,
-  Sjelden, Episk, Legendarisk og Mytisk. Skins er bare utseende – de gir ingen fordel i kamp.
+- **Skins** i fire kategorier: hær (31 fargedrakter på alle enhetene), flagg (26 – spillerflagget, fargen på erobret
+  land på kartet og flagget ditt på leaderboardet), hovedkvarter (19) og hatter til General Buckeye (21, blant annet
+  vikinghjelm, russelue og glorie). 97 skins fordelt på Vanlig, Sjelden, Episk, Legendarisk og Mytisk, pluss fire
+  Prestisje-skins. Skins er bare utseende – de gir ingen fordel i kamp.
 - **Mine ting** (Butikk → Mine ting) viser kassene og skinsene du eier. Kjøpte kasser havner her, så du kan åpne dem
   med en gang eller spare dem til senere. Du får også en gullkasse hver gang du fullfører et kapittel.
 - **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
@@ -110,7 +111,18 @@ Koden for reklame og kjøp ligger samlet i `src/js/monetize.js`.
 | 6 | Solsystemet | Månen, Mars, Venus … Pluto, alle okkupert av romvesener | Romsoldat, romjager, laserkanon |
 | 7 | Alien-galaksen | Seks alien-planeter og Keiser Zorgons moderskip | Mega-mech, Ohio-stjernen |
 
-Når universet er erobret kan du starte en ny runde med permanent bonus (+50 % inntekt og styrke per runde).
+## Prestisje
+
+Når universet er erobret kan du ta **prestisje**: du starter på nytt som en liten bygd i Ohio, men med en prestisjestjerne
+(★, ★2, ★3 …) og disse bonusene for hver stjerne:
+
+- +50 % inntekt og hærstyrke for alltid (★2 gir +100 %, ★3 +150 % osv.)
+- +300 edelstener og en kosmisk kasse
+- du beholder trykk-kraften, skins, kasser, edelstener, venner og reklamefri
+- eksklusive prestisje-skins som ikke finnes i kasser: Prestisjeflagg (★1), Prestisjekrone (★2), Stjernepalasset (★3) og
+  Stjernehæren (★5)
+
+Stjernen vises ved bygd-skiltet, på profilen og på leaderboardet.
 
 En effektiv spiller bruker omtrent to timer på hele kampanjen, og litt mer uten å trykke mye. Spillet lagres
 automatisk på enheten.
@@ -119,8 +131,8 @@ Språk: norsk (standard) og engelsk, valgbart i innstillingene.
 
 ## Leaderboard, venner og innlogging
 
-Topp-fanen har to lister: **Venner** og **Alle**. Poengene er hvor mange områder du har erobret totalt (også i nye
-runder). Hver spiller har en vennekode (f.eks. `OHIO-7K3QPZ`) som kan deles; skriv inn koden til en venn for å legge
+Topp-fanen har to lister: **Venner** og **Alle**. Hver rad viser spillerens flagg og prestisjestjerne. Poengene er hvor
+mange områder du har erobret totalt (også i nye runder). Hver spiller har en vennekode (f.eks. `OHIO-7K3QPZ`) som kan deles; skriv inn koden til en venn for å legge
 dem til. Alle kan spille som gjest, og logge inn med **Facebook** eller **Apple** for å beholde plassen og vennene på
 alle enheter (en gjestekonto kobles til innloggingen, så ingenting går tapt). Listen viser bare navnet på bygda –
 aldri navnet fra Facebook eller Apple. Innstillinger har «Logg ut» og «Slett nettprofil» (Apple krever at brukere kan

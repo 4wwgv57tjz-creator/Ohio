@@ -7,6 +7,7 @@ export const RARITIES = [
   { id: 'epic', name: { nb: 'Episk', en: 'Epic' }, color: '#a35cff', refund: 60 },
   { id: 'legendary', name: { nb: 'Legendarisk', en: 'Legendary' }, color: '#ffa600', refund: 150 },
   { id: 'mythic', name: { nb: 'Mytisk', en: 'Mythic' }, color: '#ff3d77', refund: 400 },
+  { id: 'prestige', name: { nb: 'Prestisje', en: 'Prestige' }, color: '#7a5cff', refund: 0 }, // kun fra prestisje, aldri i kasser
 ];
 export const RARITY = Object.fromEntries(RARITIES.map((r, i) => [r.id, { ...r, rank: i }]));
 
@@ -64,8 +65,73 @@ export const SKINS = [
   K('hat_pirate', 'hat', 'epic', 'Kapteinshatt', 'Captain’s Hat', { hat: 'pirate' }),
   K('hat_crown', 'hat', 'legendary', 'Krone', 'Crown', { hat: 'crown' }),
   K('hat_astro', 'hat', 'mythic', 'Romhjelm', 'Space Helmet', { hat: 'astro' }),
+
+  // ---- flere hær-skins ----
+  K('army_jungle', 'army', 'common', 'Jungelkamo', 'Jungle Camo', { team: team('#3f7d3a', '#2a5428', '#7fbf6a', '#c9a26b') }),
+  K('army_urban', 'army', 'common', 'Bykamo', 'Urban Camo', { team: team('#8c95a6', '#5b6375', '#c7ccd6', '#f2c94c') }),
+  K('army_olive', 'army', 'common', 'Oliven', 'Olive', { team: team('#7a8a3a', '#55621f', '#b5c26e', '#e5484d') }),
+  K('army_sky', 'army', 'common', 'Himmelblå', 'Sky Blue', { team: team('#5fb6ff', '#3a83cc', '#bfe3ff', '#ffffff') }),
+  K('army_scarlet', 'army', 'rare', 'Skarlagen og grå', 'Scarlet & Grey', { team: team('#bb0000', '#6e0000', '#d9d9d9', '#ffffff') }),
+  K('army_candy', 'army', 'rare', 'Godteri', 'Candy', { team: team('#ff8fc8', '#3fc9a8', '#ffd1ea', '#ffffff') }),
+  K('army_lime', 'army', 'rare', 'Lime', 'Lime', { team: team('#9be15d', '#4fae3c', '#dcffb8', '#2b2350') }),
+  K('army_ocean', 'army', 'rare', 'Havblå', 'Ocean', { team: team('#1fb5c9', '#127a8a', '#9ff0f7', '#ffd23f') }),
+  K('army_pumpkin', 'army', 'epic', 'Gresskar', 'Pumpkin', { team: team('#ff8a1f', '#2b2235', '#ffc27a', '#7be07b') }),
+  K('army_christmas', 'army', 'epic', 'Julehæren', 'Holiday Army', { team: team('#e5484d', '#2f8a3a', '#ff9a9e', '#ffd23f') }),
+  K('army_toxic', 'army', 'epic', 'Giftgrønn', 'Toxic', { team: team('#7dff3a', '#7a2bd6', '#d8ffb0', '#2b2350'), fx: 'neon' }),
+  K('army_ice', 'army', 'epic', 'Is', 'Ice', { team: team('#bfefff', '#5fb6e8', '#ffffff', '#56e0ff'), fx: 'shine' }),
+  K('army_shadow', 'army', 'legendary', 'Skygge', 'Shadow', { team: team('#2a2438', '#120f1c', '#5d5180', '#c28dff'), fx: 'galaxy' }),
+  K('army_phoenix', 'army', 'legendary', 'Føniks', 'Phoenix', { team: team('#ff5a1f', '#c4321a', '#ffb347', '#ffd23f'), fx: 'lava' }),
+  K('army_diamond', 'army', 'mythic', 'Diamanthæren', 'Diamond Army', { team: team('#a8f0ff', '#5fc2e8', '#ffffff', '#ff77c8'), fx: 'sparkle' }),
+  K('army_hologram', 'army', 'mythic', 'Hologram', 'Hologram', { team: team('#56e0ff', '#7a5cff', '#c8f7ff', '#ff77c8'), fx: 'holo' }),
+  // ---- flere flagg ----
+  K('flag_sweden', 'flag', 'common', 'Sverige', 'Sweden', { design: 'sweden', own: '#7fb0ff' }),
+  K('flag_denmark', 'flag', 'common', 'Danmark', 'Denmark', { design: 'denmark', own: '#ff9a9a' }),
+  K('flag_finland', 'flag', 'common', 'Finland', 'Finland', { design: 'finland', own: '#a9c4ff' }),
+  K('flag_iceland', 'flag', 'common', 'Island', 'Iceland', { design: 'iceland', own: '#8fb4ff' }),
+  K('flag_cow', 'flag', 'common', 'Kuflekker', 'Cow Spots', { design: 'cow', own: '#f2f2f2' }),
+  K('flag_corn', 'flag', 'common', 'Maisflagg', 'Corn Flag', { design: 'corn', own: '#ffe066' }),
+  K('flag_buckeye', 'flag', 'rare', 'Buckeye', 'Buckeye', { design: 'buckeye', own: '#c9a27a' }),
+  K('flag_heart', 'flag', 'rare', 'Hjerte', 'Heart', { design: 'heart', own: '#ffa3c8' }),
+  K('flag_moon', 'flag', 'rare', 'Månenatt', 'Moonlit Night', { design: 'moon', own: '#8f9ce8' }),
+  K('flag_tiger', 'flag', 'rare', 'Tiger', 'Tiger', { design: 'tiger', own: '#ffb35c' }),
+  K('flag_ohiomap', 'flag', 'epic', 'Ohio-kart', 'Ohio Map', { design: 'ohiomap', own: '#ffd23f' }),
+  K('flag_lightning', 'flag', 'epic', 'Lyn', 'Lightning', { design: 'lightning', own: '#b39dff' }),
+  K('flag_rocket', 'flag', 'epic', 'Rakett', 'Rocket', { design: 'rocket', own: '#a6dcff' }),
+  K('flag_alien', 'flag', 'epic', 'Romvesen', 'Alien', { design: 'alien', own: '#9be98f' }),
+  K('flag_galaxy', 'flag', 'legendary', 'Galakseflagg', 'Galaxy Flag', { design: 'galaxy', own: '#a98cff', fx: 'gold' }),
+  K('flag_diamond', 'flag', 'mythic', 'Diamantflagg', 'Diamond Flag', { design: 'diamond', own: '#8ff0ff', fx: 'rainbow' }),
+  // ---- flere hovedkvarter ----
+  K('hq_forest', 'hq', 'common', 'Skogsgrønn', 'Forest Green', { fx: 'forest' }),
+  K('hq_sunset', 'hq', 'common', 'Solnedgang', 'Sunset', { fx: 'sunset' }),
+  K('hq_lava', 'hq', 'rare', 'Lavaborg', 'Lava Keep', { fx: 'lava' }),
+  K('hq_ice', 'hq', 'rare', 'Isslott', 'Ice Castle', { fx: 'ice' }),
+  K('hq_noir', 'hq', 'rare', 'Svart-hvitt', 'Noir', { fx: 'noir' }),
+  K('hq_candy', 'hq', 'epic', 'Godteslott', 'Candy Castle', { fx: 'candy' }),
+  K('hq_retro', 'hq', 'epic', 'Gammeldags', 'Retro', { fx: 'retro' }),
+  K('hq_ghost', 'hq', 'epic', 'Spøkelseshus', 'Haunted', { fx: 'ghost' }),
+  K('hq_rainbow', 'hq', 'legendary', 'Regnbuepalass', 'Rainbow Palace', { fx: 'rainbow' }),
+  K('hq_hologram', 'hq', 'mythic', 'Hologramborg', 'Hologram Keep', { fx: 'hologram' }),
+  // ---- flere hatter ----
+  K('hat_chef', 'hat', 'common', 'Kokkelue', 'Chef’s Hat', { hat: 'chef' }),
+  K('hat_beanie', 'hat', 'common', 'Strikkelue', 'Beanie', { hat: 'beanie' }),
+  K('hat_flowers', 'hat', 'common', 'Blomsterkrans', 'Flower Crown', { hat: 'flowers' }),
+  K('hat_tophat', 'hat', 'rare', 'Flosshatt', 'Top Hat', { hat: 'tophat' }),
+  K('hat_santa', 'hat', 'rare', 'Nisselue', 'Santa Hat', { hat: 'santa' }),
+  K('hat_propeller', 'hat', 'rare', 'Propellcaps', 'Propeller Cap', { hat: 'propeller' }),
+  K('hat_ninja', 'hat', 'rare', 'Ninjabånd', 'Ninja Headband', { hat: 'ninja' }),
+  K('hat_russ', 'hat', 'epic', 'Russelue', 'Graduation Cap', { hat: 'russ' }),
+  K('hat_wizard', 'hat', 'epic', 'Trollmannshatt', 'Wizard Hat', { hat: 'wizard' }),
+  K('hat_bunny', 'hat', 'epic', 'Kaninører', 'Bunny Ears', { hat: 'bunny' }),
+  K('hat_fire', 'hat', 'epic', 'Brannhjelm', 'Firefighter Helmet', { hat: 'fire' }),
+  K('hat_halo', 'hat', 'legendary', 'Glorie', 'Halo', { hat: 'halo' }),
+  // ---- eksklusive prestisje-skins (låses opp med prestisjestjerner, finnes ikke i kasser) ----
+  K('flag_stars', 'flag', 'prestige', 'Prestisjeflagg', 'Prestige Flag', { design: 'stars', own: '#ffd23f', prestige: 1 }),
+  K('hat_prestige', 'hat', 'prestige', 'Prestisjekrone', 'Prestige Crown', { hat: 'prestige', prestige: 2 }),
+  K('hq_star', 'hq', 'prestige', 'Stjernepalasset', 'Star Palace', { fx: 'star', prestige: 3 }),
+  K('army_stars', 'army', 'prestige', 'Stjernehæren', 'Star Army', { team: team('#24308a', '#141c55', '#6a7cf0', '#ffd23f'), fx: 'stars', prestige: 5 }),
 ];
 export const SKIN_BY_ID = Object.fromEntries(SKINS.map((k) => [k.id, k]));
+export const PRESTIGE_SKINS = Object.fromEntries(SKINS.filter((k) => k.prestige).map((k) => [k.prestige, k.id]));
 export const DEFAULT_SKINS = Object.fromEntries(CATEGORIES.map((c) => [c.id, SKINS.find((k) => k.cat === c.id && k.def).id]));
 
 // ---------- lootkasser ----------
@@ -148,7 +214,7 @@ export function openCrate(s, crateId, { free = false, rnd = Math.random } = {}) 
   }
   if (c.guarantee && !rolls.some((r) => RARITY[r].rank >= RARITY[c.guarantee].rank)) rolls[rolls.length - 1] = c.guarantee;
   const items = rolls.map((rar) => {
-    const pool = SKINS.filter((k) => k.rarity === rar && !k.def);
+    const pool = SKINS.filter((k) => k.rarity === rar && !k.def && !k.prestige);
     const fresh = pool.filter((k) => !s.skins.owned[k.id]);
     const from = fresh.length && rnd() < 0.75 ? fresh : pool; // nye skins prioriteres
     const skin = from[Math.floor(rnd() * from.length)];

@@ -1,6 +1,6 @@
 // Spillmotor – ren logikk uten DOM, slik at den kan testes og simuleres i Node.
 import { BUILDINGS, UNITS, REGIONS, ERAS, REGION_BY_ID, BUILDING_BY_ID, UNIT_BY_ID, regionsOfEra } from './data.js';
-import { newCosmetics, restoreCosmetics, EMPTY_INV } from './cosmetics.js';
+import { newCosmetics, restoreCosmetics, EMPTY_INV, addCrate, PRESTIGE_SKINS, equippedSkin } from './cosmetics.js';
 
 export const SAVE_VERSION = 1;
 export const B_GROWTH = 1.15; // prisøkning per bygning
@@ -233,7 +233,14 @@ export function nextTarget(s) {
   return best;
 }
 
-// Ny runde med permanent bonus etter at universet er erobret
+// ---------- prestisje ----------
+// Når universet er erobret kan man starte på nytt i Ohio med en prestisjestjerne og bonuser.
+export const PRESTIGE_GEMS = 300;
+export const PRESTIGE_BONUS = 0.5; // +50 % inntekt og hærstyrke per stjerne (se prestigeMult)
+export function prestigeRewards(level) {
+  return { level, mult: 1 + PRESTIGE_BONUS * level, gems: PRESTIGE_GEMS, crate: 'cosmic', skin: PRESTIGE_SKINS[level] || null, keepTap: true };
+}
+export const canPrestige = (s) => !!s.finished;
 export function prestigeReset(s) {
   const n = newState(s.name);
   n.prestige = (s.prestige || 0) + 1;
@@ -243,6 +250,11 @@ export function prestigeReset(s) {
   n.gems = s.gems; n.skins = s.skins; n.crates = s.crates; n.adFree = s.adFree; n.ads = s.ads; n.purchases = s.purchases;
   n.social = s.social; n.flags = s.flags;
   n.stats.lifetimeBase = (s.stats.lifetimeBase || 0) + (s.totalEarned || 0);
+  const r = prestigeRewards(n.prestige);
+  n.tapLevel = s.tapLevel || 0; // trykk-kraften beholdes
+  n.gems = (n.gems || 0) + r.gems;
+  addCrate(n, r.crate);
+  if (r.skin) n.skins.owned[r.skin] = Date.now();
   return n;
 }
 
@@ -260,5 +272,6 @@ export function scoreEntry(s) {
   const score = Math.max(s.stats.won || 0, (s.social && s.social.best) || 0);
   if (s.social) s.social.best = score;
   const lifetime = lifetimeEarned(s);
-  return { name: String(s.name || '').slice(0, 22), score, lifetime, era: s.era, prestige: s.prestige || 0, rank: score + Math.min(0.999, Math.log10(lifetime + 1) / 100) };
+  const flag = s.skins ? equippedSkin(s, 'flag').id : 'flag_ohio';
+  return { name: String(s.name || '').slice(0, 22), score, lifetime, era: s.era, prestige: s.prestige || 0, flag, rank: score + Math.min(0.999, Math.log10(lifetime + 1) / 100) };
 }
