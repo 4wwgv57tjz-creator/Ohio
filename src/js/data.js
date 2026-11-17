@@ -217,6 +217,7 @@ for (const r of REGIONS) {
   const b = BALANCE.r && BALANCE.r[r.id];
   r.def = b ? b.def : 10;
   r.income = b ? b.income : 1;
+  r.time = b && b.t ? b.t : 120; // forventet antall sekunder for å ta området (fra simulatoren)
 }
 for (const it of [...BUILDINGS, ...UNITS]) {
   const b = BALANCE.i && BALANCE.i[it.id];

@@ -1,0 +1,12 @@
+{
+  "ads": {
+    "provider": "demo",
+    "adsenseClient": "ca-pub-0000000000000000",
+    "testMode": true,
+    "interstitialEvery": 2,
+    "interstitialMinGap": 180
+  },
+  "payments": {
+    "provider": "demo"
+  }
+}

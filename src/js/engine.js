@@ -1,5 +1,6 @@
 // Spillmotor – ren logikk uten DOM, slik at den kan testes og simuleres i Node.
 import { BUILDINGS, UNITS, REGIONS, ERAS, REGION_BY_ID, BUILDING_BY_ID, UNIT_BY_ID, regionsOfEra } from './data.js';
+import { newCosmetics, restoreCosmetics } from './cosmetics.js';
 
 export const SAVE_VERSION = 1;
 export const B_GROWTH = 1.15; // prisøkning per bygning
@@ -11,6 +12,11 @@ export const TAP_PCT = 0.012; // andel av inntekt per trykk per nivå
 export const BOOST_MULT = 3;
 export const BOOST_SECS = 30;
 export const SAFE_RATIO = 1.5; // hærstyrke/forsvar for 100 % vinnersjanse
+export const AD_BOOST_MULT = 2; // inntektsboost fra belønningsreklame
+export const AD_BOOST_SECS = 600;
+export const START_GEMS = 50;
+export const gemsForRegion = (r) => 5 + 2 * r.era;
+export const gemsForEra = (era) => 50 * (era + 1);
 
 export function newState(name = '') {
   const now = Date.now();
@@ -34,6 +40,13 @@ export function newState(name = '') {
     tut: 0,
     seenIntro: -1,
     finished: false,
+    gems: START_GEMS,
+    skins: newCosmetics(),
+    crates: { opened: 0, pity: 0 },
+    adFree: false,
+    adBoostUntil: 0,
+    ads: { lastInterstitial: 0, battlesSince: 0, freeCrateAt: 0, gemDay: '', gemCount: 0, watched: 0 },
+    purchases: [],
   };
 }
 
@@ -45,7 +58,12 @@ export function restore(data) {
   s.stats = { ...base.stats, ...(data.stats || {}) };
   s.settings = { ...base.settings, ...(data.settings || {}) };
   for (const k of ['buildings', 'units', 'conquered', 'damage']) s[k] = { ...(data[k] || {}) };
-  for (const k of ['money', 'totalEarned', 'era', 'tapLevel', 'prestige', 'tut', 'boostUntil', 'lastSeen']) if (!Number.isFinite(s[k])) s[k] = base[k];
+  s.skins = restoreCosmetics(data.skins);
+  s.crates = { ...base.crates, ...(data.crates || {}) };
+  s.ads = { ...base.ads, ...(data.ads || {}) };
+  s.purchases = Array.isArray(data.purchases) ? data.purchases.slice(-50) : [];
+  s.adFree = !!data.adFree;
+  for (const k of ['money', 'totalEarned', 'era', 'tapLevel', 'prestige', 'tut', 'boostUntil', 'lastSeen', 'gems', 'adBoostUntil']) if (!Number.isFinite(s[k])) s[k] = base[k];
   s.era = Math.max(0, Math.min(ERAS.length - 1, Math.floor(s.era)));
   s.v = SAVE_VERSION;
   return s;
@@ -56,6 +74,8 @@ export const nextMilestone = (n) => MILESTONES.find((t) => t > n) ?? null;
 export const prevMilestone = (n) => { let p = 0; for (const t of MILESTONES) if (n >= t) p = t; return p; };
 export const prestigeMult = (s) => 1 + 0.5 * (s.prestige || 0);
 export const boostActive = (s, now = Date.now()) => now < (s.boostUntil || 0);
+export const adBoostActive = (s, now = Date.now()) => now < (s.adBoostUntil || 0);
+export const boostMult = (s, now = Date.now()) => (boostActive(s, now) ? BOOST_MULT : 1) * (adBoostActive(s, now) ? AD_BOOST_MULT : 1);
 
 export const isAvailable = (s, item) => item.era <= s.era;
 export const owned = (s, kind, id) => (kind === 'b' ? s.buildings[id] : s.units[id]) || 0;
@@ -73,7 +93,7 @@ export function baseIncome(s) {
   for (const b of BUILDINGS) { const n = s.buildings[b.id]; if (n) sum += buildingIncome(s, b, n); }
   return sum;
 }
-export const incomePerSec = (s, now = Date.now()) => baseIncome(s) * (boostActive(s, now) ? BOOST_MULT : 1);
+export const incomePerSec = (s, now = Date.now()) => baseIncome(s) * boostMult(s, now);
 
 export function armyPower(s) {
   let sum = 0;
@@ -175,10 +195,12 @@ export function attack(s, regionId, rnd = Math.random) {
   const frac = win ? Math.min(0.4, 0.2 * Math.pow(D / P, 2)) : 0.3;
   const { lost, total } = applyCasualties(s, frac, rnd);
   let dealt = 0;
+  let gems = 0;
   if (win) {
     s.conquered[r.id] = true;
     delete s.damage[r.id];
     s.stats.won++;
+    gems = gemsForRegion(r);
   } else {
     dealt = Math.min(D - r.def * 0.25, P * 0.5);
     s.damage[r.id] = (s.damage[r.id] || 0) + Math.max(0, dealt);
@@ -186,7 +208,9 @@ export function attack(s, regionId, rnd = Math.random) {
   }
   s.stats.unitsLost += total;
   const eraDone = win && eraComplete(s);
-  return { win, chance, P, D, lost, lostTotal: total, dealt, eraDone, region: r, powerAfter: armyPower(s) };
+  if (eraDone) gems += gemsForEra(s.era);
+  s.gems = (s.gems || 0) + gems;
+  return { win, chance, P, D, lost, lostTotal: total, dealt, eraDone, region: r, powerAfter: armyPower(s), gems };
 }
 
 export const eraComplete = (s) => regionsOfEra(s.era).every((r) => s.conquered[r.id]);
@@ -210,5 +234,14 @@ export function prestigeReset(s) {
   n.stats = { ...s.stats, wins: (s.stats.wins || 0) + 1 };
   n.settings = { ...s.settings };
   n.tut = 99;
+  n.gems = s.gems; n.skins = s.skins; n.crates = s.crates; n.adFree = s.adFree; n.ads = s.ads; n.purchases = s.purchases;
+  return n;
+}
+
+// Gir tilbake enheter (belønning for å se reklame etter et tap)
+export function restoreUnits(s, lost) {
+  let n = 0;
+  for (const [id, k] of Object.entries(lost || {})) { s.units[id] = (s.units[id] || 0) + k; n += k; }
+  s.stats.unitsLost = Math.max(0, s.stats.unitsLost - n);
   return n;
 }

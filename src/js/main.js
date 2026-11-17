@@ -1,6 +1,8 @@
 // Take over the world Ohio – brukergrensesnitt, spill-løkke og lagring.
 import * as E from './engine.js';
-import { ERAS, BUILDINGS, UNITS, REGION_BY_ID, regionsOfEra, SPACE_HOMES } from './data.js';
+import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, regionsOfEra, SPACE_HOMES } from './data.js';
+import * as C from './cosmetics.js';
+import * as M from './monetize.js';
 import { MAPS } from './mapdata.js';
 import * as A from './art.js';
 import { t, L, fmt, money, duration, setLang, getLang } from './i18n.js';
@@ -17,6 +19,14 @@ let lastSig = {};
 let nextCrate = Date.now() + 35000;
 let coachTimer = 0;
 let viewBox = null; // kartets synlige utsnitt [x, y, w, h]
+let shopView = 'store';
+let skinCat = 'army';
+let mapView = 'map';
+let lastBattle = null;
+const AD_GEMS = 30;
+const AD_GEMS_PER_DAY = 8;
+const FREE_CRATE_COOLDOWN = 30 * 60 * 1000;
+const TIME_SKIPS = [{ id: 'skip1', hours: 1, gems: 120 }, { id: 'skip4', hours: 4, gems: 400 }];
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -59,11 +69,16 @@ function enemyArtFor(r, i = 0) {
 
 // ---------------- skall og tema ----------------
 function buildShell() {
-  const tabs = [['base', 'base'], ['build', 'build'], ['army', 'army'], ['map', 'map']];
+  const tabs = [['base', 'base'], ['build', 'build'], ['army', 'army'], ['map', 'map'], ['shop', 'shop']];
   $('#app').innerHTML = `
   <header class="hud">
-    <button class="money-pill" type="button" data-action="tab" data-tab="build">${ico('coin')}<span id="hud-money">$0</span><span id="hud-income">+$0/s</span></button>
-    <div class="power-pill">${ico('swords')}<span id="hud-power">0</span></div>
+    <div class="hud-card">
+      <button class="hud-money" type="button" data-action="tab" data-tab="build">${ico('coin')}<span id="hud-money">$0</span><span id="hud-income">+$0/s</span></button>
+      <div class="hud-stats">
+        <button class="hud-stat" type="button" data-action="tab" data-tab="army">${ico('swords')}<span id="hud-power">0</span></button>
+        <button class="hud-stat" type="button" data-action="tab" data-tab="shop">${ico('gem')}<span id="hud-gems">0</span></button>
+      </div>
+    </div>
     <button class="icon-btn" id="btn-settings" type="button" data-action="settings">${ico('gear')}</button>
     <div class="boost-bar" id="boost-bar" hidden></div>
   </header>
@@ -89,6 +104,27 @@ function applyTheme() {
   if (meta) meta.setAttribute('content', era.theme.sky1);
 }
 
+function applySkins() {
+  if (!S) return;
+  A.setArmySkin(C.equippedSkin(S, 'army'));
+  const flag = C.equippedSkin(S, 'flag');
+  A.setFlagDesign(flag.design);
+  A.setHat(C.equippedSkin(S, 'hat').hat);
+  const app = $('#app');
+  app.style.setProperty('--own', flag.own);
+  app.classList.toggle('own-rainbow', flag.fx === 'rainbow');
+  const cm = $('#coach svg.mascot');
+  if (cm) cm.outerHTML = A.mascot();
+}
+const hqFx = () => C.equippedSkin(S, 'hq').fx || '';
+const rarityChip = (r) => `<span class="rarity r-${r}">${esc(L(C.RARITY[r].name))}</span>`;
+function skinPreview(k) {
+  if (k.cat === 'army') return A.unitArt('soldier', 'me', k);
+  if (k.cat === 'flag') return A.flagSvg('flag-prev', k.design);
+  if (k.cat === 'hat') return A.mascot('happy', k.hat);
+  return `<span class="hq-prev hq-fx-${k.fx}">${A.hq(ERAS[S.era].hq)}</span>`;
+}
+
 function renderShellText() {
   document.documentElement.lang = getLang() === 'nb' ? 'nb' : 'en';
   $$('.tabbar [data-tab]').forEach((b) => { $('.tab-label', b).textContent = t('tab_' + b.dataset.tab); });
@@ -111,6 +147,7 @@ function renderTab() {
   if (tab === 'base') renderBase();
   else if (tab === 'build') renderList('b');
   else if (tab === 'army') renderList('u');
+  else if (tab === 'shop') renderShop();
   else renderMap();
   updateBadges();
 }
@@ -120,6 +157,7 @@ function updateHUD() {
   $('#hud-money').textContent = money(S.money);
   $('#hud-income').textContent = '+' + money(E.incomePerSec(S)) + '/s';
   $('#hud-power').textContent = fmt(E.armyPower(S));
+  $('#hud-gems').textContent = fmt(S.gems || 0);
   const left = Math.ceil(((S.boostUntil || 0) - Date.now()) / 1000);
   const bb = $('#boost-bar');
   if (left > 0) { bb.hidden = false; bb.textContent = '⚡ ' + t('boost_left', { s: left }); } else bb.hidden = true;
@@ -130,6 +168,8 @@ function updateBadges() {
   $('#tab-map .badge').hidden = !canWin;
   $('#tab-build .badge').hidden = !(S.era > 0 && (S.seenBuild ?? 0) < S.era);
   $('#tab-army .badge').hidden = !(S.era > 0 && (S.seenArmy ?? 0) < S.era);
+  const freeCrate = Date.now() >= (S.ads.freeCrateAt || 0) && M.adsEnabled();
+  $('#tab-shop .badge').hidden = !(S.tut >= 5 && (freeCrate || (S.gems || 0) >= C.CRATES[0].price));
 }
 
 // ---------------- BASE ----------------
@@ -194,17 +234,19 @@ function renderBase() {
       <h1 class="era-title">${esc(L(era.title))}</h1>
       <p class="era-goal">${esc(L(era.goal))}</p>
       <div class="progress"><div class="progress-fill" style="width:${(pr.done / pr.total) * 100}%"></div><span>${t('conquered_of', { a: pr.done, b: pr.total })}</span></div>
+      <button type="button" class="link-btn tree-link" data-action="open-tree">${ico('tree')} ${t('open_tree')}</button>
     </div>
   </div>
   <div class="stage ${era.space ? 'space' : ''}" id="stage">
     ${backdrop(era)}
     <div class="village-sign">${A.flagSvg('sign-flag')}<span>${esc(S.name)}</span></div>
-    <button class="hq" id="hq" type="button" aria-label="${t('tap_hint')}">${A.hq(era.hq)}</button>
+    <button class="hq hq-fx-${hqFx()}" id="hq" type="button" aria-label="${t('tap_hint')}">${A.hq(era.hq)}</button>
     <div class="tap-hint" id="tap-hint">${t('tap_hint')} <b id="tap-val">+${money(E.tapValue(S))}</b></div>
     <div class="parade" id="parade">${paradeHTML()}</div>
   </div>
   <div class="pad stack">
     <div class="card target-card" id="target-card">${targetCardHTML()}</div>
+    ${S.tut >= 5 ? `<div id="boost-wrap">${boostCardHTML()}</div>` : ''}
     <div id="tap-card-wrap">${tapCardHTML()}</div>
   </div>`;
   const hq = $('#hq');
@@ -336,10 +378,17 @@ function doBuyTap() {
 }
 
 // ---------------- KART ----------------
+function mapToggle() {
+  return `<div class="mode-switch" role="group">
+    <button type="button" class="${mapView === 'map' ? 'on' : ''}" data-action="mapview" data-view="map">${ico('map')} ${t('map_view_map')}</button>
+    <button type="button" class="${mapView === 'tree' ? 'on' : ''}" data-action="mapview" data-view="tree">${ico('tree')} ${t('map_view_tree')}</button>
+  </div>`;
+}
 function renderMap() {
   const era = ERAS[S.era];
   const pr = E.eraProgress(S);
-  $('#scr-map').innerHTML = `<div class="pad"><div class="screen-head"><div><div class="eyebrow">${t('chapter', { n: S.era + 1 })} · ${t('conquered_of', { a: pr.done, b: pr.total })}</div><h2 class="h2">${esc(L(era.title))}</h2></div></div></div>
+  if (mapView === 'tree') { renderTree(); return; }
+  $('#scr-map').innerHTML = `<div class="pad"><div class="screen-head"><div><div class="eyebrow">${t('chapter', { n: S.era + 1 })} · ${t('conquered_of', { a: pr.done, b: pr.total })}</div><h2 class="h2">${esc(L(era.title))}</h2></div>${mapToggle()}</div></div>
   <div class="map-wrap ${era.space ? 'space' : ''}" id="map-wrap">
     ${era.space ? spaceMapSVG(era) : geoMapSVG(era)}
     ${era.space ? '' : `<button class="map-zoom" type="button" data-action="zoomout" aria-label="${t('zoom_out')}" hidden>${ico('zoomout')}</button>`}
@@ -360,7 +409,7 @@ function geoMapSVG(era) {
     const isHome = id === era.home;
     const r = REGION_BY_ID[id];
     const own = isHome || (r && S.conquered[id]);
-    const fill = own ? 'var(--gold)' : r ? r.color : '#ccc';
+    const fill = own ? 'var(--own)' : r ? r.color : '#ccc';
     paths += `<path class="reg ${own ? 'own' : ''} ${selected === id ? 'sel' : ''}" data-id="${id}" d="${g.d}" style="fill:${fill}"/>`;
   }
   for (const [id, g] of Object.entries(m.regions)) {
@@ -454,7 +503,7 @@ function regionListHTML() {
     const done = S.conquered[r.id];
     const ch = E.chanceFor(S, r);
     return `<button type="button" class="region-row ${done ? 'done' : ''} ${selected === r.id ? 'sel' : ''}" data-action="select" data-id="${r.id}">
-      <span class="swatch" style="background:${done ? 'var(--gold)' : r.color}"></span>
+      <span class="swatch" style="background:${done ? 'var(--own)' : r.color}"></span>
       <span class="rname">${esc(L(r.name))}</span>
       ${done ? `<span class="rinc">+${money(r.income * pm())}/s</span>${ico('check')}` : `<span class="rdef">${ico('skull')}${fmt(E.regionDef(S, r))}</span><span class="rchance ${chanceClass(ch)}">${pct(ch)}</span>`}
     </button>`;
@@ -593,6 +642,7 @@ function startBattle(id) {
   const mine = pickMySprites(Math.min(5, Math.max(1, E.armySize(S))));
   const res = E.attack(S, id);
   if (!res) return;
+  lastBattle = res;
   persist();
   showBattle(r, res, mine);
 }
@@ -660,9 +710,10 @@ function showBattleResult(ov, r, res) {
   card.innerHTML = `<div class="result-mascot">${A.mascot(res.win ? 'happy' : 'sad')}</div>
     <h2 class="result-title">${res.win ? t('victory') : t('defeat')}</h2>
     <p>${res.win ? t('victory_text', { r: esc(L(r.name)) }) : t('defeat_text', { r: esc(L(r.name)) })}</p>
-    ${res.win ? `<p class="result-reward">${ico('coin')} ${t('new_income', { v: money(r.income * pm()) })}</p>` : ''}
+    ${res.win ? `<p class="result-reward">${ico('coin')} ${t('new_income', { v: money(r.income * pm()) })}</p><p class="result-reward gems">${ico('gem')} ${t('gems_won', { n: res.gems })}</p>` : ''}
     <p class="result-loss">${res.lostTotal ? t('lost_units', { n: fmt(res.lostTotal) }) : t('lost_none')}</p>
     ${!res.win ? `<p class="tip">${t('defeat_tip')}</p>` : ''}
+    ${!res.win && res.lostTotal && M.adsEnabled() ? `<button class="btn btn-ad big" type="button" data-action="ad-revive">${ico(S.adFree ? 'gift' : 'ad')} ${t('revive', { n: fmt(res.lostTotal) })}</button>` : ''}
     <button class="btn btn-gold big" type="button" data-action="battle-done">${t('continue')}</button>`;
   $('.battle-inner', ov).appendChild(card);
   if (res.win) confetti(ov, 40);
@@ -680,6 +731,7 @@ function battleDone(btn) {
   renderTab();
   updateHUD();
   updateTutorial();
+  maybeInterstitial();
 }
 
 // ---------------- MODALER ----------------
@@ -737,6 +789,7 @@ function startGame() {
   S.seenIntro = 0;
   persist();
   closeModal($('.intro-modal'));
+  applySkins();
   applyTheme();
   renderShellText();
   setTab('base');
@@ -757,10 +810,12 @@ function showEraComplete() {
   const cur = ERAS[S.era];
   const next = ERAS[S.era + 1];
   sfx.fanfare();
+  M.happytime();
   if (!next) { S.finished = true; persist(); showFinal(); return; }
   const unlocks = [...BUILDINGS, ...UNITS].filter((it) => it.era === S.era + 1);
   const m = openModal(`<div class="modal-mascot">${A.mascot()}</div>
     <h2 class="big-title">${esc(L(cur.won))}</h2>
+    <p class="result-reward gems center-row">${ico('gem')} ${t('gems_won', { n: E.gemsForEra(S.era) })}</p>
     <p class="speech">${esc(L(next.intro))}</p>
     <div class="unlock-title">${t('era_unlocked')}</div>
     <div class="unlock-grid">${unlocks.map((it) => `<div class="unlock"><div class="unlock-art">${itemArt(it)}</div><span>${esc(L(it.name))}</span></div>`).join('')}</div>
@@ -798,6 +853,7 @@ function doPrestige(btn) {
   S = E.prestigeReset(S);
   selected = null; viewBox = null;
   persist();
+  applySkins();
   applyTheme();
   setTab('base');
   updateHUD();
@@ -813,7 +869,8 @@ function checkOffline() {
     <h2 class="big-title">${t('welcome_back')}</h2>
     <p class="speech">${t('away_text', { t: duration(secs) })}</p>
     <div class="big-money">${ico('coin')} ${money(earned)}</div>
-    <button type="button" class="btn btn-gold big" data-action="collect" data-amount="${earned}">${t('collect')}</button>`, 'welcome');
+    <button type="button" class="btn btn-gold big" data-action="collect" data-amount="${earned}">${t('collect')}</button>
+    ${M.adsEnabled() && S.tut >= 5 ? `<button type="button" class="btn btn-ad big" data-action="ad-double" data-amount="${earned}">${ico(S.adFree ? 'gift' : 'ad')} ${t('double_reward')} · ${money(earned * 2)}</button>` : ''}`, 'welcome');
 }
 
 function showSettings() {
@@ -828,6 +885,10 @@ function showSettings() {
     <label class="field-label" for="rename">${t('village_name')}</label>
     <div class="rename-row"><input id="rename" class="text-input" maxlength="22" value="${esc(S.name)}"><button type="button" class="btn btn-soft" data-action="rename">${t('save_name')}</button></div>
     ${canInstall ? `<div class="install-box"><b>${ico('download')} ${t('install')}</b><p>${installEvt ? '' : ios ? t('install_ios') : t('install_other')}</p>${installEvt ? `<button type="button" class="btn btn-gold" data-action="install">${t('install_btn')}</button>` : ''}</div>` : ''}
+    <div class="stats-box"><b>${ico('shop')} ${t('store_section')}</b>
+      <p class="small">${S.adFree ? '✓ ' + t('adfree_active') : M.isDemoAds() ? t('ads_demo_mode') : t('ads_live_mode', { p: M.CONFIG.ads.provider })}</p>
+      ${M.paymentsEnabled() ? `<button type="button" class="link-btn" data-action="restore">${t('restore_purchases')}</button>` : ''}
+    </div>
     <div class="stats-box"><b>${t('stats')}</b>
       <div class="stat-list">
         <span>${t('stat_time')}</span><b>${duration(st.playTime)}</b>
@@ -840,6 +901,398 @@ function showSettings() {
       </div></div>
     <div class="danger-zone" id="danger"><button type="button" class="btn btn-danger" data-action="reset">${t('reset')}</button></div>
     <p class="credits">${t('credits')}</p>`, 'settings');
+}
+
+
+// ---------------- BUTIKK, SKINS OG LOOTKASSER ----------------
+const today = () => new Date().toISOString().slice(0, 10);
+function gemAdsLeft() {
+  if (S.ads.gemDay !== today()) { S.ads.gemDay = today(); S.ads.gemCount = 0; }
+  return Math.max(0, AD_GEMS_PER_DAY - (S.ads.gemCount || 0));
+}
+const productPrice = (id) => esc(L(M.PRODUCT_BY_ID[id].price));
+const adBtn = (action, disabled) => `<button type="button" class="btn btn-ad" data-action="${action}" ${disabled ? 'disabled' : ''}>${ico(S.adFree ? 'gift' : 'ad')} ${S.adFree ? t('claim') : t('watch')}</button>`;
+
+function renderShop() {
+  $('#scr-shop').innerHTML = `<div class="pad stack">
+    <div class="screen-head"><div><div class="eyebrow">${t('shop_title')}</div><div class="big-num">${ico('gem')}${fmt(S.gems || 0)}</div></div>
+      <div class="mode-switch" role="group">
+        <button type="button" class="${shopView === 'store' ? 'on' : ''}" data-action="shopview" data-view="store">${t('shop_store')}</button>
+        <button type="button" class="${shopView === 'skins' ? 'on' : ''}" data-action="shopview" data-view="skins">${t('shop_skins')}</button>
+      </div></div>
+    ${shopView === 'store' ? storeHTML() : skinsHTML()}
+  </div>`;
+}
+
+function storeHTML() {
+  const now = Date.now();
+  const freeLeft = (S.ads.freeCrateAt || 0) - now;
+  const gemLeft = gemAdsLeft();
+  return `
+  ${M.adsEnabled() ? `<div class="section-title">${S.adFree ? t('free_rewards_adfree') : t('free_rewards')}</div>
+  <div class="offer-list">
+    <div class="offer"><div class="offer-art">${A.crateArt('wood')}</div><div class="offer-body"><b>${t('free_crate')}</b><span>${freeLeft > 0 ? t('ready_in', { t: duration(freeLeft / 1000) }) : S.adFree ? t('free_crate_desc_adfree') : t('free_crate_desc')}</span></div>${adBtn('ad-crate', freeLeft > 0)}</div>
+    <div class="offer"><div class="offer-art gem-art">${ico('gem')}</div><div class="offer-body"><b>+${AD_GEMS} ${t('gems')}</b><span>${t('left_today', { n: gemLeft })}</span></div>${adBtn('ad-gems', gemLeft <= 0)}</div>
+  </div>` : ''}
+  <div class="section-title">${t('loot_crates')}</div>
+  <div class="crate-list">${C.CRATES.map((c) => `<div class="crate-card crate-${c.id}">
+    <div class="crate-card-art">${A.crateArt(c.id)}</div>
+    <div class="crate-card-body"><b>${esc(L(c.name))}</b>
+      <span>${c.items === 1 ? t('crate_items_1') : t('crate_items_n', { n: c.items })}${c.guarantee ? ' · ' + t('crate_guarantee', { r: esc(L(C.RARITY[c.guarantee].name)) }) : ''}</span>
+      <button type="button" class="link-btn" data-action="odds" data-id="${c.id}">${ico('info')} ${t('see_odds')}</button></div>
+    <button type="button" class="buy-btn gem-btn ${S.gems >= c.price ? '' : 'cant'}" data-action="crate" data-id="${c.id}"><span class="lbl">${t('open')}</span><span class="price">${ico('gem')}${c.price}</span></button>
+  </div>`).join('')}</div>
+  <p class="pity-note">${ico('star')} ${t('pity', { n: Math.max(1, C.PITY - (S.crates.pity || 0)) })}</p>
+  ${E.baseIncome(S) > 0 ? `<div class="section-title">${t('time_skips')}</div>
+  <div class="offer-list">${TIME_SKIPS.map((k) => `<div class="offer"><div class="offer-art ffwd-art">${ico('ffwd')}</div>
+    <div class="offer-body"><b>${t('skip_title', { h: k.hours })}</b><span>+${money(E.baseIncome(S) * k.hours * 3600)}</span></div>
+    <button type="button" class="buy-btn gem-btn ${S.gems >= k.gems ? '' : 'cant'}" data-action="skip" data-id="${k.id}"><span class="lbl">${t('buy')}</span><span class="price">${ico('gem')}${k.gems}</span></button></div>`).join('')}</div>` : ''}
+  ${M.paymentsEnabled() ? paidHTML() : ''}`;
+}
+
+function paidHTML() {
+  const packs = M.PRODUCTS.filter((p) => p.id.startsWith('gems_'));
+  return `
+  <div class="section-title">${t('adfree_title')}</div>
+  ${S.adFree ? `<div class="adfree-card owned">${ico('check')}<b>${t('adfree_owned')}</b></div>` : `<div class="adfree-card">
+    <div class="adfree-ico">${ico('adfree')}</div>
+    <div class="adfree-body"><b>${t('adfree_name')}</b><ul><li>${t('adfree_b1')}</li><li>${t('adfree_b2')}</li><li>${t('adfree_b3', { n: M.PRODUCT_BY_ID.adfree.gems })}</li></ul></div>
+    <button type="button" class="btn btn-gold" data-action="iap" data-id="adfree">${productPrice('adfree')}</button>
+  </div>`}
+  ${S.purchases.includes('starter') ? '' : `<div class="starter-card"><span class="tag">${t('one_time')}</span>
+    <div class="starter-art">${A.crateArt('cosmic')}</div>
+    <div class="starter-body"><b>${t('starter_name')}</b><span>${t('starter_desc')}</span></div>
+    <button type="button" class="btn btn-gold" data-action="iap" data-id="starter">${productPrice('starter')}</button></div>`}
+  <div class="section-title">${t('buy_gems')}</div>
+  <div class="gem-grid">${packs.map((p) => `<button type="button" class="gem-pack" data-action="iap" data-id="${p.id}">
+    ${p.tag ? `<span class="tag">${t('tag_' + p.tag)}</span>` : ''}<span class="gem-ico">${ico('gem')}</span><b>${fmt(p.gems)}</b><span class="gem-price">${productPrice(p.id)}</span></button>`).join('')}</div>
+  <p class="demo-note">${ico('info')} ${t('demo_store_note')}</p>`;
+}
+
+function skinsHTML() {
+  const total = C.SKINS.length, own = C.ownedCount(S);
+  const list = C.SKINS.filter((k) => k.cat === skinCat).sort((a, b) => C.RARITY[a.rarity].rank - C.RARITY[b.rarity].rank);
+  return `
+  <div class="progress"><div class="progress-fill" style="width:${(own / total) * 100}%"></div><span>${t('collection', { a: own, b: total })}</span></div>
+  <div class="chip-row" role="group">${C.CATEGORIES.map((c) => `<button type="button" class="chip ${c.id === skinCat ? 'on' : ''}" data-action="skincat" data-cat="${c.id}">${esc(L(c.name))}</button>`).join('')}</div>
+  <div class="skin-grid">${list.map((k) => {
+    const owned = !!S.skins.owned[k.id];
+    const on = S.skins.equipped[k.cat] === k.id;
+    return `<button type="button" class="skin-card r-${k.rarity} ${owned ? '' : 'locked'} ${on ? 'on' : ''}" data-action="${owned ? 'equip' : 'skin-locked'}" data-id="${k.id}">
+      <span class="skin-art">${skinPreview(k)}</span>
+      <span class="skin-name">${esc(L(k.name))}</span>
+      ${rarityChip(k.rarity)}
+      <span class="skin-state">${on ? ico('check') + t('equipped') : owned ? t('equip') : ico('lock') + t('locked')}</span>
+    </button>`;
+  }).join('')}</div>
+  <p class="demo-note">${t('skins_cosmetic')}</p>
+  <button type="button" class="btn btn-gold big" data-action="shopview" data-view="store">${t('get_more_skins')}</button>`;
+}
+
+function showOdds(id) {
+  const c = C.CRATE_BY_ID[id];
+  openModal(`<div class="modal-head"><h2 class="h2">${t('odds_title', { c: esc(L(c.name)) })}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <div class="odds-art">${A.crateArt(c.id)}</div>
+    <div class="odds-list">${C.RARITIES.map((r) => `<div class="odds-row r-${r.id}">${rarityChip(r.id)}<div class="odds-bar"><i style="width:${Math.max(1.5, c.odds[r.id])}%"></i></div><b>${String(c.odds[r.id]).replace('.', getLang() === 'nb' ? ',' : '.')} %</b></div>`).join('')}</div>
+    ${c.guarantee ? `<p class="small center">${t('odds_guarantee', { r: esc(L(C.RARITY[c.guarantee].name)) })}</p>` : ''}
+    <p class="small center">${t('odds_note')}</p>
+    <p class="small center">${t('odds_pity', { n: C.PITY })}</p>`, 'odds-modal');
+}
+
+function buyTimeSkip(id) {
+  const k = TIME_SKIPS.find((x) => x.id === id);
+  if (!k) return;
+  if (S.gems < k.gems) { sfx.nope(); toast(t('not_enough_gems')); return; }
+  const amount = E.baseIncome(S) * k.hours * 3600;
+  S.gems -= k.gems; S.money += amount; S.totalEarned += amount;
+  sfx.coin();
+  toast('+' + money(amount), 'gold');
+  updateHUD(); persist(); renderShop();
+}
+
+// ----- åpne kasse -----
+function openCrateFlow(crateId, { free = false } = {}) {
+  const c = C.CRATE_BY_ID[crateId];
+  const items = C.openCrate(S, crateId, { free });
+  if (!items) { sfx.nope(); toast(t('not_enough_gems')); return; }
+  persist();
+  updateHUD();
+  modalCount++;
+  const ov = document.createElement('div');
+  ov.className = 'crate-open';
+  ov.innerHTML = `<div class="crate-stage"><div class="crate-rays"></div><div class="crate-big">${A.crateArt(c.id)}</div><p class="crate-hint">${t('tap_to_open')}</p></div>`;
+  $('#overlay-root').appendChild(ov);
+  updateTutorial();
+  let idx = -1;
+  let busy = false;
+  const best = items.reduce((a, b) => (C.RARITY[b.rarity].rank > C.RARITY[a.rarity].rank ? b : a), items[0]);
+  const close = () => { ov.remove(); modalCount = Math.max(0, modalCount - 1); updateHUD(); updateBadges(); if (tab === 'shop') renderShop(); updateTutorial(); };
+  const reveal = (it) => {
+    const rank = C.RARITY[it.rarity].rank;
+    [sfx.coin, sfx.crate, sfx.milestone, sfx.fanfare, sfx.fanfare][rank]();
+    if (S.settings.vibrate) buzz(rank >= 3 ? 60 : 20);
+    const last = idx === items.length - 1;
+    ov.querySelector('.crate-stage').innerHTML = `<div class="crate-rays r-${it.rarity}"></div>
+      <div class="loot-card r-${it.rarity}">
+        ${it.dup ? '' : `<span class="loot-new">${t('new_skin')}</span>`}
+        <div class="loot-art">${skinPreview(it.skin)}</div>
+        ${rarityChip(it.rarity)}
+        <h3>${esc(L(it.skin.name))}</h3>
+        <p class="loot-cat">${esc(L(C.CATEGORIES.find((x) => x.id === it.skin.cat).name))}</p>
+        ${it.dup ? `<p class="loot-dup">${ico('gem')} ${t('duplicate', { n: it.refund })}</p>` : ''}
+      </div>
+      ${last ? '' : `<p class="crate-hint">${t('tap_next')} · ${idx + 1}/${items.length}</p>`}`;
+    if (rank >= 3) confetti(ov, 70);
+    if (last) showDone();
+  };
+  const showDone = () => {
+    const newBest = !best.dup && S.skins.equipped[best.skin.cat] !== best.skin.id ? best : null;
+    const row = document.createElement('div');
+    row.className = 'loot-actions';
+    row.innerHTML = `${items.length > 1 ? `<div class="loot-summary">${items.map((it) => `<span class="loot-mini r-${it.rarity}" title="${esc(L(it.skin.name))}">${skinPreview(it.skin)}</span>`).join('')}</div>` : ''}
+      <div class="row2">${newBest ? `<button type="button" class="btn btn-gold" data-crate="equip">${t('use_now')}</button>` : ''}<button type="button" class="btn ${newBest ? 'btn-soft' : 'btn-gold'}" data-crate="done">${t('done')}</button></div>`;
+    ov.querySelector('.crate-stage').appendChild(row);
+    row.querySelector('[data-crate="done"]').addEventListener('click', (e) => { e.stopPropagation(); close(); });
+    row.querySelector('[data-crate="equip"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      C.equip(S, newBest.skin.id); applySkins(); persist();
+      toast(t('skin_equipped_toast', { name: L(newBest.skin.name) }));
+      close();
+    });
+  };
+  ov.addEventListener('click', (e) => {
+    if (busy || e.target.closest('button')) return;
+    if (idx >= items.length - 1) return;
+    if (idx === -1) {
+      busy = true;
+      ov.classList.add('opening');
+      sfx.boom();
+      setTimeout(() => { busy = false; idx = 0; reveal(items[0]); }, 650);
+      return;
+    }
+    idx++;
+    reveal(items[idx]);
+  });
+}
+
+// ----- kjøp (demo eller ekte butikk) -----
+function confirmPurchase(p) {
+  return new Promise((resolve) => {
+    let ok = false;
+    const lines = [];
+    if (p.adFree) lines.push(`<li>${ico('adfree')} ${t('adfree_name')}</li>`);
+    if (p.gems) lines.push(`<li>${ico('gem')} ${fmt(p.gems)} ${t('gems')}</li>`);
+    if (p.skinRarity) lines.push(`<li>${ico('palette')} ${rarityChip(p.skinRarity)} skin</li>`);
+    const m = openModal(`<div class="modal-head"><h2 class="h2">${t('confirm_purchase')}</h2></div>
+      <ul class="iap-lines">${lines.join('')}</ul>
+      <p class="demo-warning">${ico('info')} ${t('demo_purchase_text')}</p>
+      <div class="row2"><button type="button" class="btn btn-gold" data-iap="yes">${t('demo_buy', { p: esc(L(p.price)) })}</button><button type="button" class="btn btn-soft" data-iap="no">${t('cancel')}</button></div>`, 'iap-modal', () => resolve(ok));
+    m.querySelector('[data-iap="yes"]').addEventListener('click', (e) => { ok = true; closeModal(e.target); });
+    m.querySelector('[data-iap="no"]').addEventListener('click', (e) => closeModal(e.target));
+  });
+}
+async function buyProduct(id) {
+  const p = M.PRODUCT_BY_ID[id];
+  if (!p) return;
+  if (p.once && S.purchases.includes(id)) return;
+  const ok = await M.purchase(id);
+  if (!ok) return;
+  if (p.gems) S.gems += p.gems;
+  if (p.adFree) S.adFree = true;
+  if (p.skinRarity) {
+    const pool = C.SKINS.filter((k) => k.rarity === p.skinRarity && !S.skins.owned[k.id]);
+    if (pool.length) { const k = pool[Math.floor(Math.random() * pool.length)]; S.skins.owned[k.id] = Date.now(); toast(t('new_skin') + ' ' + L(k.name), 'gold'); }
+    else S.gems += C.RARITY[p.skinRarity].refund;
+  }
+  S.purchases.push(id);
+  persist();
+  sfx.fanfare();
+  toast(t('purchase_done'), 'gold');
+  updateHUD(); updateBadges();
+  renderTab();
+}
+
+// ----- reklame -----
+let adSoundWas = null;
+function onAdStart() { adSoundWas = S ? S.settings.sound : null; setSound(false); M.gameplayStop(); }
+function onAdEnd() { if (adSoundWas !== null) setSound(adSoundWas); adSoundWas = null; M.gameplayStart(); }
+async function watchAd(placement, reward) {
+  unlockAudio();
+  if (S.adFree) { reward(); persist(); return true; }
+  const res = await M.rewardedAd(placement);
+  if (res === 'ok') {
+    S.ads.watched = (S.ads.watched || 0) + 1;
+    reward();
+    persist();
+    return true;
+  }
+  toast(res === 'skipped' ? t('ad_skipped') : t('ad_none'));
+  return false;
+}
+async function maybeInterstitial() {
+  if (!S || S.adFree || !M.adsEnabled()) return;
+  const a = S.ads;
+  const now = Date.now();
+  a.battlesSince = (a.battlesSince || 0) + 1;
+  if (S.tut < 5 || S.stats.playTime < 240 || modalCount > 0) return;
+  if (a.battlesSince < M.CONFIG.ads.interstitialEvery) return;
+  if (now - (a.lastInterstitial || 0) < M.CONFIG.ads.interstitialMinGap * 1000) return;
+  a.battlesSince = 0;
+  a.lastInterstitial = now;
+  persist();
+  await M.interstitialAd('after_battle');
+}
+const FAKE_ADS = [
+  { art: () => A.buildingArt('burger'), title: 'Ohio Burger', text: { nb: 'Nå med ekstra mais! Prøv Columbus-menyen i dag.', en: 'Now with extra corn! Try the Columbus meal today.' }, color: '#ff8a3d' },
+  { art: () => A.colaArt(), title: 'Buckeye Cola', text: { nb: 'Brusen generaler drikker. 100 % nøttefri!', en: 'The soda generals drink. 100% nut-free!' }, color: '#e5484d' },
+  { art: () => A.buildingArt('tech'), title: 'OhioPhone 99', text: { nb: 'Tre kameraer. Null dekning i Ohio.', en: 'Three cameras. Zero signal in Ohio.' }, color: '#3559d6' },
+  { art: () => A.buildingArt('mooncheese'), title: 'Måneost™', text: { nb: 'Hentet fersk fra månen. Pass deg for romvesener!', en: 'Fresh from the Moon. Watch out for aliens!' }, color: '#f0a91c' },
+];
+function demoAd(type) {
+  return new Promise((resolve) => {
+    modalCount++;
+    onAdStart();
+    const ad = FAKE_ADS[Math.floor(Math.random() * FAKE_ADS.length)];
+    const secs = type === 'rewarded' ? 5 : 3;
+    const ov = document.createElement('div');
+    ov.className = 'ad-overlay';
+    ov.innerHTML = `<div class="ad-top"><span class="ad-label">${t('ad_label')}</span><button type="button" class="ad-close" disabled>${secs}</button></div>
+      <div class="ad-card" style="--ad:${ad.color}"><div class="ad-art">${ad.art()}</div><h3>${esc(ad.title)}</h3><p>${esc(L(ad.text))}</p></div>
+      <p class="ad-foot">${t('ad_demo_note')}</p>
+      <div class="ad-actions">${type === 'rewarded' ? `<button type="button" class="link-btn ad-skip">${t('ad_skip')}</button>` : ''}
+      ${type === 'interstitial' && M.paymentsEnabled() ? `<button type="button" class="btn btn-soft ad-remove">${ico('adfree')} ${t('remove_ads')}</button>` : ''}</div>`;
+    $('#overlay-root').appendChild(ov);
+    const btn = $('.ad-close', ov);
+    let left = secs;
+    const iv = setInterval(() => {
+      left--;
+      if (left > 0) btn.textContent = left;
+      else { clearInterval(iv); btn.disabled = false; btn.classList.add('ready'); btn.innerHTML = type === 'rewarded' ? t('ad_claim') : ico('close'); }
+    }, 1000);
+    const end = (v) => { clearInterval(iv); ov.remove(); modalCount = Math.max(0, modalCount - 1); onAdEnd(); resolve(v); };
+    btn.addEventListener('click', () => end('ok'));
+    $('.ad-skip', ov)?.addEventListener('click', () => end('skipped'));
+    $('.ad-remove', ov)?.addEventListener('click', () => { end('ok'); shopView = 'store'; setTab('shop'); });
+  });
+}
+function boostCardHTML() {
+  if (!M.adsEnabled()) return '';
+  const left = Math.ceil(((S.adBoostUntil || 0) - Date.now()) / 1000);
+  if (left > 0) {
+    return `<div class="item-card boost-card active"><div class="item-art boost-art">${ico('boost')}</div>
+      <div class="item-body"><div class="item-name">${t('boost_active')}</div><div class="item-desc">${t('boost_left2', { t: duration(left) })}</div></div></div>`;
+  }
+  return `<div class="item-card boost-card"><div class="item-art boost-art">${ico('boost')}</div>
+    <div class="item-body"><div class="item-name">${t('boost_title')}</div><div class="item-desc">${S.adFree ? t('boost_desc_adfree') : t('boost_desc')}</div></div>
+    ${adBtn('ad-boost', false)}</div>`;
+}
+
+// ---------------- REISEN (hele spillet som et tre) ----------------
+const roughTime = (secs) => duration(secs >= 90 ? Math.round(secs / 60) * 60 : secs);
+function wrapLabel(name, max = 15) {
+  if (name.length <= max) return [name];
+  const words = name.split(' ');
+  let a = '';
+  while (words.length && (a + ' ' + words[0]).trim().length <= max) a = (a + ' ' + words.shift()).trim();
+  if (!a) a = words.shift();
+  return [a, words.join(' ')];
+}
+function treeHTML() {
+  const total = REGIONS.length;
+  const done = REGIONS.filter((r) => S.conquered[r.id]).length;
+  const totalSecs = REGIONS.reduce((a, r) => a + r.time, 0);
+  const leftSecs = REGIONS.filter((r) => !S.conquered[r.id]).reduce((a, r) => a + r.time, 0);
+  const W = 360, X = 180, FR = 40, CH = 96;
+  const rows = [];
+  rows.push({ kind: 'top', h: 96 });
+  for (let e = ERAS.length - 1; e >= 0; e--) {
+    const rs = regionsOfEra(e).slice().reverse();
+    rs.forEach((r, i) => rows.push({ kind: 'fruit', r, e, side: (rs.length - i) % 2 ? -1 : 1, h: FR }));
+    rows.push({ kind: 'chapter', e, h: CH + 54 });
+  }
+  rows.push({ kind: 'root', h: 120 });
+  let y = 0;
+  for (const row of rows) { row.y = y + row.h / 2; y += row.h; }
+  const H = y;
+  const next = E.nextTarget(S);
+  const here = rows.find((r) => r.kind === 'fruit' && next && r.r.id === next.id) || rows.find((r) => r.kind === 'chapter' && r.e === S.era);
+  const hereY = S.finished ? rows[0].y : here ? here.y : H - 60;
+  let svg = '';
+  // stamme: lys bakgrunn, mørkere der du har vært
+  const trunk = (y0, y1, w, color) => `<path d="M${X} ${y1}C${X - 10} ${(y0 * 2 + y1) / 3} ${X + 10} ${(y0 + y1 * 2) / 3} ${X} ${y0}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round"/>`;
+  svg += trunk(rows[0].y, H - 70, 22, '#2b2350') + trunk(rows[0].y, H - 70, 15, '#d9cbb8');
+  svg += trunk(hereY, H - 70, 15, '#9b6334');
+  for (const row of rows) {
+    if (row.kind === 'fruit') {
+      const { r, e, side } = row;
+      const fx = X + side * 46, fy = row.y;
+      const own = S.conquered[r.id];
+      const isNext = next && r.id === next.id;
+      const future = e > S.era;
+      const fill = own ? 'var(--own)' : future ? '#d8d2e6' : r.color;
+      svg += `<path d="M${X} ${fy + 12}Q${X + side * 22} ${fy + 10} ${fx - side * 12} ${fy}" fill="none" stroke="#2b2350" stroke-width="7" stroke-linecap="round"/><path d="M${X} ${fy + 12}Q${X + side * 22} ${fy + 10} ${fx - side * 12} ${fy}" fill="none" stroke="${own || e <= S.era ? '#9b6334' : '#d9cbb8'}" stroke-width="3.6" stroke-linecap="round"/>`;
+      svg += `<path d="M${fx - side * 2} ${fy - 13}q${side * 8} -8 ${side * 14} -2q${-side * 6} 6 ${-side * 14} 2z" fill="${future ? '#c9d6c0' : '#5fc94a'}" stroke="#2b2350" stroke-width="1.8"/>`;
+      const go = e === S.era && !own ? `data-action="tree-go" data-id="${r.id}" class="tree-tap"` : '';
+      svg += `<g ${go}>${isNext ? `<circle cx="${fx}" cy="${fy}" r="20" class="tree-ring"/>` : ''}<circle cx="${fx}" cy="${fy}" r="14" fill="${fill}" stroke="#2b2350" stroke-width="3"/>`;
+      if (own) svg += `<path d="M${fx - 6} ${fy}l4 4 8-9" fill="none" stroke="#2b2350" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+      else if (future) svg += `<rect x="${fx - 5}" y="${fy - 1}" width="10" height="7" rx="1.5" fill="#8a82a6"/><path d="M${fx - 3} ${fy - 1}v-2.5a3 3 0 0 1 6 0v2.5" fill="none" stroke="#8a82a6" stroke-width="2"/>`;
+      else if (isNext) svg += `<path d="M${fx - 5} ${fy - 5}l10 10M${fx + 5} ${fy - 5}l-10 10" stroke="#2b2350" stroke-width="2.6" stroke-linecap="round"/>`;
+      const lines = wrapLabel(L(r.name));
+      const lx = fx + side * 22, anchor = side < 0 ? 'end' : 'start';
+      svg += `<text x="${lx}" y="${fy + (lines.length > 1 ? -2 : 4)}" text-anchor="${anchor}" class="tree-label ${future ? 'dim' : ''} ${isNext ? 'next' : ''}">${lines.map((l, i) => `<tspan x="${lx}" dy="${i ? 13 : 0}">${esc(l)}</tspan>`).join('')}</text></g>`;
+      if (isNext) svg += `<g id="tree-here" transform="translate(${fx + side * -2} ${fy - 30})"><rect x="-34" y="-11" width="68" height="20" rx="10" fill="#ef4f5a" stroke="#2b2350" stroke-width="2.4"/><text y="4" text-anchor="middle" class="tree-here">${t('tree_here')}</text></g>`;
+    } else if (row.kind === 'chapter') {
+      const e = row.e, era = ERAS[e], cy = row.y;
+      const pr = E.eraProgress(S, e);
+      const secs = regionsOfEra(e).reduce((a, r) => a + r.time, 0);
+      const state = pr.done === pr.total ? 'done' : e === S.era ? 'now' : e < S.era ? 'done' : 'locked';
+      const art = e <= 4 ? A.hq(era.hq) : A.planet(e === 5 ? 'saturn' : 'mothership');
+      const ny = cy - 26;
+      svg += `<circle cx="${X}" cy="${ny}" r="34" fill="${state === 'locked' ? '#ece8f4' : '#fff'}" stroke="#2b2350" stroke-width="3.4"/>`;
+      svg += art.replace('<svg ', `<svg x="${X - 27}" y="${ny - 27}" width="54" height="54" ${state === 'locked' ? 'opacity=".35" ' : ''}`);
+      const title = L(era.title);
+      const meta = `${t('about_time', { t: roughTime(secs) })} · ${state === 'done' ? '✓ ' + t('ch_done') : state === 'now' ? t('ch_now') + ` ${pr.done}/${pr.total}` : t('ch_locked')}`;
+      const pw = Math.min(330, Math.max(150, title.length * 10.8 + 34, meta.length * 6.6 + 30));
+      const py = ny + 42;
+      svg += `<rect x="${X - pw / 2}" y="${py}" width="${pw}" height="58" rx="14" fill="${state === 'locked' ? '#f4f1fa' : state === 'now' ? '#fff6cf' : '#fff'}" stroke="#2b2350" stroke-width="3"/>`;
+      svg += `<text x="${X}" y="${py + 16}" text-anchor="middle" class="tree-ch-eyebrow">${esc(t('chapter', { n: e + 1 }))}</text>`;
+      svg += `<text x="${X}" y="${py + 35}" text-anchor="middle" class="tree-ch-title ${state === 'locked' ? 'dim' : ''}">${esc(title)}</text>`;
+      svg += `<text x="${X}" y="${py + 50}" text-anchor="middle" class="tree-ch-meta">${esc(meta)}</text>`;
+    } else if (row.kind === 'top') {
+      const cy = row.y;
+      svg += `<circle cx="${X}" cy="${cy}" r="30" fill="${S.finished ? 'var(--own)' : '#fff6cf'}" stroke="#2b2350" stroke-width="3.4"/>`;
+      svg += `<path d="M${X - 18} ${cy + 8}l4-20 9 9 5-14 5 14 9-9 4 20z" fill="#ffd23f" stroke="#2b2350" stroke-width="2.6" stroke-linejoin="round"/>`;
+      svg += `<text x="${X}" y="${cy + 50}" text-anchor="middle" class="tree-ch-title">${esc(t('tree_end'))}</text>`;
+    } else if (row.kind === 'root') {
+      const cy = row.y - 20;
+      svg += `<path d="M${X} ${cy - 10}q-30 20-62 26M${X} ${cy - 10}q30 20 62 26M${X} ${cy - 10}q-8 26-24 40M${X} ${cy - 10}q10 26 26 40" fill="none" stroke="#2b2350" stroke-width="7" stroke-linecap="round"/><path d="M${X} ${cy - 10}q-30 20-62 26M${X} ${cy - 10}q30 20 62 26M${X} ${cy - 10}q-8 26-24 40M${X} ${cy - 10}q10 26 26 40" fill="none" stroke="#9b6334" stroke-width="3.4" stroke-linecap="round"/>`;
+      svg += `<ellipse cx="${X}" cy="${cy + 10}" rx="120" ry="20" fill="var(--ground, #6cc551)" opacity=".55"/>`;
+      svg += A.hq(0).replace('<svg ', `<svg x="${X - 32}" y="${cy - 64}" width="64" height="56" `);
+      svg += `<text x="${X}" y="${cy + 46}" text-anchor="middle" class="tree-ch-meta">${esc(t('tree_start', { name: S.name }))}</text>`;
+    }
+  }
+  return `<div class="card tree-summary">
+      <div class="eyebrow">${t('tree_title')}</div>
+      <div class="tree-big">${t('tree_total', { t: roughTime(totalSecs) })}</div>
+      <p class="small">${t('tree_counts', { c: ERAS.length, r: total })}</p>
+      <div class="progress"><div class="progress-fill" style="width:${(done / total) * 100}%"></div><span>${t('tree_progress', { p: Math.round((done / total) * 100) })} · ${done}/${total}</span></div>
+      <p class="small">${t('tree_played', { a: roughTime(S.stats.playTime), b: roughTime(leftSecs) })}</p>
+      <p class="small muted">${t('tree_note')}</p>
+    </div>
+    <div class="tree-wrap"><svg class="tree" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('tree_title'))}">${svg}</svg></div>`;
+}
+function renderTree() {
+  const pr = E.eraProgress(S);
+  $('#scr-map').innerHTML = `<div class="pad stack"><div class="screen-head"><div><div class="eyebrow">${t('chapter', { n: S.era + 1 })} · ${t('conquered_of', { a: pr.done, b: pr.total })}</div><h2 class="h2">${t('map_view_tree')}</h2></div>${mapToggle()}</div>
+    ${treeHTML()}</div>`;
+}
+function scrollTreeToHere() {
+  requestAnimationFrame(() => {
+    const scr = $('#scr-map'), here = $('#tree-here') || $('.tree-ring');
+    if (!scr || !here) return;
+    const a = here.getBoundingClientRect(), b = scr.getBoundingClientRect();
+    scr.scrollTop += a.top - b.top - scr.clientHeight / 2;
+  });
 }
 
 // ---------------- små effekter ----------------
@@ -905,7 +1358,12 @@ function collectCrate(x, y) {
   S.stats.crates++;
   sfx.crate();
   if (S.settings.vibrate) buzz(30);
-  if (Math.random() < 0.62 || E.boostActive(S)) {
+  if (Math.random() < 0.14) {
+    const g = 10 + Math.floor(Math.random() * 16);
+    S.gems += g;
+    floatText(x, y, '+' + g + ' 💎', 'ft-money big');
+    toast(t('crate_gems', { n: g }), 'boost');
+  } else if (Math.random() < 0.62 || E.boostActive(S)) {
     const amount = Math.max(25, E.baseIncome(S) * 40 + E.tapValue(S) * 15);
     S.money += amount; S.totalEarned += amount;
     floatText(x, y, '+' + money(amount), 'ft-money big');
@@ -959,8 +1417,13 @@ function updateLive() {
     if (sig !== lastSig.target) { lastSig.target = sig; const c = $('#target-card'); if (c) c.innerHTML = targetCardHTML(); }
     const tb = $('[data-action="buytap"]');
     if (tb && S.tapLevel < E.TAP_MAX) tb.classList.toggle('cant', S.money < E.tapCost(S.tapLevel));
+    const bw = $('#boost-wrap');
+    if (bw) { const bs = E.adBoostActive(S) ? Math.ceil((S.adBoostUntil - Date.now()) / 1000) : -1; if (bs !== lastSig.boost) { lastSig.boost = bs; bw.innerHTML = boostCardHTML(); } }
   } else if (tab === 'build' || tab === 'army') {
     updateBuyButtons();
+  } else if (tab === 'shop') {
+    const g = S.gems + ':' + Math.floor(Date.now() / 30000);
+    if (g !== lastSig.shop) { lastSig.shop = g; const sc = $('#scr-shop').scrollTop; renderShop(); $('#scr-shop').scrollTop = sc; }
   }
 }
 function frame(now) {
@@ -1062,6 +1525,57 @@ function onAction(e) {
       break;
     }
     case 'prestige': doPrestige(btn.closest('.modal') ? btn : null); break;
+    case 'shopview': shopView = btn.dataset.view; sfx.click(); renderShop(); $('#scr-shop').scrollTop = 0; break;
+    case 'skincat': skinCat = btn.dataset.cat; sfx.click(); renderShop(); break;
+    case 'equip': {
+      if (C.equip(S, btn.dataset.id)) {
+        applySkins(); persist(); sfx.buy();
+        toast(t('skin_equipped_toast', { name: L(C.SKIN_BY_ID[btn.dataset.id].name) }));
+        renderShop();
+      }
+      break;
+    }
+    case 'skin-locked': sfx.nope(); toast(t('skin_locked_toast')); break;
+    case 'crate': openCrateFlow(btn.dataset.id); break;
+    case 'odds': showOdds(btn.dataset.id); break;
+    case 'skip': buyTimeSkip(btn.dataset.id); break;
+    case 'iap': buyProduct(btn.dataset.id); break;
+    case 'restore': toast(t('restore_done')); break;
+    case 'ad-crate':
+      if (Date.now() < (S.ads.freeCrateAt || 0)) break;
+      watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; openCrateFlow('wood', { free: true }); });
+      break;
+    case 'ad-gems':
+      if (gemAdsLeft() <= 0) break;
+      watchAd('gems', () => { gemAdsLeft(); S.ads.gemCount++; S.gems += AD_GEMS; toast(t('gems_toast', { n: AD_GEMS }), 'boost'); sfx.coin(); updateHUD(); renderShop(); });
+      break;
+    case 'ad-boost':
+      watchAd('boost', () => { S.adBoostUntil = Date.now() + E.AD_BOOST_SECS * 1000; toast(t('boost_toast'), 'boost'); sfx.milestone(); lastSig.boost = null; updateHUD(); });
+      break;
+    case 'ad-double': {
+      const amt = Number(btn.dataset.amount) || 0;
+      watchAd('offline_double', () => {
+        S.money += amt * 2; S.totalEarned += amt * 2;
+        sfx.coin();
+        closeModal(btn); updateHUD(); persist();
+      });
+      break;
+    }
+    case 'ad-revive': {
+      const res = lastBattle;
+      if (!res || !res.lostTotal) break;
+      watchAd('revive', () => {
+        const n = E.restoreUnits(S, res.lost);
+        res.lostTotal = 0;
+        btn.remove();
+        toast(t('revived', { n: fmt(n) }), 'boost');
+        sfx.recruit(); updateHUD(); persist();
+      });
+      break;
+    }
+    case 'mapview': mapView = btn.dataset.view; sfx.click(); renderMap(); if (mapView === 'tree') scrollTreeToHere(); else $('#scr-map').scrollTop = 0; break;
+    case 'open-tree': mapView = 'tree'; setTab('map'); scrollTreeToHere(); break;
+    case 'tree-go': mapView = 'map'; selected = btn.dataset.id; renderMap(); $('#scr-map').scrollTop = 0; zoomToRegion(selected); break;
     case 'install':
       if (installEvt) { installEvt.prompt(); installEvt.userChoice?.finally(() => { installEvt = null; }); closeModal(btn); }
       break;
@@ -1096,8 +1610,10 @@ function boot(hotData) {
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; });
   applyTheme();
   renderShellText();
+  M.initMonetization({ demoAd, confirmPurchase, onAdStart, onAdEnd }).then(() => M.gameplayStart());
   if (!S) showIntro();
   else {
+    applySkins();
     setSound(S.settings.sound);
     setTab('base');
     updateHUD();
@@ -1116,6 +1632,8 @@ function boot(hotData) {
       era: (e) => { for (let i = 0; i < e; i++) regionsOfEra(i).forEach((r) => { S.conquered[r.id] = true; }); S.era = e; S.tut = 9; applyTheme(); viewBox = null; selected = null; renderTab(); updateTutorial(); },
       offline: (secs) => { S.lastSeen = Date.now() - secs * 1000; checkOffline(); },
       crate: () => { nextCrate = 0; },
+      gems: (n) => { S.gems += n; updateHUD(); },
+      playtime: (secs) => { S.stats.playTime = secs; },
     };
   }
   try {

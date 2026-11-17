@@ -28,17 +28,33 @@ export const TEAMS = {
   foe: { main: '#ef5b5b', dark: '#b33b3b', light: '#ffa3a3', acc: '#3d3366', skin: '#f2c19b', metal: '#b1a6bf' },
 };
 
-// Ohio flagget (svalehale) – spillerens flagg
-export function burgee(x, y, s = 1, red = '#e5484d') {
-  return `<g transform="translate(${x} ${y}) scale(${s})">
-  <path d="M0 0h30l-8 9 8 9H0z" fill="${red}" ${st(2)}/>
-  <path d="M1 6h22M1 12h22" stroke="#fff" stroke-width="2.2"/>
-  <path d="M0 0l15 9L0 18z" fill="#3559d6" ${st(2)}/>
-  <circle cx="5.5" cy="9" r="2.6" fill="#fff"/><circle cx="5.5" cy="9" r="1.2" fill="${red}"/>
-  </g>`;
+// Spillerens flagg (svalehale-form som Ohio-flagget). Utseendet følger valgt flagg-skin.
+let flagDesign = 'ohio';
+export const setFlagDesign = (d) => { flagDesign = d || 'ohio'; };
+const SWALLOW = 'M0 0h30l-8 9 8 9H0z';
+function flagInner(design, red) {
+  switch (design) {
+    case 'star': return `<rect width="30" height="18" fill="#3a6fe0"/>${star(10, 9, 6.4, '#fff', 1.2)}`;
+    case 'forest': return `<rect width="30" height="18" fill="#4fae3c"/><path d="M0 13.5h30" stroke="#2f7d24" stroke-width="5"/><circle cx="9" cy="7" r="3.8" fill="#ffd23f" stroke="${INK}" stroke-width="1.2"/>`;
+    case 'pirate': return `<rect width="30" height="18" fill="#2b2d42"/><path d="M5 13l10 3.2M15 13L5 16.2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="7.6" r="3.8" fill="#fff"/><rect x="8.1" y="9.6" width="3.8" height="2.6" rx=".7" fill="#fff"/><circle cx="8.7" cy="7.4" r="1" fill="#2b2d42"/><circle cx="11.3" cy="7.4" r="1" fill="#2b2d42"/>`;
+    case 'checker': {
+      let r = '<rect width="30" height="18" fill="#fff"/>';
+      for (let y = 0; y < 3; y++) for (let x = 0; x < 5; x++) if ((x + y) % 2 === 0) r += `<rect x="${x * 6}" y="${y * 6}" width="6" height="6" fill="#2b2d42"/>`;
+      return r;
+    }
+    case 'norway': return `<rect width="30" height="18" fill="#e5484d"/><path d="M0 9h30M10 0v18" stroke="#fff" stroke-width="5.2"/><path d="M0 9h30M10 0v18" stroke="#2f4fb3" stroke-width="2.6"/>`;
+    case 'fire': return `<rect width="30" height="18" fill="#ff5a1f"/><path d="M0 18V10q4-6 6-1 2-7 6-1 3-7 6 0 3-4 6 2l6 8z" fill="#ffd23f"/><path d="M0 18v-4q5-5 8-1 3-5 6 0 4-4 8 1l8 4z" fill="#fff59a"/>`;
+    case 'gold': return `<rect width="30" height="18" fill="#ffc62e"/><path d="M0 3.5h30" stroke="#fff3b0" stroke-width="2"/>${star(10, 9.5, 5.4, '#fff', 1.2)}`;
+    case 'rainbow': return ['#ff4d6d', '#ff9f1c', '#ffe14d', '#4dd06a', '#4d9fff', '#9a5cff'].map((c, i) => `<rect y="${i * 3}" width="30" height="3.2" fill="${c}"/>`).join('');
+    default: return `<rect width="30" height="18" fill="${red}"/><path d="M1 6h22M1 12h22" stroke="#fff" stroke-width="2.2"/><path d="M0 0l15 9L0 18z" fill="#3559d6" ${st(2)}/><circle cx="5.5" cy="9" r="2.6" fill="#fff"/><circle cx="5.5" cy="9" r="1.2" fill="${red}"/>`;
+  }
+}
+export function burgee(x, y, s = 1, red = '#e5484d', design = flagDesign) {
+  const id = nid('fl');
+  return `<g transform="translate(${x} ${y}) scale(${s})"><defs><clipPath id="${id}"><path d="${SWALLOW}"/></clipPath></defs><g clip-path="url(#${id})">${flagInner(design, red)}</g><path d="${SWALLOW}" fill="none" ${st(2)}/></g>`;
 }
 
-export const flagSvg = (cls = 'flag-svg') => wrap(burgee(1, 1, 1), '0 0 32 20', cls);
+export const flagSvg = (cls = 'flag-svg', design) => wrap(burgee(1, 1, 1, '#e5484d', design), '0 0 32 20', cls);
 
 // ================= ENHETER =================
 const UNITS = {
@@ -550,9 +566,27 @@ export function hq(era) {
 }
 
 // ================= MASKOT: General Buckeye =================
-export function mascot(mood = 'happy') {
+let mascotHat = 'general';
+export const setHat = (h) => { mascotHat = h || 'general'; };
+const HATS = {
+  general: `<path d="M22 36q28-24 56 0v6H22z" fill="#3f6a3a" ${st()}/><path d="M22 40h56" stroke="#ffd23f" stroke-width="4"/><path d="M18 42h64q-4 9-32 9T18 42z" fill="${INK}"/>${star(50, 30, 6, '#ffd23f', 1.8)}`,
+  cap: `<path d="M26 41q1-23 24-23t24 23z" fill="#e5484d" ${st()}/><path d="M50 41h34q3 1 0 5H50z" fill="#c43c41" ${st(2.4)}/><circle cx="50" cy="18" r="2.6" fill="#c43c41" ${st(1.4)}/><circle cx="48" cy="31" r="5.4" fill="#fff" ${st(1.6)}/><circle cx="48" cy="31" r="2.4" fill="#e5484d"/>`,
+  cowboy: `<ellipse cx="50" cy="40" rx="41" ry="7" fill="#a8692f" ${st()}/><path d="M30 39q-1-24 20-24t20 24z" fill="#b47538" ${st()}/><path d="M43 17q7 7 14 0" fill="none" stroke="#7a4b22" stroke-width="2.6" stroke-linecap="round"/><path d="M31 34h38" stroke="#3d2414" stroke-width="4.4"/>${star(50, 34, 3.6, '#ffd23f', 1.2)}`,
+  party: `<g transform="rotate(10 50 40)"><path d="M35 41L51 5l15 36z" fill="#ff5d8f" ${st()}/><path d="M40 30l18-6M44 20l11-4" stroke="#ffd23f" stroke-width="3" stroke-linecap="round"/><circle cx="46" cy="36" r="2" fill="#56e0ff"/><circle cx="58" cy="34" r="2" fill="#56e0ff"/><circle cx="51" cy="5" r="5.4" fill="#ffd23f" ${st(2)}/></g>`,
+  viking: `<path d="M28 30q-15-4-17-21q11 6 21 12z" fill="#f6e7c1" ${st(2.6)}/><path d="M72 30q15-4 17-21q-11 6-21 12z" fill="#f6e7c1" ${st(2.6)}/><path d="M24 43q0-27 26-27t26 27z" fill="#a9b4c6" ${st()}/><path d="M24 38h52" stroke="#7d889c" stroke-width="5"/><path d="M50 17v21" stroke="#7d889c" stroke-width="4"/>${[30, 40, 60, 70].map((x) => `<circle cx="${x}" cy="38" r="1.6" fill="#e3e9f2"/>`).join('')}`,
+  pirate: `<path d="M15 41q9-27 35-25q26-2 35 25q-17-8-35-8t-35 8z" fill="#2b2d42" ${st()}/><path d="M19 38q31-11 62 0" fill="none" stroke="#ffd23f" stroke-width="2.4"/><circle cx="50" cy="25" r="4.6" fill="#fff"/><path d="M44 31l12 4M56 31l-12 4" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="48.4" cy="24.6" r="1.2" fill="#2b2d42"/><circle cx="51.6" cy="24.6" r="1.2" fill="#2b2d42"/>`,
+  crown: `<path d="M27 42l4-24 10 10 9-17 9 17 10-10 4 24z" fill="#ffd23f" ${st()}/><path d="M28 38h44" stroke="#e8a91c" stroke-width="3.4"/><circle cx="50" cy="30" r="3.4" fill="#ef4f5a" ${st(1.4)}/><circle cx="37" cy="32" r="2.6" fill="#56e0ff" ${st(1.2)}/><circle cx="63" cy="32" r="2.6" fill="#56e0ff" ${st(1.2)}/><circle cx="50" cy="11" r="2.2" fill="#fff"/>`,
+  astro: '',
+};
+export function mascot(mood = 'happy', hat = mascotHat) {
   const mouth = mood === 'sad' ? `<path d="M44 74q6-5 12 0" fill="none" ${st(2.4)}/>` : `<path d="M42 71q8 8 16 0" fill="#ff8f8f" ${st(2.4)}/>`;
-  return wrap(`<ellipse cx="50" cy="94" rx="26" ry="4" fill="#1b1340" opacity=".16"/>
+  const bubble = hat === 'astro'
+    ? `<path d="M50 15V4" ${st(2.6)}/><circle cx="50" cy="4" r="3.4" fill="#ff5d5d" ${st(1.6)} class="blink"/>
+       <circle cx="50" cy="57" r="42" fill="#bfe8ff" fill-opacity=".26" ${st(3)}/>
+       <path d="M22 44q7-19 27-24" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" opacity=".85"/>
+       <path d="M17 82q33 17 66 0" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round"/><path d="M17 82q33 17 66 0" fill="none" stroke="#c4cddb" stroke-width="6" stroke-linecap="round"/>`
+    : '';
+  return wrap(`<ellipse cx="50" cy="96" rx="26" ry="3.6" fill="#1b1340" opacity=".16"/>
   <circle cx="18" cy="70" r="7" fill="#fff" ${st(2.4)}/>
   <ellipse cx="50" cy="60" rx="33" ry="31" fill="#7b4a2a" ${st()}/>
   <ellipse cx="34" cy="46" rx="8" ry="5" fill="#fff" opacity=".22" transform="rotate(-30 34 46)"/>
@@ -561,13 +595,40 @@ export function mascot(mood = 'happy') {
   <path d="M36 49q6-4 12-1M54 48q6-3 12 1" fill="none" stroke="#3d2414" stroke-width="3.4" stroke-linecap="round"/>
   ${mouth}
   <path d="M32 67q9-9 18-2 9-7 18 2-7 4-18 0-11 4-18 0z" fill="#3d2414" ${st(1.6)}/>
-  <path d="M22 36q28-24 56 0v6H22z" fill="#3f6a3a" ${st()}/>
-  <path d="M22 40h56" stroke="#ffd23f" stroke-width="4"/>
-  <path d="M18 42h64q-4 9-32 9T18 42z" fill="${INK}"/>
-  ${star(50, 30, 6, '#ffd23f', 1.8)}
+  ${HATS[hat] ?? HATS.general}
   <circle cx="82" cy="40" r="7" fill="#fff" ${st(2.4)}/>
-  <path d="M40 92l4-6 6 4 6-4 4 6" fill="#ffd23f" ${st(1.8)}/>`, '0 0 100 100', 'mascot');
+  <path d="M40 92l4-6 6 4 6-4 4 6" fill="#ffd23f" ${st(1.8)}/>
+  ${bubble}`, '0 0 100 100', 'mascot');
 }
+
+// ================= LOOTKASSER =================
+export function crateArt(kind = 'wood') {
+  const [main, dark, trim, glow] = {
+    wood: ['#c98b4f', '#8f5a2c', '#d9dee8', ''],
+    gold: ['#ffcf3d', '#c99411', '#fff4c2', '#ffe680'],
+    cosmic: ['#7a5cff', '#3f24a8', '#7ffcff', '#c77dff'],
+  }[kind] || ['#c98b4f', '#8f5a2c', '#d9dee8', ''];
+  return wrap(`${glow ? `<circle cx="50" cy="56" r="44" fill="${glow}" opacity=".35" class="pulse"/>` : ''}
+  <ellipse cx="50" cy="92" rx="38" ry="5" fill="#1b1340" opacity=".18"/>
+  <rect x="14" y="44" width="72" height="44" rx="6" fill="${main}" ${st()}/>
+  <path d="M16 59h68M16 74h68" stroke="${dark}" stroke-width="2.4"/>
+  <path d="M14 50h10v38H20q-6 0-6-6zM86 50H76v38h4q6 0 6-6z" fill="${trim}" ${st(2.4)}/>
+  <g class="lid"><rect x="10" y="30" width="80" height="18" rx="6" fill="${main}" ${st()}/>
+  <path d="M12 39h76" stroke="${dark}" stroke-width="2.4"/>
+  <path d="M10 36q0-6 6-6h6v18h-6q-6 0-6-6zM90 36q0-6-6-6h-6v18h6q6 0 6-6z" fill="${trim}" ${st(2.4)}/></g>
+  <rect x="43" y="42" width="14" height="16" rx="3.4" fill="${trim}" ${st(2.4)}/>
+  ${kind === 'gold' ? `<path d="M50 46l3 4-3 4-3-4z" fill="#ef4f5a" ${st(1.4)}/>` : `<circle cx="50" cy="50" r="2.4" fill="${INK}"/>`}
+  ${kind === 'cosmic' ? `${star(28, 70, 4.6, '#fff', 1.2)}${star(70, 68, 3.6, '#7ffcff', 1.2)}${star(56, 80, 2.8, '#ffe680', 1)}` : ''}
+  ${kind === 'gold' ? `${star(26, 22, 4, '#fff8c4', 1.2)}${star(78, 18, 3, '#fff8c4', 1.2)}` : ''}`, '0 0 100 100', 'crate-art crate-' + kind);
+}
+// Fiktiv brus for demo-reklamer
+export const colaArt = () => wrap(`<ellipse cx="50" cy="91" rx="22" ry="4" fill="#1b1340" opacity=".16"/>
+  <rect x="30" y="16" width="40" height="72" rx="9" fill="#e5484d" ${st()}/>
+  <rect x="30" y="16" width="40" height="9" rx="4.5" fill="#d6dde8" ${st(2.4)}/>
+  <rect x="30" y="79" width="40" height="9" rx="4.5" fill="#d6dde8" ${st(2.4)}/>
+  <path d="M31 44q19-9 38 0v18q-19 9-38 0z" fill="#fff"/>
+  <ellipse cx="50" cy="53" rx="8" ry="7" fill="#7b4a2a" ${st(1.6)}/><ellipse cx="50" cy="50" rx="4.4" ry="2.4" fill="#e2bd8f"/>
+  <path d="M37 28v44" stroke="#fff" stroke-width="3.4" opacity=".45" stroke-linecap="round"/>`, '0 0 100 100', 'bld-art');
 
 // ================= PLANETER =================
 const PLANETS = {
@@ -668,14 +729,31 @@ const ICONS = {
   zoomout: `<circle cx="10.5" cy="10.5" r="7" fill="#fff" ${st(2)}/><path d="M15.5 15.5l5 5" ${st(3)}/><path d="M7.5 10.5h6" ${st(2.2)}/>`,
   vibrate: `<rect x="8" y="3" width="8" height="18" rx="2" fill="#c4cddb" ${st(1.8)}/><path d="M4 8v8M20 8v8M2 10v4M22 10v4" ${st(1.6)}/>`,
   download: `<path d="M12 3v11M7.5 10l4.5 4.5 4.5-4.5" fill="none" ${st(2.4)}/><path d="M4 16v4h16v-4" fill="none" ${st(2.2)}/>`,
+  gem: `<path d="M7 3.5h10l4.5 5.5L12 21 2.5 9z" fill="#56e0ff" ${st(1.8)}/><path d="M2.5 9h19M9.5 9L12 3.8 14.5 9 12 21 9.5 9" fill="none" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.4 8l1.8-2.6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>`,
+  shop: `<path d="M3 9l2-5h14l2 5z" fill="#ff5d8f" ${st(1.8)}/><path d="M3 9q1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0" fill="#fff" ${st(1.4)}/><rect x="4.5" y="11.4" width="15" height="9.6" rx="1.4" fill="#fff4d6" ${st(1.8)}/><rect x="10" y="14" width="4.6" height="7" fill="#8fd3ff" ${st(1.3)}/>`,
+  tree: `<path d="M12 22v-7" stroke="${INK}" stroke-width="5.4" stroke-linecap="round"/><path d="M12 22v-7" stroke="#9b6334" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="9.5" r="7.6" fill="#5fc94a" ${st(1.8)}/><circle cx="9" cy="8" r="1.7" fill="#ffd23f" ${st(1)}/><circle cx="14.6" cy="11.4" r="1.7" fill="#ff5d5d" ${st(1)}/>`,
+  ad: `<rect x="2.5" y="4.5" width="19" height="13.5" rx="3" fill="#ffd23f" ${st(1.8)}/><path d="M10 8.2v6l5-3z" fill="${INK}"/><path d="M8 21h8" ${st(1.8)}/>`,
+  adfree: `<rect x="2.5" y="4.5" width="19" height="13.5" rx="3" fill="#fff" ${st(1.8)}/><path d="M10 8.2v6l5-3z" fill="#c4cddb"/><path d="M4.5 20L19.5 3" stroke="#ef4f5a" stroke-width="3" stroke-linecap="round"/>`,
+  palette: `<path d="M12 3a9 9 0 1 0 0 18c1.6 0 2-1.3 1.2-2.4-.8-1.1-.2-2.6 1.3-2.6H17a4 4 0 0 0 4-4c0-5-4-9-9-9z" fill="#fff4d6" ${st(1.8)}/><circle cx="7.5" cy="11" r="1.7" fill="#ef5b5b"/><circle cx="10" cy="7" r="1.7" fill="#ffd23f"/><circle cx="15" cy="7.5" r="1.7" fill="#4fb843"/><circle cx="17.5" cy="11.5" r="1.5" fill="#3559d6"/>`,
+  ffwd: `<path d="M3 6l8 6-8 6zM12 6l8 6-8 6z" fill="#8fd3ff" ${st(1.8)}/>`,
+  clock: `<circle cx="12" cy="12" r="9" fill="#fff" ${st(1.8)}/><path d="M12 7v5l3.5 2" fill="none" ${st(2)}/>`,
+  gift: `<rect x="3.5" y="10" width="17" height="11" rx="2" fill="#ff5d8f" ${st(1.8)}/><rect x="2.5" y="7" width="19" height="4" rx="1.5" fill="#ff8fb1" ${st(1.6)}/><path d="M12 7v14" stroke="#ffd23f" stroke-width="3"/><path d="M12 7q-6-6-7.5-1.5T12 7q6-6 7.5-1.5T12 7" fill="none" ${st(1.5)}/>`,
 };
 export const icon = (name, cls = 'ico') => wrap(ICONS[name] || ICONS.star, '0 0 24 24', cls);
 
-export function unitArt(id, side = 'me') {
+const DEFAULT_ME = { ...TEAMS.me };
+let armyFx = '';
+// Hær-skin: bytter fargene på alle egne enheter (og legger på glød/regnbue for de sjeldneste)
+export function setArmySkin(skin) {
+  Object.assign(TEAMS.me, DEFAULT_ME, skin && skin.team ? skin.team : {});
+  armyFx = skin && skin.fx ? 'fx-' + skin.fx : '';
+}
+export function unitArt(id, side = 'me', skin = null) {
   const f = UNITS[id];
-  const t = TEAMS[side];
+  const t = side === 'me' && skin ? { ...DEFAULT_ME, ...(skin.team || {}) } : TEAMS[side];
+  const fx = side === 'me' ? (skin ? (skin.fx ? 'fx-' + skin.fx : '') : armyFx) : '';
   const inner = f ? f(t) : '';
-  return wrap(side === 'foe' ? `<g transform="translate(100 0) scale(-1 1)">${inner}</g>` : inner, '0 0 100 100', 'unit-art');
+  return wrap(side === 'foe' ? `<g transform="translate(100 0) scale(-1 1)">${inner}</g>` : inner, '0 0 100 100', 'unit-art ' + fx);
 }
 export function enemyArt(kind, variant) {
   let inner;

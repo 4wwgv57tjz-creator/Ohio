@@ -1,6 +1,6 @@
 // Balanserer spillet: simulerer en fornuftig spiller og kalibrerer forsvaret til hver region
 // slik at hver erobring tar omtrent ønsket tid. Skriver src/js/balance.js.
-// Kjør: npm run sim   (TAPS=1.5 trykk per sekund som standard, CHECK=1 for kun rapport)
+// Kjør: npm run sim   (TAPS=1.5 trykk per sekund som standard, CHECK=1 beholder tallene og oppdaterer bare tidsestimatene)
 import { writeFileSync } from 'node:fs';
 import * as E from '../src/js/engine.js';
 import { BUILDINGS, UNITS, REGIONS, ERAS, regionsOfEra } from '../src/js/data.js';
@@ -143,7 +143,7 @@ for (let e = 0; e < ERAS.length; e++) {
     Object.assign(s, res.s);
     total += res.t;
     const income = CHECK ? r.income : nice(Math.max(1, E.baseIncome(s) * INCOME_FRAC));
-    out.r[r.id] = { def: D, income };
+    out.r[r.id] = { def: D, income, t: res.t };
     r.def = D; r.income = income;
     conquer(s, r, D);
     const topB = BUILDINGS.filter((b) => s.buildings[b.id]).map((b) => `${b.id}:${s.buildings[b.id]}`).slice(-3).join(' ');
@@ -156,7 +156,7 @@ for (const u of UNITS) out.i[u.id] = { cost: u.cost, power: u.power };
 function fmt(x) { const u = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc']; let i = 0; while (x >= 1000 && i < u.length - 1) { x /= 1000; i++; } return (x < 10 ? x.toFixed(2) : x < 100 ? x.toFixed(1) : x.toFixed(0)) + u[i]; }
 console.log(rows.join('\n'));
 console.log(`Total: ${(total / 60).toFixed(1)} min med ${TAPS} trykk/s`);
-if (!CHECK) {
+{
   writeFileSync(new URL('../src/js/balance.js', import.meta.url), '// AUTOGENERERT av tools/simulate.mjs – priser, inntekt, styrke og forsvar.\nexport const BALANCE = ' + JSON.stringify(out, null, 0).replace(/},"/g, '},\n  "') + ';\n');
   console.log('Skrev src/js/balance.js');
 }

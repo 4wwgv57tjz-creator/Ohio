@@ -1,6 +1,7 @@
 // Bygger spillet til:
-//   docs/            – installerbar mobil-webapp (PWA) for GitHub Pages: index.html, manifest, service worker, ikoner
-//   dist/artifact.html – samme spill som ett HTML-fragment (for claude.ai Artifact)
+//   docs/                 – installerbar mobil-webapp (PWA) for GitHub Pages. Reklame/kjøp styres av monetize.config.json
+//   dist/artifact.html    – samme spill som ett HTML-fragment (for claude.ai Artifact, alltid demo-reklame)
+//   builds/crazygames/, builds/poki/ – egne versjoner for spillportaler (med portalens reklame-SDK, uten kjøp)
 // Kjør: npm run build
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -13,8 +14,9 @@ const read = (rel) => readFileSync(p(rel), 'utf8');
 const TITLE = 'Take over the world Ohio';
 const DESC = 'Et fargerikt tycoon-krigsspill: start som en liten bygd i Ohio og ta over Ohio, USA, Amerika, hele jorda – og til slutt verdensrommet mot aliens!';
 
-// 1) JavaScript
-const js = (await esbuild.build({
+// 1) JavaScript – bygges én gang per reklame-/kjøpsoppsett
+const userCfg = existsSync(p('monetize.config.json')) ? JSON.parse(read('monetize.config.json')) : {};
+const bundle = async (cfg) => (await esbuild.build({
   entryPoints: [p('src/js/main.js').pathname],
   bundle: true,
   minify: true,
@@ -22,7 +24,11 @@ const js = (await esbuild.build({
   target: ['es2020', 'safari14'],
   write: false,
   legalComments: 'none',
+  define: { __MONETIZE__: JSON.stringify(cfg) },
 })).outputFiles[0].text;
+const js = await bundle(userCfg);
+const demoCfg = { ...userCfg, ads: { ...(userCfg.ads || {}), provider: 'demo' }, payments: { provider: 'demo' } };
+const jsDemo = await bundle(demoCfg);
 
 // 2) CSS + innebygde fonter
 const font = (file) => readFileSync(p('assets/fonts/' + file)).toString('base64');
@@ -31,7 +37,8 @@ const fontCss = `@font-face{font-family:'Luckiest Guy';font-style:normal;font-we
 const css = (await esbuild.transform(read('src/css/style.css'), { loader: 'css', minify: true })).code;
 
 const loading = `<div id="app"><div style="margin:auto;font:700 22px system-ui;color:#2b2350;text-align:center;padding:40vh 16px 0">Take over the world <b>OHIO</b></div></div>`;
-const safeJs = js.replace(/<\/script/gi, '<\\/script');
+const safe = (code) => code.replace(/<\/script/gi, '<\\/script');
+const safeJs = safe(js);
 
 // 3) PWA (docs/)
 const hash = createHash('sha256').update(js + css).digest('hex').slice(0, 10);
@@ -114,10 +121,33 @@ const fragment = `<title>${TITLE}</title>
 <meta name="theme-color" content="#7fd3ff">
 <style>${fontCss}${css}</style>
 ${loading}
-<script>${safeJs}</script>
+<script>${safe(jsDemo)}</script>
 `;
 writeFileSync(p('dist/artifact.html'), fragment);
+
+// 5) Spillportaler: portalen viser reklamen og deler inntekten. Kjøp med ekte penger er av.
+for (const portal of ['crazygames', 'poki']) {
+  const cfg = { ...userCfg, ads: { ...(userCfg.ads || {}), provider: portal }, payments: { provider: 'none' } };
+  const code = await bundle(cfg);
+  mkdirSync(p(`builds/${portal}/`), { recursive: true });
+  writeFileSync(p(`builds/${portal}/index.html`), `<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>${TITLE}</title>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<style>${fontCss}${css}</style>
+</head>
+<body>
+${loading}
+<script>${safe(code)}</script>
+</body>
+</html>
+`);
+}
 
 const kb = (s) => (Buffer.byteLength(s) / 1024).toFixed(0) + ' KB';
 console.log(`JS ${kb(js)} · CSS ${kb(css)} · fonter ${kb(fontCss)}`);
 console.log(`docs/index.html ${kb(pwa)} · dist/artifact.html ${kb(fragment)} · versjon ${hash}`);
+console.log(`Reklame i docs/: ${(userCfg.ads && userCfg.ads.provider) || 'demo'} · kjøp: ${(userCfg.payments && userCfg.payments.provider) || 'demo'} · portalversjoner i builds/crazygames og builds/poki`);

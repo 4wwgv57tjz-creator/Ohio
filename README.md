@@ -25,6 +25,74 @@ Tips:
 - **Forsyningskasser** faller ned med fallskjerm av og til. Trykk på dem for penger eller ×3 inntekt i 30 sekunder.
 - **Trykk-kraft** kan oppgraderes, så hvert trykk gir mer.
 - **General Buckeye** (Ohio-nøtta med generalhatt) viser deg hva du skal gjøre i starten.
+- **Reisen** (Kart → Reisen, eller «Se hele reisen» på Base) viser hele spillet som et tre: alle 7 kapitler og
+  60 områder, hvor du er nå, og hvor lang tid som er igjen (ca. 2 timer totalt for en aktiv spiller).
+
+## Butikk, skins, lootkasser og reklame
+
+- **Skins** i fire kategorier: hær (farger på alle enhetene), flagg (spillerflagget og fargen på erobret land på
+  kartet), hovedkvarter og hatter til General Buckeye. 39 skins fordelt på fem sjeldenhetsgrader: Vanlig,
+  Sjelden, Episk, Legendarisk og Mytisk. Skins er bare utseende – de gir ingen fordel i kamp.
+- **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
+  Sjansene vises i spillet («Se sjansene»). Legendarisk eller bedre er garantert minst hvert 20. skin, nye skins
+  prioriteres, og duplikater blir til edelstener.
+- **Edelstener** tjenes ved å erobre områder, fullføre kapitler, fra forsyningskasser og ved å se reklame – og kan
+  kjøpes i butikken. De brukes på lootkasser og «tidshopp» (få 1 eller 4 timer med inntekt med en gang).
+- **Belønningsreklame** (frivillig): gratis trekasse hvert 30. minutt, +30 edelstener (8 per dag), 2× inntekt i
+  10 minutter, dobbel inntekt mens du var borte, og få tilbake soldatene etter et tap.
+- **Reklame mellom kampene**: høyst etter annenhver kamp og med minst 3 minutter mellom. Aldri i opplæringen eller de
+  første 4 minuttene.
+- **Reklamefri**: fjerner reklamen mellom kampene, og alle «se reklame»-belønninger gis uten reklame. Finnes også i
+  en startpakke sammen med edelstener og et episk skin.
+
+## Tjen penger på spillet
+
+Slik det er bygget nå, kjører butikken og reklamen i **demo-modus**: reklamene er spillets egne fiktive merker, og
+kjøp koster ingenting. Det er for å teste. For å tjene ekte penger velger du en av veiene under. Alle krever en
+konto hos et selskap som betaler ut penger, og nesten alle krever at kontoeieren er **18 år** – er du yngre, må en
+forelder eie kontoen.
+
+**1. Spillportal – enklest (anbefalt).** Last opp spillet på [CrazyGames](https://developer.crazygames.com/) eller
+[Poki](https://developers.poki.com/). Portalen viser reklamen og betaler deg en andel av inntekten. Ferdige versjoner
+med portalens reklame bygges automatisk:
+
+- `builds/crazygames/index.html` – pakk mappa som zip og last den opp på CrazyGames sin utviklerside.
+- `builds/poki/index.html` – for Poki (de velger ut spillene selv, så du må søke).
+
+Portalene tillater ikke salg med egne betalingsløsninger, så i disse versjonene er kjøp med ekte penger skjult.
+Edelstener tjenes ved å spille og se reklame (det er da du tjener penger).
+
+**2. Egen nettside med Google AdSense.** Krever et eget domene (ikke github.io) og en godkjent AdSense-konto med
+H5-spillreklame. Sett dette i `monetize.config.json` og kjør `npm run build`:
+
+```json
+{ "ads": { "provider": "adsense", "adsenseClient": "ca-pub-DITT-NUMMER", "testMode": false } }
+```
+
+Bruk `"testMode": true` mens du tester. I Norge og resten av EØS må reklamen ha et samtykkebanner (GDPR) – det setter
+du opp under «Personvern og meldinger» i AdSense.
+
+**3. App i App Store / Google Play.** Ekte kjøp av edelstener og reklamefri krever en app i en appbutikk, med Apple/Google
+sitt betalingssystem. Det gjøres best ved å lage spillet i Unity (Unity LevelPlay for reklame og Unity IAP for kjøp)
+eller pakke denne web-appen inn med Capacitor (AdMob og et betalingstillegg). Utviklerkonto koster 25 dollar én gang hos
+Google og 99 dollar i året hos Apple, og iPhone-versjonen må bygges på en Mac.
+
+**Om lootkasser som koster penger:** App Store og Google Play krever at sjansene vises (det gjør spillet). Lootkasser
+som kjøpes for ekte penger er forbudt i Belgia, og flere land, også Norge, vurderer strengere regler. Hvis du selger
+edelstener for ekte penger, sjekk reglene der spillet skal selges.
+
+### monetize.config.json
+
+| Felt | Verdier | Betydning |
+|------|---------|-----------|
+| `ads.provider` | `demo`, `adsense`, `crazygames`, `poki`, `none` | Hvilken reklame `docs/`-versjonen bruker |
+| `ads.adsenseClient` | `ca-pub-…` | AdSense-utgivernummeret ditt |
+| `ads.testMode` | `true` / `false` | AdSense testreklame (ingen inntekt) |
+| `ads.interstitialEvery` | tall | Reklame mellom kamper etter så mange kamper |
+| `ads.interstitialMinGap` | sekunder | Minste tid mellom to slike reklamer |
+| `payments.provider` | `demo`, `none` | `demo` viser kjøpsflyten uten betaling, `none` skjuler kjøp |
+
+Koden for reklame og kjøp ligger samlet i `src/js/monetize.js`.
 
 ## Kapitlene
 
@@ -76,6 +144,8 @@ src/
   js/balance.js   priser, inntekt, styrke og forsvar (generert av simulatoren)
   js/art.js       all grafikk som SVG: enheter, bygninger, hovedkvarter, maskot, planeter, ikoner
   js/mapdata.js   forenklede kart (generert fra kartdata)
+  js/cosmetics.js skins, sjeldenhet og lootkasser (sjanser og garanti)
+  js/monetize.js  reklame (demo, AdSense, CrazyGames, Poki) og kjøp
   js/i18n.js      tekster og tallformatering
   js/audio.js     lydeffekter med Web Audio
   css/style.css   tegneserietemaet
@@ -86,16 +156,18 @@ tools/
   icons.mjs       lager app-ikonene fra logoen
 assets/           fonter (med lisenser) og app-ikoner
 docs/             ferdig bygget app (dette er det som publiseres)
+builds/           ferdige versjoner for CrazyGames og Poki
+monetize.config.json  valg av reklame og kjøp
 ```
 
 Kommandoer (Node 18+):
 
 ```sh
 npm install          # henter byggeverktøy og kartdata
-npm run build        # bygger docs/index.html, manifest, service worker og dist/artifact.html
+npm run build        # bygger docs/ (PWA), builds/crazygames, builds/poki og dist/artifact.html
 npm run maps         # lager src/js/mapdata.js på nytt
 npm run sim          # balanserer spillet på nytt og skriver src/js/balance.js
-CHECK=1 npm run sim  # viser bare hvor lang tid hvert område tar med dagens tall
+CHECK=1 npm run sim  # beholder tallene og oppdaterer bare tidsestimatene (brukes i «Reisen»)
 ```
 
 Balansen er laget med en simulator: den spiller spillet med en fornuftig strategi (1,5 trykk per sekund) og
@@ -104,7 +176,7 @@ første by til et par minutter i verdensrommet. Nye bygninger og enheter i hvert
 inntekten spilleren har når kapitlet starter. Ønsket tempo står øverst i `tools/simulate.mjs`.
 
 For testing: åpne spillet med `#debug` på slutten av adressen. Da finnes `window.__ohio` i konsollen med
-hjelpere som `give(1e6)`, `power(100)`, `win()` og `era(4)`.
+hjelpere som `give(1e6)`, `gems(500)`, `power(100)`, `win()` og `era(4)`.
 
 ## Lisenser og kreditering
 
