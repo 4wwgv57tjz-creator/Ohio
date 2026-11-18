@@ -61,6 +61,7 @@ export function newState(name = '') {
     purchases: [],
     ev: newEvState(),
     daily: { last: '', streak: 0, total: 0 },
+    target: '', // fienden spilleren har valgt å krige mot (tom = den enkleste)
   };
 }
 // Hendelser i basen (se events.js): neste hendelse, den som venter, de siste vi har vist og midlertidige virkninger
@@ -102,6 +103,7 @@ export function restore(data) {
   s.adFree = !!data.adFree;
   s.pu = restorePowerups(data.pu);
   s.ev = restoreEv(data.ev);
+  s.target = typeof data.target === 'string' && REGION_BY_ID[data.target] ? data.target : '';
   const dl = data.daily && typeof data.daily === 'object' ? data.daily : {};
   s.daily = { last: typeof dl.last === 'string' ? dl.last.slice(0, 10) : '', streak: Math.max(0, Math.floor(num(dl.streak))), total: Math.max(0, Math.floor(num(dl.total))) };
   if (!TACTICS[s.settings.tactic]) s.settings.tactic = 'normal';
@@ -532,6 +534,12 @@ export function advanceEra(s) {
   return true;
 }
 // Neste mål: området der hæren din står sterkest (terrengbonus teller med)
+// Fienden spilleren har valgt (må være i kapittelet man er i og ikke erobret), ellers den enkleste
+export function chosenTarget(s) {
+  const r = s.target && REGION_BY_ID[s.target];
+  if (r && r.era === s.era && !s.conquered[r.id]) return r;
+  return nextTarget(s);
+}
 export function nextTarget(s) {
   let best = null, bestQ = -1;
   for (const r of regionsOfEra(s.era)) {

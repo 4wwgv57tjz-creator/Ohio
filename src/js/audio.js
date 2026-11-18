@@ -136,6 +136,30 @@ export const sfx = {
   laser() { tone(2200, 0.7, { type: 'sawtooth', vol: 0.08, slide: -1900 }); tone(1100, 0.7, { type: 'square', vol: 0.05, slide: -900 }); },
   nuts() { for (let i = 0; i < 8; i++) { tone(300 + Math.random() * 400, 0.04, { type: 'square', vol: 0.09, delay: i * 0.05 }); noise(0.03, { vol: 0.15, freq: 2000, delay: i * 0.05 }); } },
   bribe() { noise(0.05, { vol: 0.2, freq: 3000 }); tone(1568, 0.1, { type: 'square', vol: 0.1, delay: 0.05 }); tone(2093, 0.3, { type: 'triangle', vol: 0.12, delay: 0.12 }); },
+  // skytelyd for hver troppetype (og fiendens skudd)
+  gun(unit) {
+    switch (unit) {
+      case 'militia': noise(0.09, { vol: 0.22, freq: 1600 }); tone(240, 0.08, { type: 'square', vol: 0.06, slide: -140 }); break; // gammelt gevær
+      case 'hunter': noise(0.2, { vol: 0.3, freq: 2600 }); tone(120, 0.15, { type: 'sine', vol: 0.18, slide: -60 }); break; // hagle
+      case 'truck': for (let i = 0; i < 5; i++) noise(0.035, { vol: 0.2, freq: 2200, delay: i * 0.055 }); break; // maskingevær
+      case 'soldier': for (let i = 0; i < 3; i++) { noise(0.04, { vol: 0.2, freq: 3500, delay: i * 0.08 }); tone(900, 0.03, { type: 'square', vol: 0.04, slide: -600, delay: i * 0.08 }); } break; // automatgevær
+      case 'tank': tone(70, 0.4, { type: 'sine', vol: 0.32, slide: -35 }); noise(0.35, { vol: 0.32, freq: 900 }); break; // kanon
+      case 'heli': for (let i = 0; i < 9; i++) noise(0.022, { vol: 0.16, freq: 3000, delay: i * 0.032 }); break; // minigun
+      case 'jet': sweep(0.3, { vol: 0.16, from: 600, to: 3200 }); noise(0.18, { vol: 0.24, freq: 1800, delay: 0.26 }); break; // rakett
+      case 'ship': tone(55, 0.6, { type: 'sine', vol: 0.32, slide: -20 }); noise(0.5, { vol: 0.3, freq: 700 }); tone(110, 0.3, { type: 'triangle', vol: 0.1, slide: -50 }); break; // skipskanon
+      case 'drone': tone(520, 0.14, { type: 'square', vol: 0.07, slide: 700 }); tone(1300, 0.08, { type: 'sawtooth', vol: 0.06, slide: -900, delay: 0.1 }); break; // summende zap
+      case 'carrier': sweep(0.5, { vol: 0.18, from: 400, to: 4000 }); tone(180, 0.5, { type: 'sawtooth', vol: 0.04, slide: 300 }); break; // fly letter
+      case 'mech': tone(90, 0.12, { type: 'square', vol: 0.12, slide: -40 }); tone(70, 0.35, { type: 'sine', vol: 0.28, slide: -30, delay: 0.12 }); noise(0.3, { vol: 0.28, freq: 1100, delay: 0.12 }); break; // skritt og kanon
+      case 'rocket': sweep(0.55, { vol: 0.2, from: 200, to: 2400 }); noise(0.3, { vol: 0.3, freq: 1500, delay: 0.5 }); break; // rakettbatteri
+      case 'spacemarine': tone(1800, 0.09, { type: 'square', vol: 0.07, slide: -1200 }); tone(1700, 0.09, { type: 'square', vol: 0.07, slide: -1100, delay: 0.11 }); break; // lasergevær
+      case 'spacefighter': for (let i = 0; i < 3; i++) tone(1300, 0.08, { type: 'sawtooth', vol: 0.06, slide: -1000, delay: i * 0.09 }); break; // blaster
+      case 'laser': tone(880, 0.4, { type: 'sawtooth', vol: 0.06, slide: 120 }); tone(1760, 0.4, { type: 'sine', vol: 0.06, slide: -200 }); break; // laserkanon
+      case 'megamech': tone(45, 0.7, { type: 'sine', vol: 0.34, slide: -15 }); noise(0.55, { vol: 0.34, freq: 1200 }); tone(1500, 0.2, { type: 'square', vol: 0.04, delay: 0.05 }); break; // megakanon
+      case 'ohiostar': sweep(0.4, { vol: 0.14, from: 3000, to: 600 }); [784, 988, 1175].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.06, delay: 0.05 + i * 0.05 })); break; // kosmisk stråle
+      case 'foe': noise(0.08, { vol: 0.14, freq: 700 }); tone(160, 0.08, { type: 'square', vol: 0.04, slide: -60 }); break; // fiendens skudd
+      default: noise(0.08, { vol: 0.2, freq: 2000 });
+    }
+  },
   star(i = 1) { const k = Math.pow(1.26, i - 1); tone(880 * k, 0.18, { type: 'triangle', vol: 0.16 }); tone(1760 * k, 0.12, { type: 'triangle', vol: 0.06, delay: 0.03 }); },
   // ----- fra før -----
   // tonen stiger med kombotrinnet

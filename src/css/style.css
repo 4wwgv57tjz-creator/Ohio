@@ -1729,3 +1729,39 @@ button.loot-mini { position: relative; display: grid; place-items: center; font:
 .take { padding: 5px 12px; background: #fff; border: 2.5px solid var(--ink); border-radius: 999px; box-shadow: 0 2px 0 var(--ink); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; touch-action: manipulation; }
 .take.on { background: var(--gold); }
 .take:active { transform: translateY(2px); box-shadow: none; }
+
+/* kamp: troppene skyter – munningsflamme og skudd over slagmarken */
+.lane-row .fighter.fire { animation: fire-kick 0.18s ease-out; }
+@keyframes fire-kick { 0% { transform: translateX(0) scale(1.06); filter: brightness(1.7) drop-shadow(0 0 6px #ffd23f); } 100% { transform: translateX(-3px); filter: none; } }
+.lane-foe .fighter.fire { animation-name: fire-kick-foe; }
+@keyframes fire-kick-foe { 0% { transform: translateX(0) scale(1.06); filter: brightness(1.6) drop-shadow(0 0 6px #ff5d5d); } 100% { transform: translateX(3px); filter: none; } }
+.tracer { position: absolute; left: 30%; z-index: 2; width: 14px; height: 4px; margin-top: -2px; border-radius: 3px; background: #ffe066; box-shadow: 0 0 6px #ffd23f; pointer-events: none; animation: tracer 0.28s linear forwards; }
+.tracer.shell { width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: #ff8a3d; box-shadow: 0 0 8px #ff5a1f; animation-duration: 0.36s; }
+.tracer.missile { width: 20px; height: 5px; background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 55%, #ff5d5d); box-shadow: none; animation-duration: 0.42s; }
+.tracer.laser { width: 36px; height: 3px; background: linear-gradient(90deg, rgba(127, 252, 255, 0), #7ffcff 60%, #fff); box-shadow: 0 0 8px #7ffcff; animation-duration: 0.2s; }
+.tracer.foe { background: #ff5d5d; box-shadow: 0 0 6px #ff3d3d; animation-name: tracer-back; }
+@keyframes tracer { from { left: 30%; opacity: 1; } to { left: 72%; opacity: 0.3; } }
+@keyframes tracer-back { from { left: 66%; opacity: 1; } to { left: 24%; opacity: 0.3; } }
+
+/* velg fiende */
+.pick-enemy { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 13px; }
+.pick-enemy .ico { width: 16px; height: 16px; }
+.target-card.picked { animation: pop 0.35s ease-out; }
+.enemy-list { display: grid; gap: 8px; margin-top: 8px; }
+.enemy-pick { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: #fff; border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.enemy-pick.on { background: #fff3d6; box-shadow: 0 0 0 3px var(--gold), 0 4px 0 var(--ink); }
+.enemy-pick:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.ep-art { flex: none; width: 54px; height: 54px; padding: 3px; background: #fff3f0; border: 2.5px solid var(--ink); border-radius: 12px; }
+.ep-art svg { display: block; width: 100%; height: 100%; }
+.ep-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ep-info b { font-size: 15.5px; }
+.ep-flavor { overflow: hidden; color: var(--ink-soft); font-size: 12px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; font-weight: 700; }
+.ep-row .ico { width: 15px; height: 15px; flex: none; }
+.ep-def, .ep-rew { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.ep-ch { flex: none; padding: 4px 8px; border: 2.5px solid var(--ink); border-radius: 999px; font-size: 13px; font-weight: 800; background: #e3e9f2; }
+.ep-ch.c-sure, .ep-ch.c-good { background: #c8f7c5; }
+.ep-ch.c-risky { background: #fff0b8; }
+.ep-ch.c-bad, .ep-ch.c-none { background: #ffc9c9; }
+@media (prefers-reduced-motion: reduce) { .lane-row .fighter.fire, .tracer { animation: none !important; } }
+.boom.hit { width: 46px; height: 46px; margin: -23px 0 0 -23px; opacity: 0.9; }

@@ -17,7 +17,9 @@ tegneseriestil, og lydene lages direkte i nettleseren – det er ingen bilde- el
    (opptil 8 timer).
 3. **Hær**: rekrutter enheter. Hver enhetstype gir hærstyrke og hører til en klasse: infanteri, kjøretøy, fly eller
    skip.
-4. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent og gjelder for en
+4. **Velg fiende**: du bestemmer selv hvem du kriger mot – alle fiendene i kapittelet du er i, i den rekkefølgen du
+   vil. Trykk **Bytt fiende** på kortet «Neste mål» på Base for en liste med vinnersjanse, forsvar, terreng og belønning,
+   eller trykk på et område på kartet. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent og gjelder for en
    automatisk plassering der du ikke gjør noe i kampen. Først med 1,8 ganger så stor hær som forsvaret er seieren
    sikker. Taper du, blir fienden svekket – men svekkelsen bygges opp igjen over tid, og ingen fiende kan svekkes under
    40 %.
@@ -265,7 +267,10 @@ All lyd lages i nettleseren med Web Audio (ingen lydfiler, se `src/js/audio.js`)
 kasser (risting, åpning og egen avsløringslyd for hver sjeldenhet), bla og ta i bruk skins, innbyggere (gås, robot,
 romvesen, barn, bestemor, bonde, kokk, soldat, ordfører og forsker), generalen som prater når den sier noe, hendelser
 (eget «ta-da» og «wah-wah» for bra og dårlig utfall), daglig bonus, fallskjermkasser, powerups som settes inn og går
-ut, kamp (treff, alarm, skjold, artilleri, generalenes evner og en «pling» per stjerne), fanebytte, vinduer og zoom
+ut, kamp (hver troppetype har sin egen skytelyd – musket, hagle, maskingevær, automatgevær, kanon, minigun, raketter,
+skipskanon, dronezap, lasergevær, blaster, laserkanon, megakanon og kosmisk stråle – og troppene skyter salver over
+slagmarken med munningsflamme; i tillegg treff, alarm, skjold, artilleri, generalenes evner og en «pling» per
+stjerne), fanebytte, vinduer og zoom
 mellom kapitlene. Lyden kan slås av i innstillingene.
 
 ## For utviklere

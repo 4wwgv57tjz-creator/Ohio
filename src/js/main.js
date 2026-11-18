@@ -431,13 +431,14 @@ function targetCardHTML() {
     ${prestigeRewardsHTML(S.prestige + 1)}
     <div class="tc-actions one"><button class="btn btn-gold" data-action="prestige-ask">${ico('star')} ${t('take_prestige', { n: S.prestige + 1 })}</button></div>`;
   }
-  const r = E.nextTarget(S);
+  const r = E.chosenTarget(S);
   if (!r) return `<div class="tc-head"><div class="tc-art">${miniGeneral()}</div><div class="tc-info"><h3>${esc(L(ERAS[S.era].won))}</h3></div></div>
     <div class="tc-actions"><button class="btn btn-gold" data-action="era-done">${ico('star')} ${t('continue')}</button></div>`;
   const P = E.battlePower(S, r), D = E.battleDef(S, r), ch = E.winChance(P, D);
   const fill = Math.min(100, (P / (D * E.SAFE_RATIO)) * 100);
   return `<div class="tc-head"><div class="tc-art">${enemyArtFor(r)}</div>
-    <div class="tc-info"><div class="eyebrow">${t('next_target')}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
+    <div class="tc-info"><div class="eyebrow">${S.target === r.id ? t('chosen_enemy') : t('next_target')}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p>
+    ${S.tut >= 5 && E.eraProgress(S).total - E.eraProgress(S).done > 1 ? `<button type="button" class="link-btn pick-enemy" data-action="pick-target">${ico('swords')} ${t('switch_enemy', { n: E.eraProgress(S).total - E.eraProgress(S).done })}</button>` : ''}</div></div>
     <div class="vs-row"><span class="vs-me">${ico('swords')}<b>${fmt(P)}</b></span><span class="vs-mid">${t('vs')}</span><span class="vs-foe"><b>${fmt(D)}</b>${ico('skull')}</span></div>
     <div class="meter"><div class="meter-fill ${chanceClass(ch)}" style="width:${fill}%"></div><span>${pct(ch)} ${t('win_chance')}</span></div>
     ${terrainHTML(r)}
@@ -969,7 +970,7 @@ function sheetHTML() {
   const kind = levelKind(mapEra);
   let id = selected;
   if (id && id !== era.home && REGION_BY_ID[id]?.era !== mapEra) id = null;
-  if (!id && kind === 'now') id = E.nextTarget(S)?.id;
+  if (!id && kind === 'now') id = E.chosenTarget(S)?.id;
   if (!id) return `<p class="muted">${kind !== 'now' ? t('lvl_pick') : S.finished ? t('universe_yours') : t('pick_region')}</p>`;
   if (id === era.home) return homeSheetHTML();
   const r = REGION_BY_ID[id];
@@ -1022,6 +1023,9 @@ function regionListHTML() {
 
 function selectRegion(id) {
   selected = id;
+  // et område i kapittelet du er i, som ikke er erobret ennå, blir fienden du har valgt
+  const sr = REGION_BY_ID[id];
+  if (sr && sr.era === S.era && !S.conquered[id] && S.target !== id) { S.target = id; lastSig.target = null; persist(); }
   const era = ERAS[mapEra];
   $$('#map-svg .reg, #map-svg .node').forEach((p) => p.classList.toggle('sel', p.dataset.id === id));
   if (era.space && !levelBusy) { const l = $('#map-wrap .map-layer'); if (l) { l.innerHTML = spaceMapSVG(mapEra); setupMapGestures(); } }
@@ -1516,6 +1520,8 @@ function startBattle(id, plan = null) {
   showBattle(r, prep);
 }
 
+// Hva slags skudd hver troppetype sender over slagmarken (lyden kommer fra sfx.gun)
+const SHOT = { militia: 'bullet', hunter: 'bullet', truck: 'bullet', soldier: 'bullet', heli: 'bullet', tank: 'shell', ship: 'shell', mech: 'shell', megamech: 'shell', jet: 'missile', rocket: 'missile', carrier: 'missile', drone: 'laser', spacemarine: 'laser', spacefighter: 'laser', laser: 'laser', ohiostar: 'laser' };
 function showBattle(r, prep) {
   modalCount++;
   updateTutorial();
@@ -1523,8 +1529,10 @@ function showBattle(r, prep) {
   ov.className = 'battle live' + (ERAS[S.era].space ? ' space' : '');
   const T = TERRAINS[r.terrain];
   const ab = prep.ability ? C.ABILITIES[prep.ability] : null;
+  // troppene som vises (og skyter) i hver korridor: de to sterkeste typene du sendte dit
+  const laneUnits = prep.lanes.map((ln, l) => [...new Set(prep.squads.filter((q) => prep.plan[q.key] === l).map((q) => q.unit))].slice(0, 2));
   const laneRows = prep.lanes.map((ln, l) => {
-    const mineHere = [...new Set(prep.squads.filter((q) => prep.plan[q.key] === l).map((q) => q.unit))].slice(0, 2);
+    const mineHere = laneUnits[l];
     const foe = ln.share ? (ln.share >= 0.4 ? [enemyArtFor(r, l), enemyArtFor(r, l + 1)] : [enemyArtFor(r, l)]) : [];
     return `<div class="lane-row${ln.share ? '' : ' empty'}" data-lane="${l}"><span class="lane-tag">${t(LANE_KEYS[l])}${ln.share ? ` ${ico(LANE_TYPES[ln.type].icon)}` : ''}</span>
       <div class="lane-me">${mineHere.map((id, i) => `<div class="fighter" style="--i:${i + l}">${A.unitArt(id, 'me')}</div>`).join('')}</div>
@@ -1565,16 +1573,49 @@ function showBattle(r, prep) {
   const st = {
     t: -PRE_MS, last: 0, score: 0, hp: 1, done: false, combo: 1, bestCombo: 1, lastHit: -1e9, hits: 0, arty: 0,
     artyReady: 400, shieldUntil: -1, shieldReady: 0, nextSp: 0, warn: null, blocked: 0, missed: 0,
-    genUsed: false, air: false, stunUntil: -1, cancelled: {}, nextSpawn: 150,
+    genUsed: false, air: false, stunUntil: -1, cancelled: {}, nextSpawn: 150, nextVolley: 60, nextFoe: 700,
   };
   const words = getLang() === 'en' ? ['POW!', 'BOOM!', 'BANG!', 'ZAP!', 'CRASH!', 'WHAM!'] : ['POW!', 'BOOM!', 'BANG!', 'ZAP!', 'KRASJ!', 'PANG!'];
   const colors = ['#ffd23f', '#ff8a3d', '#ff5d8f', '#7ffcff'];
   const early = () => (prep.early && st.t < prep.early ? 2 : 1);
+  // salve: en tropp i en korridor skyter – egen lyd per troppetype, munningsflamme og et skudd over til fienden
+  const rows = $$('.lane-row', ov);
+  const myLanes = prep.lanes.map((ln, l) => l).filter((l) => prep.lanes[l].share && laneUnits[l].length);
+  const foeLanes = prep.lanes.map((ln, l) => l).filter((l) => prep.lanes[l].share);
+  const shot = (l, cls, foe = false) => {
+    if (reducedMotion() || !rows[l]) return;
+    const tr = document.createElement('span');
+    tr.className = 'tracer ' + cls + (foe ? ' foe' : '');
+    tr.style.top = 30 + Math.random() * 34 + '%';
+    rows[l].appendChild(tr);
+    setTimeout(() => tr.remove(), 520);
+  };
+  const flash = (el) => { if (!el || reducedMotion()) return; el.classList.remove('fire'); void el.offsetWidth; el.classList.add('fire'); };
+  const volley = () => {
+    if (!myLanes.length) return;
+    const l = myLanes[Math.floor(Math.random() * myLanes.length)];
+    const k = Math.floor(Math.random() * laneUnits[l].length);
+    const unit = laneUnits[l][k];
+    sfx.gun(unit);
+    flash(rows[l] && $$('.lane-me .fighter', rows[l])[k]);
+    shot(l, SHOT[unit] || 'bullet');
+    if (Math.random() < 0.45) setTimeout(() => { if (!st.done) boom(70 + Math.random() * 14, l * 33.3 + 6 + Math.random() * 18, ''); }, 260);
+  };
+  const foeVolley = () => {
+    if (!foeLanes.length) return;
+    const l = foeLanes[Math.floor(Math.random() * foeLanes.length)];
+    sfx.gun('foe');
+    const f = rows[l] && $$('.lane-foe .fighter', rows[l]);
+    flash(f && f[Math.floor(Math.random() * f.length)]);
+    shot(l, 'bullet', true);
+  };
+  // troppene i korridoren der et mål blir truffet, skyter med sin egen lyd
+  const laneGun = (l) => { const u = laneUnits[l] && laneUnits[l][0]; return u || 'soldier'; };
   let raf = 0;
   requestAnimationFrame(() => ov.classList.add('go'));
   const boom = (x, y, word, big = false) => {
     const b = document.createElement('div');
-    b.className = 'boom' + (big ? ' big' : '');
+    b.className = 'boom' + (big ? ' big' : '') + (word ? '' : ' hit');
     b.style.left = x + '%';
     b.style.top = y + '%';
     b.innerHTML = `<svg viewBox="0 0 100 100"><path d="M50 4l9 24 25-12-10 25 24 9-24 10 12 25-25-10-11 23-9-23-25 11 11-25-24-11 24-9-12-25 25 12z" fill="${colors[Math.floor(Math.random() * colors.length)]}" stroke="#2b2350" stroke-width="4" stroke-linejoin="round"/></svg><span>${word}</span>`;
@@ -1608,7 +1649,7 @@ function showBattle(r, prep) {
     dmg(TAP_DMG * st.combo * early(), x + 2, y);
     boom(x + 4, y + 6, words[st.hits % words.length]);
     sfx.hit();
-    if (st.hits % 3 === 0) sfx.pew();
+    sfx.gun(laneGun(b._lane));
     if (S.settings.vibrate) buzz(12);
     setTimeout(() => b.remove(), 260);
     return true;
@@ -1626,6 +1667,7 @@ function showBattle(r, prep) {
     b.style.top = y + '%';
     b.innerHTML = `${enemyArtFor(r, Math.floor(Math.random() * 3))}<span class="target-ring"></span>`;
     b._xy = [x, y];
+    b._lane = lane;
     const kill = (e) => { e.preventDefault(); e.stopPropagation(); hitTarget(b, x, y); };
     b.addEventListener('pointerdown', kill);
     b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') kill(e); });
@@ -1735,7 +1777,9 @@ function showBattle(r, prep) {
       st.score += prep.autoRate * d;
       if (st.t > st.stunUntil) st.hp -= prep.drain * d;
       if (st.t >= st.nextSpawn) { spawnTarget(); st.nextSpawn = st.t + 520 + Math.random() * 260; }
-      if (Math.random() < 0.035) boom(20 + Math.random() * 60, 15 + Math.random() * 55, words[Math.floor(Math.random() * words.length)]);
+      if (st.t >= st.nextVolley) { volley(); st.nextVolley = st.t + 420 + Math.random() * 380; }
+      if (st.t >= st.nextFoe && st.t > st.stunUntil) { foeVolley(); st.nextFoe = st.t + 900 + Math.random() * 600; }
+      if (Math.random() < 0.02) boom(20 + Math.random() * 60, 15 + Math.random() * 55, words[Math.floor(Math.random() * words.length)]);
       // fiendens spesialangrep
       while (!st.warn && st.nextSp < prep.specials.length && st.cancelled[st.nextSp]) st.nextSp++;
       if (!st.warn && st.nextSp < prep.specials.length && st.t >= prep.specials[st.nextSp].at - prep.warnMs) startWarn(st.nextSp);
@@ -2499,7 +2543,7 @@ function treeHTML() {
   let y = 0;
   for (const row of rows) { row.y = y + row.h / 2; y += row.h; }
   const H = y;
-  const next = E.nextTarget(S);
+  const next = E.chosenTarget(S);
   const here = rows.find((r) => r.kind === 'fruit' && next && r.r.id === next.id) || rows.find((r) => r.kind === 'chapter' && r.e === S.era);
   const hereY = S.finished ? rows[0].y : here ? here.y : H - 60;
   let svg = '';
@@ -2708,6 +2752,38 @@ function socialSettingsHTML() {
     <p class="small">${st.signedIn ? t('signed_in_with', { p: providerName(st.provider) }) : t('playing_as_guest')}${st.code ? ` · ${t('your_code')} ${formatCode(st.code)}` : ''}</p>
     ${st.signedIn ? `<div class="row2"><button type="button" class="btn btn-soft" data-action="logout">${t('logout')}</button><button type="button" class="btn btn-danger" data-action="delete-online">${t('delete_online')}</button></div>` : `<button type="button" class="link-btn" data-action="tab" data-tab="top">${t('login_from_top')}</button>`}
   </div>`;
+}
+
+// ---------------- velg fiende ----------------
+// Alle fiendene i kapittelet du er i (samme nivå). Ta dem i den rekkefølgen du vil.
+function openEnemyPicker() {
+  const cur = E.chosenTarget(S);
+  const list = regionsOfEra(S.era).filter((r) => !S.conquered[r.id]).sort((a, b) => E.regionDef(S, a) - E.regionDef(S, b));
+  openModal(`<div class="modal-head"><h2 class="h2">${t('pick_enemy')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <p class="small">${t('pick_enemy_sub', { n: S.era + 1 })}</p>
+    <div class="enemy-list">${list.map((r) => {
+      const ch = E.chanceFor(S, r);
+      const T = TERRAINS[r.terrain];
+      return `<button type="button" class="enemy-pick${cur && cur.id === r.id ? ' on' : ''}" data-action="set-target" data-id="${r.id}" aria-pressed="${!!(cur && cur.id === r.id)}">
+        <span class="ep-art">${enemyArtFor(r)}</span>
+        <span class="ep-info"><b>${esc(L(r.name))}</b><span class="ep-flavor">${esc(L(r.flavor))}</span>
+          <span class="ep-row"><span class="ep-def">${ico('skull')}${fmt(E.battleDef(S, r))}</span>${T ? `<span class="terrain-chip" style="--tc:${T.color}">${esc(L(T.name))}</span>` : ''}<span class="ep-rew">${ico('coin')}+${money(r.income * pm())}/s</span></span></span>
+        <span class="ep-ch ${chanceClass(ch)}">${pct(ch)}</span>
+      </button>`;
+    }).join('')}</div>`, 'enemy-modal');
+}
+function setTarget(btn) {
+  const r = REGION_BY_ID[btn.dataset.id];
+  if (!r || r.era !== S.era || S.conquered[r.id]) return;
+  S.target = r.id;
+  selected = r.id;
+  persist();
+  sfx.click();
+  closeModal(btn);
+  lastSig.target = null;
+  const c = $('#target-card');
+  if (c) { c.innerHTML = targetCardHTML(); c.classList.remove('picked'); void c.offsetWidth; c.classList.add('picked'); }
+  toast(t('enemy_set', { r: L(r.name) }));
 }
 
 // ---------------- hendelser i basen ----------------
@@ -2934,7 +3010,7 @@ function updateLive() {
   if (tab === 'base') {
     const tv = $('#tap-val');
     if (tv) tv.textContent = '+' + money(E.tapValue(S));
-    const r = E.nextTarget(S);
+    const r = E.chosenTarget(S);
     const sig = r ? r.id + ':' + Math.floor(Math.log10(E.armyPower(S) + 1) * 40) + ':' + E.chanceFor(S, r).toFixed(2) : 'none';
     if (sig !== lastSig.target) { lastSig.target = sig; const c = $('#target-card'); if (c) c.innerHTML = targetCardHTML(); }
     const tb = $('[data-action="buytap"]');
@@ -3170,6 +3246,8 @@ function onAction(e) {
       break;
     }
     case 'event-open': openEvent(); break;
+    case 'pick-target': openEnemyPicker(); break;
+    case 'set-target': setTarget(btn); break;
     case 'citizen': pokeCitizen(btn); break;
     case 'ev-answer': answerEvent(btn); break;
     case 'daily-open': openDaily(); break;
