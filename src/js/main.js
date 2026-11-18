@@ -249,6 +249,34 @@ const QUIPS = {
 };
 const TOWN = [['farmer', 'granny', 'kid', 'chef', 'goose', 'mayor'], ['soldier', 'farmer', 'mayor', 'kid', 'granny', 'chef', 'goose'], ['soldier', 'scientist', 'mayor', 'kid', 'granny', 'chef'], ['robot', 'alien', 'scientist', 'soldier', 'kid']];
 const EMOTES = ['♪', '♥', '?', '!', 'z', '…', '☆', '♪♪'];
+// det innbyggerne sier når man trykker på dem
+const CIT_SAY = {
+  goose: { nb: 'HONK!', en: 'HONK!' },
+  robot: { nb: 'BIP BOOP', en: 'BEEP BOOP' },
+  alien: { nb: 'Blørk!', en: 'Blörk!' },
+  kid: { nb: 'Hihi!', en: 'Hehe!' },
+  granny: { nb: 'Å, så søtt!', en: 'Oh, how sweet!' },
+  farmer: { nb: 'Hei, sjef!', en: 'Howdy, boss!' },
+  chef: { nb: 'Mmm, suppe!', en: 'Mmm, soup!' },
+  soldier: { nb: 'Javel, sjef!', en: 'Yes, sir!' },
+  mayor: { nb: 'Ahem.', en: 'Ahem.' },
+  scientist: { nb: 'Eureka!', en: 'Eureka!' },
+};
+function pokeCitizen(btn) {
+  const k = btn.dataset.kind;
+  unlockAudio();
+  sfx.citizen(k);
+  if (S.settings.vibrate) buzz(10);
+  const w = btn.closest('.walker');
+  if (w && !w.querySelector('.say-pop')) {
+    const b = document.createElement('span');
+    b.className = 'say-pop';
+    b.textContent = L(CIT_SAY[k] || CIT_SAY.farmer);
+    w.appendChild(b);
+    setTimeout(() => b.remove(), 1500);
+  }
+  if (btn.animate && !reducedMotion()) btn.animate([{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-14px) scale(1.12)' }, { transform: 'translateY(0) scale(1)' }], { duration: 380, easing: 'ease-out' });
+}
 const pickN = (arr, n) => arr.slice().sort(() => Math.random() - 0.5).slice(0, n);
 const multTxt = (m) => '×' + String(m).replace('.', getLang() === 'nb' ? ',' : '.');
 const genMood = () => (EV.currentEvent(S) ? 'sad' : 'happy');
@@ -266,9 +294,10 @@ function refreshGeneral() {
   g.className = 'hq-gen g-' + A.getGeneral();
   $('.hq-gen-in', g).innerHTML = A.mascotWindow(genMood());
 }
-function genSay(text, ms = 3800) {
+function genSay(text, ms = 3800, talk = false) {
   const b = $('#gen-say');
   if (!b || !text) return;
+  if (talk) sfx.talk(S.general);
   const id = ++sayId;
   b.textContent = text;
   b.hidden = false;
@@ -289,11 +318,11 @@ function genReact(kind) {
 function maybeQuip(now) {
   if (!S || S.tut < 5 || tab !== 'base' || modalCount > 0 || document.hidden || now < nextQuip) return;
   nextQuip = now + 22000 + Math.random() * 22000;
-  if (EV.currentEvent(S)) { genSay(say('evSpawn', 'ev_spawn_say')); return; }
+  if (EV.currentEvent(S)) { genSay(say('evSpawn', 'ev_spawn_say'), 3800, true); return; }
   const own = voice(S.general, 'quip'); // Drip snakker slang hele tiden
-  if (own) { genSay(L(own)); return; }
+  if (own) { genSay(L(own), 3800, true); return; }
   const pool = [...QUIPS.all, ...(QUIPS[S.general] || [])];
-  genSay(L(pool[Math.floor(Math.random() * pool.length)]));
+  genSay(L(pool[Math.floor(Math.random() * pool.length)]), 3800, true);
 }
 function townsfolkHTML() {
   const pool = TOWN[S.era <= 0 ? 0 : S.era <= 3 ? 1 : S.era === 4 ? 2 : 3];
@@ -302,7 +331,7 @@ function townsfolkHTML() {
     const d = (18 + Math.random() * 16) * (i ? -1 : 1);
     const dur = 9 + Math.random() * 6;
     return `<div class="walker w${i}${i === 0 && evOn ? ' away' : ''}" style="--d:${d.toFixed(0)}px;--dur:${dur.toFixed(1)}s;animation-delay:-${(Math.random() * dur).toFixed(1)}s">
-      <div class="w-in">${A.citizenArt(k)}</div><span class="emote" style="animation-delay:${(2 + Math.random() * 9).toFixed(1)}s">${EMOTES[Math.floor(Math.random() * EMOTES.length)]}</span></div>`;
+      <button type="button" class="w-in" data-action="citizen" data-kind="${k}" aria-label="${t('citizen')}">${A.citizenArt(k)}</button><span class="emote" style="animation-delay:${(2 + Math.random() * 9).toFixed(1)}s">${EMOTES[Math.floor(Math.random() * EMOTES.length)]}</span></div>`;
   }).join('');
 }
 function eventSpotHTML() {
@@ -587,7 +616,7 @@ function installPowerup(id, slot) {
   if (at < 0) { sfx.nope(); toast(t('pu_full')); return false; }
   if (!PU.install(S, id, now, at)) { sfx.nope(); return false; }
   persist();
-  sfx.milestone();
+  sfx.powerup();
   toast(t('pu_installed', { p: L(q.name) }), 'boost');
   refreshPu();
   updateHUD();
@@ -1115,7 +1144,7 @@ async function goLevel(to) {
   const oldSvg = oldLayer && $('svg', oldLayer);
   if (!S.flags.mapZoom) { S.flags.mapZoom = 1; persist(); }
   vbAnim++;
-  sfx.click();
+  sfx.whoosh();
   if (!oldSvg || reducedMotion() || tab !== 'map' || mapView !== 'map') { mapEra = to; selected = null; viewBox = null; renderMap(); return; }
   levelBusy = true;
   const out = to > from;
@@ -1537,7 +1566,8 @@ function showBattle(r, prep) {
     st.lastHit = st.t;
     dmg(TAP_DMG * st.combo * early(), x + 2, y);
     boom(x + 4, y + 6, words[st.hits % words.length]);
-    st.hits % 2 ? sfx.pew() : sfx.boom();
+    sfx.hit();
+    if (st.hits % 3 === 0) sfx.pew();
     if (S.settings.vibrate) buzz(12);
     setTimeout(() => b.remove(), 260);
     return true;
@@ -1597,7 +1627,7 @@ function showBattle(r, prep) {
     $$('.lane-row', ov).forEach((x) => x.classList.toggle('alarm', Number(x.dataset.lane) === sp.lane));
     if (sp.type === 'charge') spawnCaptain(w);
     shieldBtn.classList.toggle('alert', sp.type === 'barrage');
-    sfx.warn();
+    sfx.alarm();
     if (S.settings.vibrate) buzz(20);
   };
   const resolveWarn = () => {
@@ -1616,7 +1646,7 @@ function showBattle(r, prep) {
       st.score += COUNTER_DMG;
       bump(0.3);
       floatTxt(44, 30, t('blocked'), 'good');
-      sfx.milestone();
+      sfx.shield();
     } else {
       st.missed++;
       st.hp -= E.SP_HP;
@@ -1708,7 +1738,7 @@ function showBattle(r, prep) {
     } else if (id === 'shield' && st.t >= st.shieldReady) {
       st.shieldUntil = st.t + SHIELD_MS;
       st.shieldReady = st.t + SHIELD_CD;
-      sfx.buy();
+      sfx.shieldUp();
     } else if (id === 'air' && !st.air) {
       st.air = true;
       b.disabled = true;
@@ -1739,15 +1769,15 @@ function showBattle(r, prep) {
         floatTxt(40, 18, '-' + money(cost), 'gold');
         floatTxt(62, 40, t('bribed'), 'good');
         dmg(ABILITY_DMG.bribe, 70, 26);
-        sfx.coin();
+        sfx.bribe();
       } else if (kind === 'nuts') {
         $$('.target:not(.captain)', targets).forEach((x) => hitTarget(x, x._xy[0], x._xy[1]));
         for (let i = 0; i < 6; i++) setTimeout(() => boom(52 + Math.random() * 38, 6 + Math.random() * 60, getLang() === 'en' ? 'NUTS!' : 'NØTT!', false), i * 70);
         dmg(ABILITY_DMG.nuts, 70, 24);
-        sfx.recruit();
+        sfx.nuts();
       } else if (kind === 'laser') {
         ov.classList.add('lasering');
-        sfx.pew();
+        sfx.laser();
         setTimeout(() => {
           ov.classList.remove('lasering');
           if (st.done) return;
@@ -1764,6 +1794,7 @@ function showBattle(r, prep) {
 
 function showBattleResult(ov, r, res) {
   if (res.win && res.stars === 3) sfx.fanfare(); else res.win ? sfx.victory() : sfx.defeat();
+  if (res.win) for (let i = 1; i <= res.stars; i++) setTimeout(() => sfx.star(i), 380 + i * 220); // en «pling» per stjerne
   ov.classList.add('done');
   const card = document.createElement('div');
   card.className = 'result-card ' + (res.win ? 'win s' + res.stars : 'lose');
@@ -1812,6 +1843,7 @@ function battleDone(btn) {
 // ---------------- MODALER ----------------
 function openModal(html, cls = '', onClose) {
   modalCount++;
+  sfx.pop();
   const m = document.createElement('div');
   m.className = 'modal-back';
   m.innerHTML = `<div class="modal ${cls}" role="dialog" aria-modal="true">${html}</div>`;
@@ -2167,6 +2199,8 @@ function buyCrateFlow(crateId) {
 }
 
 // ----- åpne kasse -----
+// Trykk for å åpne. Skinsene avsløres ett og ett (eller «Vis alle»). Etterpå kan man trykke på hvert skin,
+// bla gjennom dem med pilene, ved å sveipe eller med piltastene, og ta dem i bruk med en gang.
 function openCrateFlow(crateId, { free = false } = {}) {
   const c = C.CRATE_BY_ID[crateId];
   const items = C.openCrate(S, crateId, { free });
@@ -2178,51 +2212,95 @@ function openCrateFlow(crateId, { free = false } = {}) {
   ov.className = 'crate-open';
   ov.innerHTML = `<div class="crate-stage"><div class="crate-rays"></div><div class="crate-big">${A.crateArt(c.id)}</div><p class="crate-hint">${t('tap_to_open')}</p></div>`;
   $('#overlay-root').appendChild(ov);
+  sfx.crateShake();
   updateTutorial();
-  let idx = -1;
+  const stage = ov.querySelector('.crate-stage');
+  let idx = -1; // siste avslørte skin
+  let cur = 0; // skinnet som vises når man blar
+  let browsing = false;
   let busy = false;
-  const best = items.reduce((a, b) => (C.RARITY[b.rarity].rank > C.RARITY[a.rarity].rank ? b : a), items[0]);
-  const close = () => { ov.remove(); modalCount = Math.max(0, modalCount - 1); updateHUD(); updateBadges(); if (tab === 'shop') renderShop(); updateTutorial(); };
+  const catOf = (k) => C.CATEGORIES.find((x) => x.id === k.cat);
+  const isOn = (k) => S.skins.equipped[k.cat] === k.id;
+  const genOf = (k) => { const g = catOf(k).gen; return g && g !== S.general ? C.GENERAL_BY_ID[g] : null; };
+  const cardHTML = (it) => `<div class="loot-card r-${it.rarity}">
+      ${it.dup ? '' : `<span class="loot-new">${t('new_skin')}</span>`}
+      ${isOn(it.skin) ? `<span class="loot-on">${ico('check')} ${t('equipped')}</span>` : ''}
+      <div class="loot-art">${skinPreview(it.skin)}</div>
+      ${rarityChip(it.rarity)}
+      <h3>${esc(L(it.skin.name))}</h3>
+      <p class="loot-cat">${esc(L(catOf(it.skin).name))}</p>
+      ${it.dup ? `<p class="loot-dup">${ico('gem')} ${t('duplicate', { n: it.refund })}</p>` : ''}
+    </div>`;
+  const keys = (e) => {
+    if (e.key === 'Escape') { close(); return; }
+    if (browsing && e.key === 'ArrowRight') { e.preventDefault(); show(cur + 1); }
+    if (browsing && e.key === 'ArrowLeft') { e.preventDefault(); show(cur - 1); }
+  };
+  const close = () => { document.removeEventListener('keydown', keys); ov.remove(); modalCount = Math.max(0, modalCount - 1); updateHUD(); updateBadges(); if (tab === 'shop') renderShop(); updateTutorial(); };
+  document.addEventListener('keydown', keys);
+  // bla-visning: stort kort med piler, alle skinsene som små knapper under, og «Bruk»
+  const show = (i, quiet = false) => {
+    browsing = true;
+    const n = items.length;
+    cur = ((i % n) + n) % n;
+    const it = items[cur];
+    if (!quiet) sfx.swish();
+    const g = genOf(it.skin);
+    stage.innerHTML = `<div class="crate-rays r-${it.rarity}"></div>
+      <div class="loot-browse">
+        ${n > 1 ? `<button type="button" class="lb-nav prev" data-nav="-1" aria-label="${t('loot_prev')}">‹</button>` : ''}
+        ${cardHTML(it)}
+        ${n > 1 ? `<button type="button" class="lb-nav next" data-nav="1" aria-label="${t('loot_next')}">›</button>` : ''}
+      </div>
+      ${n > 1 ? `<div class="loot-summary">${items.map((x, k) => `<button type="button" class="loot-mini r-${x.rarity}${k === cur ? ' on' : ''}" data-pick="${k}" aria-label="${esc(L(x.skin.name))}" aria-pressed="${k === cur}">${skinPreview(x.skin)}${isOn(x.skin) ? `<span class="lm-on">${ico('check')}</span>` : ''}</button>`).join('')}</div>
+      <p class="lb-hint">${cur + 1} / ${n} · ${t('loot_browse_hint')}</p>` : ''}
+      <div class="loot-actions">
+        <div class="row2">${isOn(it.skin) ? `<span class="lb-on">${ico('check')} ${t('equipped')}</span>` : `<button type="button" class="btn btn-gold" data-crate="equip">${t('equip')}</button>`}<button type="button" class="btn btn-soft" data-crate="done">${t('done')}</button></div>
+        ${g ? `<p class="lb-note">${t('skin_for_gen', { g: esc(L(g.name)) })}</p>` : ''}
+      </div>`;
+  };
+  const equipCur = () => {
+    const it = items[cur];
+    if (!C.equip(S, it.skin.id)) { sfx.nope(); return; }
+    applySkins(); persist(); sfx.equip();
+    if (S.settings.vibrate) buzz(15);
+    const g = genOf(it.skin);
+    toast(g ? t('skin_equipped_gen_toast', { name: L(it.skin.name), g: L(g.name) }) : t('skin_equipped_toast', { name: L(it.skin.name) }), 'boost');
+    show(cur, true);
+  };
   const reveal = (it) => {
     const rank = C.RARITY[it.rarity].rank;
-    ([sfx.coin, sfx.crate, sfx.milestone, sfx.fanfare, sfx.fanfare][rank] || sfx.fanfare)();
+    sfx.reveal(rank);
     if (S.settings.vibrate) buzz(rank >= 3 ? 60 : 20);
-    const last = idx === items.length - 1;
-    ov.querySelector('.crate-stage').innerHTML = `<div class="crate-rays r-${it.rarity}"></div>
-      <div class="loot-card r-${it.rarity}">
-        ${it.dup ? '' : `<span class="loot-new">${t('new_skin')}</span>`}
-        <div class="loot-art">${skinPreview(it.skin)}</div>
-        ${rarityChip(it.rarity)}
-        <h3>${esc(L(it.skin.name))}</h3>
-        <p class="loot-cat">${esc(L(C.CATEGORIES.find((x) => x.id === it.skin.cat).name))}</p>
-        ${it.dup ? `<p class="loot-dup">${ico('gem')} ${t('duplicate', { n: it.refund })}</p>` : ''}
-      </div>
-      ${last ? '' : `<p class="crate-hint">${t('tap_next')} · ${idx + 1}/${items.length}</p>`}`;
+    if (idx === items.length - 1) show(idx, true); // det siste skinnet vises rett i bla-visningen
+    else {
+      stage.innerHTML = `<div class="crate-rays r-${it.rarity}"></div>${cardHTML(it)}
+        <p class="crate-hint">${t('tap_next')} · ${idx + 1}/${items.length}</p>
+        <button type="button" class="link-btn loot-skip" data-crate="all">${t('show_all')}</button>`;
+    }
     if (rank >= 3) confetti(ov, 70);
-    if (last) showDone();
   };
-  const showDone = () => {
-    const newBest = !best.dup && S.skins.equipped[best.skin.cat] !== best.skin.id ? best : null;
-    const row = document.createElement('div');
-    row.className = 'loot-actions';
-    row.innerHTML = `${items.length > 1 ? `<div class="loot-summary">${items.map((it) => `<span class="loot-mini r-${it.rarity}" title="${esc(L(it.skin.name))}">${skinPreview(it.skin)}</span>`).join('')}</div>` : ''}
-      <div class="row2">${newBest ? `<button type="button" class="btn btn-gold" data-crate="equip">${t('use_now')}</button>` : ''}<button type="button" class="btn ${newBest ? 'btn-soft' : 'btn-gold'}" data-crate="done">${t('done')}</button></div>`;
-    ov.querySelector('.crate-stage').appendChild(row);
-    row.querySelector('[data-crate="done"]').addEventListener('click', (e) => { e.stopPropagation(); close(); });
-    row.querySelector('[data-crate="equip"]')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      C.equip(S, newBest.skin.id); applySkins(); persist();
-      toast(t('skin_equipped_toast', { name: L(newBest.skin.name) }));
-      close();
-    });
-  };
+  // sveip til siden for å bla
+  let sx = null, sy = 0;
+  ov.addEventListener('pointerdown', (e) => { if (browsing && !e.target.closest('button')) { sx = e.clientX; sy = e.clientY; } });
+  ov.addEventListener('pointerup', (e) => {
+    if (sx === null) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    sx = null;
+    if (items.length > 1 && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) show(cur + (dx < 0 ? 1 : -1));
+  });
   ov.addEventListener('click', (e) => {
-    if (busy || e.target.closest('button')) return;
-    if (idx >= items.length - 1) return;
+    const b = e.target.closest('button');
+    if (b && b.dataset.nav) { show(cur + Number(b.dataset.nav)); return; }
+    if (b && b.dataset.pick) { show(Number(b.dataset.pick)); return; }
+    if (b && b.dataset.crate === 'equip') { equipCur(); return; }
+    if (b && b.dataset.crate === 'done') { close(); return; }
+    if (b && b.dataset.crate === 'all') { idx = items.length - 1; show(0); return; }
+    if (browsing || busy || b) return;
     if (idx === -1) {
       busy = true;
       ov.classList.add('opening');
-      sfx.boom();
+      sfx.crateOpen();
       setTimeout(() => { busy = false; idx = 0; reveal(items[0]); }, 650);
       return;
     }
@@ -2594,7 +2672,7 @@ function socialSettingsHTML() {
 // ---------------- hendelser i basen ----------------
 function onEventSpawn() {
   sfx.event();
-  if (tab === 'base') { refreshEventSpot(); genSay(say('evSpawn', 'ev_spawn_say')); }
+  if (tab === 'base') { refreshEventSpot(); genSay(say('evSpawn', 'ev_spawn_say'), 3800, true); }
   updateBadges();
 }
 function openEvent() {
@@ -2629,7 +2707,7 @@ function answerEvent(btn) {
   if (!out) { closeModal(btn); refreshEventSpot(); return; }
   const { event: x, answer: a, res } = out;
   persist();
-  if (res.good) { sfx.milestone(); if (S.settings.vibrate) buzz(20); } else { sfx.nope(); if (S.settings.vibrate) buzz(40); }
+  if (res.good) { sfx.good(); if (S.settings.vibrate) buzz(20); } else { sfx.bad(); if (S.settings.vibrate) buzz(40); }
   modal.classList.add('ev-done', res.good ? 'good' : 'bad');
   modal.innerHTML = `<div class="ev-head"><div class="ev-art">${A.citizenArt(x.who)}</div><div class="ev-ttl"><div class="eyebrow">${esc(L(x.title))}</div><h2 class="h2">${esc(res.good ? say('evGood', 'ev_good') : say('evBad', 'ev_bad'))}</h2></div></div>
     <p class="ev-chosen">«${esc(L(a.t))}»</p>
@@ -2682,7 +2760,7 @@ function claimDaily(btn, mult = 1) {
   const modal = btn && btn.isConnected ? btn.closest('.modal') : $('.daily-modal');
   if (!got) { if (modal) modal.innerHTML = dailyHTML(); return; }
   persist();
-  sfx.crate();
+  sfx.daily();
   if (S.settings.vibrate) buzz(30);
   if (modal) { modal.innerHTML = dailyHTML(got); confetti(modal, 50); }
   updateHUD(); updateBadges(); refreshDailyBtn();
@@ -2755,6 +2833,7 @@ function maybeCrate(now) {
   });
   el.addEventListener('animationend', () => el.remove());
   $('#crates').appendChild(el);
+  sfx.drop();
 }
 function collectCrate(x, y) {
   S.stats.crates++;
@@ -2848,7 +2927,7 @@ function frame(now) {
       updateBadges();
       if (S.tut === 2) updateTutorial();
       const gone = PU.expirePowerups(S);
-      if (gone.length) { gone.forEach((id) => toast(t('pu_expired', { p: L(PU.PU_BY_ID[id].name) }))); refreshPu(); persist(); }
+      if (gone.length) { gone.forEach((id) => toast(t('pu_expired', { p: L(PU.PU_BY_ID[id].name) }))); if (!document.hidden) sfx.expire(); refreshPu(); persist(); }
     }
     if (saveAcc >= 5) { saveAcc = 0; persist(); social()?.submit().catch?.(() => {}); }
     maybeCrate(Date.now());
@@ -2863,7 +2942,7 @@ function onAction(e) {
   const a = btn.dataset.action;
   if (a !== 'buy' && a !== 'buytap') unlockAudio();
   switch (a) {
-    case 'tab': { const from = tab; sfx.click(); setTab(btn.dataset.tab); if (from !== tab) maybeTimedInterstitial('tab_change'); break; }
+    case 'tab': { const from = tab; sfx.tab(); setTab(btn.dataset.tab); if (from !== tab) maybeTimedInterstitial('tab_change'); break; }
     case 'buy': doBuy(btn.dataset.kind, btn.dataset.id, btn); break;
     case 'buytap': doBuyTap(); break;
     case 'mode': {
@@ -3002,7 +3081,7 @@ function onAction(e) {
     case 'skincat': skinCat = btn.dataset.cat; sfx.click(); renderShop(); break;
     case 'equip': {
       if (C.equip(S, btn.dataset.id)) {
-        applySkins(); persist(); sfx.buy();
+        applySkins(); persist(); sfx.equip();
         toast(t('skin_equipped_toast', { name: L(C.SKIN_BY_ID[btn.dataset.id].name) }));
         renderShop();
       }
@@ -3050,6 +3129,7 @@ function onAction(e) {
       break;
     }
     case 'event-open': openEvent(); break;
+    case 'citizen': pokeCitizen(btn); break;
     case 'ev-answer': answerEvent(btn); break;
     case 'daily-open': openDaily(); break;
     case 'daily-claim': claimDaily(btn, 1); break;
@@ -3143,7 +3223,11 @@ function boot(hotData) {
       combo: (n) => { combo = n; lastTapAt = performance.now(); updateCombo(); },
       gen: (g) => { S.general = g; applySkins(); renderTab(); },
       quip: () => { nextQuip = 0; maybeQuip(performance.now()); return $('#gen-say')?.textContent; },
+      sounds: () => ({ ...played }),
     };
+    // teller hvilke lyder som spilles (for automatiske tester)
+    const played = {};
+    for (const k of Object.keys(sfx)) { const f = sfx[k]; sfx[k] = (...a) => { played[k] = (played[k] || 0) + 1; return f(...a); }; }
   }
   try {
     const hot = window.claude && window.claude.hot;

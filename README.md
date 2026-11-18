@@ -59,7 +59,7 @@ Tips:
   Generalen er inne i hovedkvarteret (i låvedøra, borgporten, lobbyen eller koøyet), reagerer når du trykker, sier
   rare ting av og til, viser deg hva du skal gjøre i starten og har sine egne skins.
 - **Livet i basen**: innbyggere går rundt (bønder, bestemødre, kokker, forskere, soldater, roboter, romvesener og en
-  gås), og av og til skjer det **rare ting i byen**. Da står noen med et utropstegn ved hovedkvarteret – trykk på dem.
+  gås) – trykk på dem, så sier de noe (gåsa sier HONK!). Av og til skjer det **rare ting i byen**. Da står noen med et utropstegn ved hovedkvarteret – trykk på dem.
   Hver hendelse har tre svar, og hvert svar er enten bra eller dårlig, men spillet sier ikke hvilket før du har valgt
   (og rekkefølgen stokkes). Det finnes 47 hendelser, som at folket sulter og det eneste som er igjen er én uendelig
   lang spagetti, at en gås vil bli statsminister, eller at hovedkvarteret har gått i søvne. Utfallet kan være penger,
@@ -100,7 +100,9 @@ Tips:
   med en gang eller spare dem til senere. Du får også en gullkasse hver gang du fullfører et kapittel.
 - **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
   Sjansene vises i spillet («Se sjansene»). Legendarisk eller bedre er garantert minst hvert 20. skin, nye skins
-  prioriteres, og duplikater blir til edelstener.
+  prioriteres, og duplikater blir til edelstener. Når kassen er åpnet, kan du trykke på hvert skin du fikk, bla
+  gjennom dem med pilene (eller sveipe / bruke piltastene) og ta dem i bruk med en gang med **Bruk**. «Vis alle»
+  hopper over avsløringen. Skins til en annen general merkes, og blir brukt når du bytter til den generalen.
 - **Edelstener** tjenes ved å erobre områder, fullføre kapitler, fra forsyningskasser og ved å se reklame – og kan
   kjøpes i butikken. De brukes på lootkasser og «tidshopp» (få 1 eller 4 timer med inntekt med en gang).
 - **Belønningsreklame** (frivillig): gratis trekasse hvert 30. minutt, +30 edelstener (8 per dag), 2× inntekt i
@@ -253,6 +255,15 @@ Legg spillet på hjemskjermen:
   Inne i spillet finnes også en installer-knapp under innstillinger (tannhjulet) når nettleseren støtter det.
 
 Du kan også åpne `docs/index.html` direkte i en nettleser på PC-en.
+
+## Lyd
+
+All lyd lages i nettleseren med Web Audio (ingen lydfiler, se `src/js/audio.js`): trykk, kritiske treff, kombo,
+kasser (risting, åpning og egen avsløringslyd for hver sjeldenhet), bla og ta i bruk skins, innbyggere (gås, robot,
+romvesen, barn, bestemor, bonde, kokk, soldat, ordfører og forsker), generalen som prater når den sier noe, hendelser
+(eget «ta-da» og «wah-wah» for bra og dårlig utfall), daglig bonus, fallskjermkasser, powerups som settes inn og går
+ut, kamp (treff, alarm, skjold, artilleri, generalenes evner og en «pling» per stjerne), fanebytte, vinduer og zoom
+mellom kapitlene. Lyden kan slås av i innstillingene.
 
 ## For utviklere
 
