@@ -1,5 +1,5 @@
 // Spillmotor – ren logikk uten DOM, slik at den kan testes og simuleres i Node.
-import { BUILDINGS, UNITS, REGIONS, ERAS, REGION_BY_ID, BUILDING_BY_ID, UNIT_BY_ID, regionsOfEra, TERRAINS, TACTICS, DOCTRINES, DOCTRINE_BY_ID, DOC_MAX, docCost } from './data.js';
+import { BUILDINGS, UNITS, REGIONS, ERAS, REGION_BY_ID, BUILDING_BY_ID, UNIT_BY_ID, regionsOfEra, TERRAINS, TACTICS, DOCTRINES, DOCTRINE_BY_ID, DOC_MAX, docCost, LANE_TYPES, LANE_POOLS } from './data.js';
 import { newPowerups, restorePowerups, puEffect, grantRandom } from './powerups.js';
 import { newCosmetics, restoreCosmetics, EMPTY_INV, addCrate, PRESTIGE_SKINS, equippedSkin, GENERAL_BY_ID, DEFAULT_GENERAL, GENERAL_SWITCH_MS } from './cosmetics.js';
 
@@ -249,22 +249,110 @@ export function battleDef(s, r, now = Date.now()) {
   if (typeof r === 'string') r = REGION_BY_ID[r];
   return regionDef(s, r) * puEffect(s, 'enemy', now) * (1 - 0.03 * docLevel(s, 'intel'));
 }
+// ---------- utplassering i tre korridorer ----------
+export const LANES = 3;
+export const COUNTER = 1.5, BAD = 0.5;
+export const SQUAD_TYPES = 5; // de fem sterkeste enhetstypene deles i tropper som kan plasseres
+const strHash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const seededRnd = (seed) => () => { seed = (seed + 0x6d2b79f5) >>> 0; let x = seed; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+const laneCache = {};
+// Fiendens oppstilling i et område (fast for hvert område, så man kan planlegge)
+export function enemyLanes(r) {
+  if (typeof r === 'string') r = REGION_BY_ID[r];
+  if (laneCache[r.id]) return laneCache[r.id];
+  const rnd = seededRnd(strHash(r.id));
+  const pool = (LANE_POOLS[r.enemy === 'ufo' ? 'ufo' : r.enemy === 'boss' ? 'boss' : r.terrain] || LANE_POOLS.plains).slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const patterns = [[0.3, 0.4, 0.3], [0.2, 0.5, 0.3], [0.3, 0.5, 0.2], [0.35, 0.3, 0.35], [0.25, 0.3, 0.45], [0.45, 0.3, 0.25]];
+  let shares = patterns[Math.floor(rnd() * patterns.length)];
+  // de første byene i Ohio har færre korridorer, så opplæringen blir enkel
+  const order = regionsOfEra(r.era).slice().sort((a, b) => a.def - b.def);
+  const idx = order.indexOf(r);
+  if (r.era === 0 && idx === 0) shares = [0, 1, 0];
+  else if (r.era === 0 && idx <= 2) shares = rnd() < 0.5 ? [0.45, 0.55, 0] : [0, 0.55, 0.45];
+  return (laneCache[r.id] = pool.map((type, i) => ({ type, share: shares[i] })));
+}
+export const laneMult = (type, cls) => { const T = LANE_TYPES[type]; return !T ? 1 : T.weak === cls ? COUNTER : T.bad === cls ? BAD : 1; };
+// Hæren delt i tropper (opptil tre per enhetstype) som kan plasseres hver for seg
+export function squadsOf(s, r) {
+  if (typeof r === 'string') r = REGION_BY_ID[r];
+  const types = [];
+  for (const u of UNITS) { const n = s.units[u.id] || 0; if (n > 0) types.push({ u, n, p: unitPower(s, u, n) * (classMult(s, u.cls) + terrainBonus(r, u.cls)) }); }
+  types.sort((a, b) => b.p - a.p);
+  const out = [];
+  for (const { u, n, p } of types.slice(0, SQUAD_TYPES)) {
+    const k = Math.min(3, n);
+    for (let i = 0; i < k; i++) {
+      const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
+      out.push({ key: u.id + ':' + i, unit: u.id, cls: u.cls, count: cnt, power: (p * cnt) / n });
+    }
+  }
+  return out;
+}
+// Hvordan en plan (tropp → korridor) står seg: styrke per korridor og total vinnersjanse.
+// Du vinner kampen ved å vinne korridorer som til sammen har over halvparten av fiendens styrke.
+export function laneEval(s, r, plan, tactic, now = Date.now()) {
+  if (typeof r === 'string') r = REGION_BY_ID[r];
+  const lanes = enemyLanes(r);
+  const D = battleDef(s, r, now);
+  const mult = TACTICS[tacticId(s, tactic)].power * puEffect(s, 'power', now);
+  const squads = squadsOf(s, r);
+  const P = [0, 0, 0];
+  let placed = 0;
+  for (const q of squads) {
+    const l = plan ? plan[q.key] : undefined;
+    if (!Number.isInteger(l) || l < 0 || l >= LANES || !lanes[l].share) continue;
+    P[l] += q.power * laneMult(lanes[l].type, q.cls);
+    placed++;
+  }
+  const out = lanes.map((ln, l) => {
+    const Dl = D * ln.share, Pl = P[l] * mult;
+    return { type: ln.type, share: ln.share, D: Dl, P: Pl, chance: ln.share ? winChance(Pl, Dl) : 0 };
+  });
+  let chance = 0;
+  for (let mask = 0; mask < 8; mask++) {
+    let pr = 1, won = 0;
+    for (let l = 0; l < LANES; l++) {
+      const c = out[l].share ? out[l].chance : 0;
+      if (mask & (1 << l)) { pr *= c; won += out[l].share; } else pr *= 1 - c;
+    }
+    if (won > 0.5 + 1e-9) chance += pr;
+  }
+  return { lanes: out, chance: Math.min(1, chance), P: out.reduce((a, x) => a + x.P, 0), D, placed, squads };
+}
+// Enkel automatisk plan: fordeler styrken etter fiendens styrke, men tar ikke hensyn til svakheter
+export function autoDeploy(s, r) {
+  if (typeof r === 'string') r = REGION_BY_ID[r];
+  const lanes = enemyLanes(r);
+  const squads = squadsOf(s, r).slice().sort((a, b) => b.power - a.power);
+  const total = squads.reduce((a, q) => a + q.power, 0);
+  const got = [0, 0, 0];
+  const plan = {};
+  for (const q of squads) {
+    let best = -1, gap = -Infinity;
+    for (let l = 0; l < LANES; l++) {
+      if (!lanes[l].share) continue;
+      const g = lanes[l].share * total - got[l];
+      if (g > gap) { gap = g; best = l; }
+    }
+    if (best < 0) break;
+    plan[q.key] = best;
+    got[best] += q.power;
+  }
+  return plan;
+}
 export function chanceFor(s, r, tactic, now = Date.now()) {
   if (typeof r === 'string') r = REGION_BY_ID[r];
-  return winChance(battlePower(s, r, tactic, now), battleDef(s, r, now));
+  return laneEval(s, r, autoDeploy(s, r), tactic, now).chance;
 }
-
-function applyCasualties(s, frac, rnd) {
-  const lost = {};
-  let total = 0;
-  if (frac <= 0) return { lost, total };
-  for (const u of UNITS) {
-    const n = s.units[u.id] || 0;
-    if (!n) continue;
-    const k = Math.min(n, Math.floor(n * frac + rnd()));
-    if (k > 0) { s.units[u.id] = n - k; lost[u.id] = k; total += k; }
-  }
-  return { lost, total };
+// Hvilke korridorer som ble vunnet (stemmer med utfallet; brukes til visning og tap)
+function laneOutcome(lanes, win, rnd) {
+  const won = lanes.map((x) => x.share > 0 && rnd() < x.chance);
+  const share = () => lanes.reduce((a, x, i) => a + (won[i] ? x.share : 0), 0);
+  const order = lanes.map((x, i) => i).filter((i) => lanes[i].share > 0).sort((a, b) => lanes[b].chance - lanes[a].chance);
+  if (win) { for (const i of order) { if (share() > 0.5 + 1e-9) break; won[i] = true; } }
+  else { for (const i of order.slice().reverse()) { if (share() <= 0.5 + 1e-9) break; won[i] = false; } }
+  return won;
 }
 
 // ---------- kamp i sanntid ----------
@@ -275,14 +363,18 @@ export const AUTO_MS = 8000;
 export const SP_HP = 0.12;
 export const BATTLE_K = 3;
 export const WARN_MS = 1700;
-export function prepareBattle(s, regionId, tactic, rnd = Math.random, now = Date.now()) {
+export function prepareBattle(s, regionId, tactic, rnd = Math.random, now = Date.now(), plan = null) {
   const r = REGION_BY_ID[regionId];
   if (!r || r.era !== s.era || s.conquered[r.id]) return null;
   const tid = tacticId(s, tactic);
   const tc = TACTICS[tid];
   const perk = genPerk(s);
-  const P = battlePower(s, r, tid, now), D = battleDef(s, r, now);
-  const chance = winChance(P, D);
+  const usePlan = plan && Object.keys(plan).length ? plan : autoDeploy(s, r);
+  const ev = laneEval(s, r, usePlan, tid, now);
+  if (!ev.placed) return null;
+  const P = ev.P, D = ev.D;
+  const chance = ev.chance;
+  const occupied = ev.lanes.map((x, i) => i).filter((i) => ev.lanes[i].share > 0);
   const u = rnd();
   const need = chance >= 1 ? 0.55 + 0.4 * u : u < chance ? 0.55 + 0.45 * (u / chance) : 1 + (u - chance) * BATTLE_K;
   // fiendens spesialangrep: flere i senere kapitler, ingen i aller første kamp
@@ -290,7 +382,7 @@ export function prepareBattle(s, regionId, tactic, rnd = Math.random, now = Date
   const specials = [];
   for (let i = 0; i < n; i++) {
     const at = AUTO_MS * ((i + 0.6) / (n + 0.4)) + (rnd() - 0.5) * 600 + (tc.delay || 0) * (1 - i / Math.max(1, n));
-    specials.push({ at: Math.min(AUTO_MS - 300, at), type: rnd() < 0.5 ? 'barrage' : 'charge' });
+    specials.push({ at: Math.min(AUTO_MS - 300, at), type: rnd() < 0.5 ? 'barrage' : 'charge', lane: occupied[Math.floor(rnd() * occupied.length)] });
   }
   const artyMult = puEffect(s, 'artillery', now) * (1 + 0.15 * docLevel(s, 'arty'));
   const artyCd = 2600 * (tc.artyCd || 1) * (perk.artyCd || 1) * (1 - 0.06 * docLevel(s, 'arty'));
@@ -300,6 +392,7 @@ export function prepareBattle(s, regionId, tactic, rnd = Math.random, now = Date
     drain: (1 - SP_HP * n) / AUTO_MS, autoRate: 1 / AUTO_MS,
     airstrike: puEffect(s, 'airstrike', now) > 0, artyMult, artyCd, warnMs,
     early: tc.early || 0, ability: perk.ability || null,
+    lanes: ev.lanes, plan: usePlan, squads: ev.squads,
   };
 }
 // Spiller resten av kampen automatisk fra en gitt stilling (brukes av «hopp over» og autokamp)
@@ -333,7 +426,19 @@ export function resolveBattle(s, prep, perf = {}, rnd = Math.random, now = Date.
   const logi = 1 - 0.08 * docLevel(s, 'log');
   let frac = win ? Math.min(0.4, 0.2 * Math.pow(D / Math.max(P, 1e-9), 2)) * (0.35 + 0.65 * (1 - hp)) : 0.35 * (retreat ? 0.35 : 1);
   frac = Math.min(0.85, frac * tc.loss * puEffect(s, 'losses', now) * logi);
-  const { lost, total } = applyCasualties(s, frac, rnd);
+  // bare troppene du sendte kan dø – flest i korridorene du tapte
+  const laneWon = laneOutcome(prep.lanes, win, rnd);
+  const lost = {};
+  let total = 0;
+  for (const q of prep.squads) {
+    const l = prep.plan[q.key];
+    if (!Number.isInteger(l) || l < 0 || !prep.lanes[l] || !prep.lanes[l].share) continue;
+    const have = s.units[q.unit] || 0;
+    if (!have) continue;
+    const f = Math.min(0.9, frac * (laneWon[l] ? 0.7 : 1.4));
+    const k = Math.min(have, q.count, Math.floor(q.count * f + rnd()));
+    if (k > 0) { s.units[q.unit] = have - k; lost[q.unit] = (lost[q.unit] || 0) + k; total += k; }
+  }
   // feltsykehus: noen av de falne kommer tilbake
   const heal = puEffect(s, 'heal', now);
   let healed = 0;
@@ -372,7 +477,7 @@ export function resolveBattle(s, prep, perf = {}, rnd = Math.random, now = Date.
   s.gems = (s.gems || 0) + gems;
   s.medals = (s.medals || 0) + medals;
   s.medalsEarned = (s.medalsEarned || 0) + medals;
-  return { win, retreat, chance: prep.chance, P, D, lost, lostTotal, healed, dealt, eraDone, region: r, powerAfter: armyPower(s), gems, tactic: prep.tactic, score, need: prep.need, hp, stars, medals, spoils, drop };
+  return { win, retreat, chance: prep.chance, P, D, lost, lostTotal, healed, dealt, eraDone, region: r, powerAfter: armyPower(s), gems, tactic: prep.tactic, score, need: prep.need, hp, stars, medals, spoils, drop, laneWon };
 }
 // Automatisk kamp (simulatoren og tester): samme sjanse som vinnersjansen
 export function attack(s, regionId, rnd = Math.random, tactic) {

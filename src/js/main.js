@@ -1,6 +1,6 @@
 // Take over the world Ohio – brukergrensesnitt, spill-løkke og lagring.
 import * as E from './engine.js';
-import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, regionsOfEra, SPACE_HOMES, TERRAINS, CLASSES, TACTICS, TACTIC_IDS, DOCTRINES, DOC_MAX, docCost } from './data.js';
+import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, UNIT_BY_ID, regionsOfEra, SPACE_HOMES, TERRAINS, CLASSES, TACTICS, TACTIC_IDS, DOCTRINES, DOC_MAX, docCost, LANE_TYPES } from './data.js';
 import * as PU from './powerups.js';
 import * as C from './cosmetics.js';
 import * as M from './monetize.js';
@@ -218,6 +218,13 @@ function terrainHTML(r) {
   const T = TERRAINS[r.terrain];
   if (!T) return '';
   return `<div class="terrain-row"><span class="terrain-chip" style="--tc:${T.color}">${esc(L(T.name))}</span><span class="terrain-best">${t('strong_here')}</span>${Object.entries(T.bonus).map(([c, b]) => `<span class="cls-chip">${ico('cls_' + c)}${esc(L(CLASSES[c].name))} +${Math.round(b * 100)} %</span>`).join('')}</div>`;
+}
+const LANE_KEYS = ['lane_0', 'lane_1', 'lane_2'];
+function lanesPreviewHTML(r) {
+  const lanes = E.enemyLanes(r);
+  return `<div class="lanes-preview"><span class="lp-title">${t('enemy_lineup')}</span>${lanes.map((ln, l) => (ln.share
+    ? `<span class="lp-lane">${ico(LANE_TYPES[ln.type].icon)}<b>${esc(L(LANE_TYPES[ln.type].name))}</b><small>${Math.round(ln.share * 100)} %</small></span>`
+    : `<span class="lp-lane empty">${t(LANE_KEYS[l])}: –</span>`)).join('')}</div>`;
 }
 function tacticHTML(r) {
   const cur = E.tacticId(S);
@@ -754,13 +761,15 @@ function sheetHTML() {
   if (kind === 'future') {
     return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><div class="eyebrow">${ico('lock')} ${t('region_locked', { n: mapEra + 1 })}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
     <div class="locked-stats"><span class="vs-foe">${ico('skull')}<b>${fmt(E.regionDef(S, r))}</b></span><span class="reward-row">${t('reward')}: ${ico('coin')} +${inc}/s</span></div>
-    ${terrainHTML(r)}`;
+    ${terrainHTML(r)}
+    ${lanesPreviewHTML(r)}`;
   }
   const P = E.battlePower(S, r), D = E.battleDef(S, r), ch = E.winChance(P, D);
   return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
     <div class="vs-row"><span class="vs-me">${ico('swords')}<b>${fmt(P)}</b></span><span class="vs-mid">${t('vs')}</span><span class="vs-foe"><b>${fmt(D)}</b>${ico('skull')}${S.damage[id] ? `<em>${t('weakened')}</em>` : ''}</span></div>
     <div class="meter"><div class="meter-fill ${chanceClass(ch)}" style="width:${ch * 100}%"></div><span>${pct(ch)} ${t('win_chance')} · ${chanceLabel(ch)}</span></div>
     ${terrainHTML(r)}
+    ${lanesPreviewHTML(r)}
     ${tacticHTML(r)}
     <div class="sheet-foot"><div class="reward-row">${t('reward')}: ${ico('coin')} +${inc}/s</div>
     <button class="btn btn-attack" data-action="attack" data-id="${id}" ${ch <= 0 ? 'disabled' : ''}>${ico('swords')} ${t('attack')}</button></div>`;
@@ -1072,13 +1081,156 @@ document.addEventListener('click', (e) => {
 });
 
 // ---------------- KAMP ----------------
-function pickMySprites(n) {
-  const owned = UNITS.filter((u) => S.units[u.id] > 0).sort((a, b) => E.unitPower(S, b) - E.unitPower(S, a));
-  if (!owned.length) return [];
-  const out = [];
-  const top = owned.slice(0, 3);
-  for (let i = 0; i < n; i++) out.push(top[i % top.length].id);
-  return out;
+
+// ---------------- UTPLASSERING ----------------
+// Før hver kamp plasserer du troppene i tre korridorer. Fienden har en type i hver korridor (med en svakhet),
+// og du vinner ved å vinne korridorer med over halvparten av fiendens styrke.
+let dep = null; // { r, plan, sel }
+let lastPlan = null; // forrige plan (i minnet), så neste angrep går raskere
+function openDeploy(id) {
+  const r = REGION_BY_ID[id];
+  if (!r || S.conquered[id]) return;
+  unlockAudio();
+  if (!E.squadsOf(S, r).length) { sfx.nope(); toast(t('no_troops')); return; }
+  dep = { r, plan: {}, sel: null };
+  const m = openModal('<div class="deploy" id="deploy"></div>', 'deploy-modal', () => { dep = null; });
+  renderDeploy();
+  wireDeploy(m);
+}
+const laneAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el.closest('#deploy .dlane:not(.empty)') : null; };
+function squadChip(q, placed) {
+  return `<button type="button" class="squad${placed ? ' placed' : ''}${dep && dep.sel === q.key ? ' sel' : ''}" data-key="${q.key}" aria-label="${esc(L(UNIT_BY_ID[q.unit].name))} ×${q.count}">
+    <span class="sq-art">${A.unitArt(q.unit, 'me')}</span><span class="sq-n">×${fmt(q.count)}</span>${placed ? '' : `<span class="sq-p">${ico('cls_' + q.cls)}${fmt(q.power)}</span>`}</button>`;
+}
+function renderDeploy() {
+  const el = $('#deploy');
+  if (!el || !dep) return;
+  const { r, plan } = dep;
+  const ev = E.laneEval(S, r, plan);
+  const T = TERRAINS[r.terrain];
+  const free = ev.squads.filter((q) => !Number.isInteger(plan[q.key]));
+  const tid = E.tacticId(S);
+  const sc = el.closest('.modal')?.scrollTop || 0;
+  el.innerHTML = `<div class="modal-head"><h2 class="h2">${t('deploy_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <div class="deploy-sub"><b>${esc(L(r.name))}</b>${T ? `<span class="terrain-chip" style="--tc:${T.color}">${esc(L(T.name))}</span>` : ''}<span class="deploy-rule">${t('deploy_rule')}</span></div>
+    <div class="deploy-field">${ev.lanes.map((ln, l) => {
+      if (!ln.share) return `<div class="dlane empty" data-lane="${l}"><div class="dlane-name">${t(LANE_KEYS[l])}</div><div class="dlane-emptytxt">${t('lane_empty')}</div></div>`;
+      const LT = LANE_TYPES[ln.type];
+      const mine = ev.squads.filter((q) => plan[q.key] === l);
+      return `<div class="dlane${dep.sel ? ' armed' : ''}" data-lane="${l}">
+        <div class="dlane-name">${t(LANE_KEYS[l])} <small>${Math.round(ln.share * 100)} %</small></div>
+        <div class="dlane-foe"><span class="ltype">${ico(LT.icon)}${esc(L(LT.name))}</span><span class="lstr">${ico('skull')}${fmt(ln.D)}</span>
+          <span class="lweak">${t('weak_vs')} ${ico('cls_' + LT.weak)}</span>${LT.bad ? `<span class="lbad">${ico('cls_' + LT.bad)}−50 %</span>` : ''}</div>
+        <div class="dlane-vs"><span class="lch ${chanceClass(ln.chance)}">${pct(ln.chance)}</span></div>
+        <div class="dlane-me">${mine.map((q) => squadChip(q, true)).join('') || `<span class="dlane-drop">${t('lane_drop')}</span>`}</div>
+        <div class="lstr me">${ico('swords')}${fmt(ln.P)}</div>
+      </div>`;
+    }).join('')}</div>
+    <div class="meter deploy-meter"><div class="meter-fill ${chanceClass(ev.chance)}" style="width:${ev.chance * 100}%"></div><span>${pct(ev.chance)} ${t('win_chance')}</span></div>
+    <div class="tactic-pick">${TACTIC_IDS.map((id) => {
+      const ch = ev.placed ? E.laneEval(S, r, plan, id).chance : 0;
+      return `<button type="button" class="tactic ${tid === id ? 'on' : ''}" data-dt="${id}"><b>${esc(L(TACTICS[id].name))}</b><span class="tactic-ch ${chanceClass(ch)}">${pct(ch)}</span></button>`;
+    }).join('')}</div>
+    <div class="deploy-tray-head"><b>${t('your_troops')}</b><span>${free.length ? t('tray_hint') : t('all_placed')}</span></div>
+    <div class="deploy-tray">${free.map((q) => squadChip(q, false)).join('')}</div>
+    <div class="deploy-actions">
+      <button type="button" class="btn btn-soft" data-dep="auto">${ico('star')} ${t('auto_deploy')}</button>
+      ${lastPlan ? `<button type="button" class="btn btn-soft" data-dep="last">${t('last_plan')}</button>` : ''}
+      <button type="button" class="btn btn-soft" data-dep="clear">${t('clear')}</button>
+    </div>
+    <button type="button" class="btn btn-attack big" data-dep="go" ${ev.placed ? '' : 'disabled'}>${ico('swords')} ${t('to_battle')}</button>
+    <p class="small deploy-note">${t('home_note')}</p>`;
+  const md = el.closest('.modal');
+  if (md) md.scrollTop = sc;
+}
+function placeSquad(key, l) {
+  if (!dep) return;
+  const lanes = E.enemyLanes(dep.r);
+  if (!lanes[l] || !lanes[l].share) return;
+  dep.plan[key] = l;
+  dep.sel = null;
+  sfx.recruit();
+  renderDeploy();
+}
+function unplaceSquad(key) {
+  if (!dep) return;
+  delete dep.plan[key];
+  sfx.click();
+  renderDeploy();
+}
+function wireDeploy(m) {
+  let drag = null;
+  m.addEventListener('pointerdown', (e) => {
+    const sq = e.target.closest('.squad');
+    if (!sq || !dep) return;
+    drag = { key: sq.dataset.key, x: e.clientX, y: e.clientY, moved: false, ghost: null, placed: sq.classList.contains('placed'), src: sq };
+    try { sq.setPointerCapture(e.pointerId); } catch { /* pekeren er allerede borte */ }
+  });
+  m.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.ghost = drag.src.cloneNode(true);
+      drag.ghost.classList.add('ghost');
+      document.body.appendChild(drag.ghost);
+    }
+    drag.ghost.style.left = e.clientX + 'px';
+    drag.ghost.style.top = e.clientY + 'px';
+    const lane = laneAt(e.clientX, e.clientY);
+    $$('#deploy .dlane').forEach((x) => x.classList.toggle('over', x === lane));
+  });
+  const up = (e) => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (d.ghost) d.ghost.remove();
+    $$('#deploy .dlane').forEach((x) => x.classList.remove('over'));
+    if (!dep) return;
+    if (d.moved) {
+      const lane = laneAt(e.clientX, e.clientY);
+      if (lane) placeSquad(d.key, Number(lane.dataset.lane)); else if (d.placed) unplaceSquad(d.key);
+      return;
+    }
+    if (d.placed) { unplaceSquad(d.key); return; }
+    const occ = E.enemyLanes(dep.r).map((x, i) => (x.share ? i : -1)).filter((i) => i >= 0);
+    if (occ.length === 1) { placeSquad(d.key, occ[0]); return; }
+    dep.sel = dep.sel === d.key ? null : d.key;
+    sfx.click();
+    renderDeploy();
+  };
+  m.addEventListener('pointerup', up);
+  m.addEventListener('pointercancel', () => { if (drag && drag.ghost) drag.ghost.remove(); drag = null; });
+  m.addEventListener('click', (e) => {
+    if (!dep) return;
+    const lane = e.target.closest('.dlane:not(.empty)');
+    if (lane && dep.sel && !e.target.closest('.squad')) { placeSquad(dep.sel, Number(lane.dataset.lane)); return; }
+    const b = e.target.closest('[data-dep],[data-dt]');
+    if (!b) return;
+    if (b.dataset.dt) {
+      if (TACTICS[b.dataset.dt]) { S.settings.tactic = b.dataset.dt; persist(); sfx.click(); renderDeploy(); }
+      return;
+    }
+    const a = b.dataset.dep;
+    if (a === 'auto') { dep.plan = E.autoDeploy(S, dep.r); dep.sel = null; sfx.buy(); renderDeploy(); }
+    else if (a === 'last' && lastPlan) {
+      const keys = new Set(E.squadsOf(S, dep.r).map((q) => q.key));
+      const lanes = E.enemyLanes(dep.r);
+      dep.plan = {};
+      for (const [k, l] of Object.entries(lastPlan)) if (keys.has(k) && lanes[l] && lanes[l].share) dep.plan[k] = l;
+      sfx.click();
+      renderDeploy();
+    } else if (a === 'clear') { dep.plan = {}; dep.sel = null; sfx.click(); renderDeploy(); }
+    else if (a === 'go') {
+      const plan = { ...dep.plan };
+      const id = dep.r.id;
+      if (!Object.keys(plan).length) return;
+      lastPlan = plan;
+      dep = null;
+      closeModal(b);
+      startBattle(id, plan);
+    }
+  });
 }
 
 // Interaktiv kamp: hæren din har liv som tappes av fiendens ild. Fienden varsler spesialangrep –
@@ -1094,25 +1246,29 @@ const COUNTER_DMG = 0.04;
 const COMBO_MAX = 1.75;
 const ABILITY_DMG = { bribe: 0.2, nuts: 0.1, laser: 0.22 };
 const starRow = (n, cls = '') => `<span class="stars-row ${cls}">${[1, 2, 3].map((i) => `<span class="st ${i <= n ? 'on' : ''}">${ico('star')}</span>`).join('')}</span>`;
-function startBattle(id) {
+function startBattle(id, plan = null) {
   const r = REGION_BY_ID[id];
   if (!r || S.conquered[id]) return;
   unlockAudio();
-  const prep = E.prepareBattle(S, id);
-  if (!prep) return;
-  const mine = pickMySprites(Math.min(5, Math.max(1, E.armySize(S))));
-  showBattle(r, prep, mine);
+  const prep = E.prepareBattle(S, id, undefined, Math.random, Date.now(), plan);
+  if (!prep) { sfx.nope(); toast(t('no_troops')); return; }
+  showBattle(r, prep);
 }
 
-function showBattle(r, prep, mine) {
+function showBattle(r, prep) {
   modalCount++;
   updateTutorial();
   const ov = document.createElement('div');
   ov.className = 'battle live' + (ERAS[S.era].space ? ' space' : '');
-  const foeCount = r.enemy === 'boss' || r.enemy === 'penguin' ? 5 : 4;
-  const foes = Array.from({ length: foeCount }, (_, i) => enemyArtFor(r, i));
   const T = TERRAINS[r.terrain];
   const ab = prep.ability ? C.ABILITIES[prep.ability] : null;
+  const laneRows = prep.lanes.map((ln, l) => {
+    const mineHere = [...new Set(prep.squads.filter((q) => prep.plan[q.key] === l).map((q) => q.unit))].slice(0, 2);
+    const foe = ln.share ? (ln.share >= 0.4 ? [enemyArtFor(r, l), enemyArtFor(r, l + 1)] : [enemyArtFor(r, l)]) : [];
+    return `<div class="lane-row${ln.share ? '' : ' empty'}" data-lane="${l}"><span class="lane-tag">${t(LANE_KEYS[l])}${ln.share ? ` ${ico(LANE_TYPES[ln.type].icon)}` : ''}</span>
+      <div class="lane-me">${mineHere.map((id, i) => `<div class="fighter" style="--i:${i + l}">${A.unitArt(id, 'me')}</div>`).join('')}</div>
+      <div class="lane-foe">${foe.map((svg, i) => `<div class="fighter" style="--i:${i + l}">${svg}</div>`).join('')}</div></div>`;
+  }).join('');
   ov.innerHTML = `<div class="battle-inner">
     <div class="battle-head"><div class="eyebrow">${esc(L(TACTICS[prep.tactic].name))}${T ? ' · ' + esc(L(T.name)) : ''}</div><h2>${esc(L(r.name))}</h2></div>
     <div class="battle-bars">
@@ -1121,9 +1277,8 @@ function showBattle(r, prep, mine) {
       <div class="bbar foe"><div class="bbar-label">${fmt(prep.D)}</div><div class="bbar-track"><div class="bbar-fill"></div></div></div>
     </div>
     <div class="battle-status"><span class="combo" hidden></span>${starRow(3, 'live-stars')}</div>
-    <div class="battlefield">
-      <div class="army me" data-n="${Math.min(mine.length, 4)}">${mine.map((id, i) => `<div class="fighter" style="--i:${i}">${A.unitArt(id, 'me')}</div>`).join('')}</div>
-      <div class="army foe" data-n="${Math.min(foes.length, 4)}">${foes.map((svg, i) => `<div class="fighter" style="--i:${i}">${svg}</div>`).join('')}</div>
+    <div class="battlefield lanes">
+      ${laneRows}
       <div class="shield-wall"></div>
       <div class="targets"></div>
       <div class="booms"></div>
@@ -1202,7 +1357,9 @@ function showBattle(r, prep, mine) {
     b.type = 'button';
     b.className = 'target';
     b.setAttribute('aria-label', t('target_label'));
-    const x = 54 + Math.random() * 33, y = 8 + Math.random() * 54;
+    const occ = prep.lanes.map((ln, i) => (ln.share ? i : -1)).filter((i) => i >= 0);
+    const lane = occ[Math.floor(Math.random() * occ.length)];
+    const x = 54 + Math.random() * 33, y = lane * 33.3 + 2 + Math.random() * 16;
     b.style.left = x + '%';
     b.style.top = y + '%';
     b.innerHTML = `${enemyArtFor(r, Math.floor(Math.random() * 3))}<span class="target-ring"></span>`;
@@ -1220,7 +1377,7 @@ function showBattle(r, prep, mine) {
     b.className = 'target captain';
     b.setAttribute('aria-label', t('captain_label'));
     b.style.left = '60%';
-    b.style.top = '26%';
+    b.style.top = (w.lane ?? 1) * 33.3 + 1 + '%';
     b.innerHTML = `${enemyArtFor(r, 0)}<span class="target-ring"></span><span class="cap-n">3</span>`;
     let left = 3;
     const hit = (e) => {
@@ -1240,11 +1397,13 @@ function showBattle(r, prep, mine) {
   };
   const startWarn = (k) => {
     const sp = prep.specials[k];
-    const w = { k, type: sp.type, impact: sp.at, from: st.t };
+    const w = { k, type: sp.type, impact: sp.at, from: st.t, lane: sp.lane };
     st.warn = w;
     warnEl.hidden = false;
     warnEl.className = 'warn ' + sp.type;
-    warnTxt.textContent = sp.type === 'barrage' ? t('warn_barrage') : t('warn_charge');
+    const laneName = t('lane_full_' + (sp.lane ?? 1));
+    warnTxt.textContent = sp.type === 'barrage' ? t('warn_barrage_lane', { lane: laneName }) : t('warn_charge_lane', { lane: laneName });
+    $$('.lane-row', ov).forEach((x) => x.classList.toggle('alarm', Number(x.dataset.lane) === sp.lane));
     if (sp.type === 'charge') spawnCaptain(w);
     shieldBtn.classList.toggle('alert', sp.type === 'barrage');
     sfx.warn();
@@ -1257,6 +1416,7 @@ function showBattle(r, prep, mine) {
     st.nextSp = w.k + 1;
     warnEl.hidden = true;
     shieldBtn.classList.remove('alert');
+    $$('.lane-row.alarm', ov).forEach((x) => x.classList.remove('alarm'));
     if (w.cap && w.cap.isConnected && !w.capDown) { w.cap.classList.add('gone'); setTimeout(() => w.cap && w.cap.remove(), 250); }
     if (st.cancelled[w.k]) return;
     const ok = w.type === 'barrage' ? st.t <= st.shieldUntil : !!w.capDown;
@@ -1428,6 +1588,7 @@ function showBattleResult(ov, r, res) {
       <div class="loot-row">${ico('gem')}<span>${t('gems_won', { n: res.gems })}</span></div>
       ${res.drop ? `<div class="loot-row drop"><span class="loot-pu">${puArt(res.drop.id)}</span><span>${t('drop_won', { p: esc(L(res.drop.name)) })}</span></div>` : ''}
     </div>` : weak ? `<p class="result-weak">${t('enemy_weakened', { p: weak })}</p>` : ''}
+    ${res.laneWon ? `<div class="lane-result">${E.enemyLanes(r).map((ln, l) => (ln.share ? `<span class="${res.laneWon[l] ? 'won' : 'lost'}">${ico(res.laneWon[l] ? 'check' : 'close')}${t(LANE_KEYS[l])}</span>` : '')).join('')}</div>` : ''}
     <p class="result-loss">${res.lostTotal ? t('lost_units', { n: fmt(res.lostTotal) }) : t('lost_none')}</p>
     ${res.healed ? `<p class="result-heal">${t('healed', { n: fmt(res.healed) })}</p>` : ''}
     ${res.hits != null ? `<p class="result-stats">${t('battle_stats2', { h: res.hits, c: fmt(Math.round((res.bestCombo || 1) * 100) / 100), b: res.blocked || 0, n: res.specials || 0 })}</p>` : ''}
@@ -2390,7 +2551,7 @@ function onAction(e) {
       persist();
       break;
     }
-    case 'attack': startBattle(btn.dataset.id); break;
+    case 'attack': openDeploy(btn.dataset.id); break;
     case 'select': selectRegion(btn.dataset.id); break;
     case 'lvl-in': goLevel(mapEra - 1); break;
     case 'lvl-out': {

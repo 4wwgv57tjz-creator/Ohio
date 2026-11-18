@@ -125,6 +125,23 @@ export const TACTICS = {
 };
 export const TACTIC_IDS = Object.keys(TACTICS);
 
+// Utplassering: slagmarken har tre korridorer. Fienden har en type i hver, og hver type er svak mot én av
+// dine klasser (+50 %). Luftvern gjør flyene dine halvt så sterke.
+export const LANE_TYPES = {
+  inf: { icon: 'cls_inf', weak: 'veh', name: { nb: 'Infanteri', en: 'Infantry' } },
+  tank: { icon: 'cls_veh', weak: 'air', name: { nb: 'Panser', en: 'Armour' } },
+  bunker: { icon: 'bunker', weak: 'inf', name: { nb: 'Bunkere', en: 'Bunkers' } },
+  aa: { icon: 'aa', weak: 'veh', bad: 'air', name: { nb: 'Luftvern', en: 'Anti-air' } },
+  coast: { icon: 'cls_sea', weak: 'sea', name: { nb: 'Kystbatteri', en: 'Coastal guns' } },
+  air: { icon: 'cls_air', weak: 'air', name: { nb: 'Fly', en: 'Aircraft' } },
+};
+export const LANE_POOLS = {
+  city: ['bunker', 'inf', 'aa'], plains: ['tank', 'inf', 'tank'], forest: ['inf', 'bunker', 'inf'], swamp: ['inf', 'bunker', 'aa'],
+  jungle: ['inf', 'bunker', 'inf'], mountain: ['bunker', 'aa', 'inf'], coast: ['coast', 'inf', 'aa'], islands: ['coast', 'air', 'coast'],
+  desert: ['tank', 'aa', 'tank'], ice: ['tank', 'inf', 'bunker'], crater: ['tank', 'bunker', 'inf'], gas: ['air', 'aa', 'air'],
+  space: ['air', 'aa', 'air'], ufo: ['air', 'air', 'aa'], boss: ['bunker', 'air', 'tank'],
+};
+
 // Krigsskolen: medaljer fra seire kjøper nivåer. Det er ikke nok medaljer til alt – velg en strategi.
 export const DOC_MAX = 5;
 export const docCost = (level) => 2 * (level + 1); // nivå 1 koster 2, nivå 5 koster 10

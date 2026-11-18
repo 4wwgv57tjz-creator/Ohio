@@ -15,17 +15,26 @@ tegneseriestil, og lydene lages direkte i nettleseren – det er ingen bilde- el
    (opptil 8 timer).
 3. **Hær**: rekrutter enheter. Hver enhetstype gir hærstyrke og hører til en klasse: infanteri, kjøretøy, fly eller
    skip.
-4. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent og gjelder hvis du ikke
-   gjør noe i kampen. Først med 1,8 ganger så stor hær som forsvaret er seieren sikker. Taper du, blir fienden svekket –
-   men svekkelsen bygges opp igjen over tid, og ingen fiende kan svekkes under 40 %.
-5. **Kampen**: hæren din har liv som tappes av fiendens ild. Trykk på fiendene med røde sikter (treff på rad gir
+4. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent og gjelder for en
+   automatisk plassering der du ikke gjør noe i kampen. Først med 1,8 ganger så stor hær som forsvaret er seieren
+   sikker. Taper du, blir fienden svekket – men svekkelsen bygges opp igjen over tid, og ingen fiende kan svekkes under
+   40 %.
+5. **Plasser troppene**: før hver kamp fordeler du troppene på tre korridorer – venstre flanke, midten og høyre flanke.
+   Trykk på en tropp og så på en korridor, eller dra den dit. Fienden har en type i hver korridor, og hver type er svak
+   mot én av klassene dine (+50 %): infanteri mot kjøretøy, panser mot fly, bunkere mot infanteri, luftvern mot
+   kjøretøy (og fly gjør bare halv skade der), kystbatteri mot skip og fly mot fly. Du vinner ved å vinne korridorer som
+   til sammen har over halvparten av fiendens styrke, så det kan lønne seg å samle styrken og ofre en korridor. Tropper du
+   ikke plasserer, blir hjemme og kan ikke dø, og i korridorer du taper, mister du flere soldater. **Auto** fordeler etter
+   fiendens styrke, men tar ikke hensyn til svakheter. Fiendens oppstilling vises i områdearket, så du kan planlegge og
+   bygge riktig hær på forhånd.
+6. **Kampen**: hæren din har liv som tappes av fiendens ild. Trykk på fiendene med røde sikter (treff på rad gir
    **kombo**), bruk **artilleriet**, og stopp fiendens varslede spesialangrep: **kanonsalve** stoppes med **Skjold**
    (trykk i tide), og **stormangrep** stoppes ved å trykke tre ganger på kapteinen. Hver general har også en egen
    **evne** én gang per kamp. **Trekk tilbake** avbryter kampen med færre tap, og **Hopp over** avgjør den med en gang.
    Uten innsats blir utfallet som vinnersjansen; god innsats gir seier oftere, færre tap og flere stjerner.
-6. **Stjerner**: en seier gir 1–3 stjerner etter hvor mye liv hæren har igjen (over halvparten gir tre). Stjernene gir
+7. **Stjerner**: en seier gir 1–3 stjerner etter hvor mye liv hæren har igjen (over halvparten gir tre). Stjernene gir
    **krigsbytte** (penger), **medaljer** til Krigsskolen, ekstra edelstener og sjanse for en gratis powerup.
-7. Hvert område du erobrer gir mer inntekt. Ta alle områdene i et kapittel for å låse opp neste kapittel med
+8. Hvert område du erobrer gir mer inntekt. Ta alle områdene i et kapittel for å låse opp neste kapittel med
    nye bygninger og enheter.
 
 Tips:

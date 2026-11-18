@@ -1478,3 +1478,75 @@ main { flex: 1; position: relative; min-height: 0; }
 @media (prefers-reduced-motion: reduce) {
   .warn, .target.captain, .ability.shield.alert, .result-stars .rs, .combo.bump { animation: none !important; }
 }
+
+/* ---------- utplassering ---------- */
+.lanes-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 6px; margin: 8px 0 0; font-size: 12px; font-weight: 700; }
+.lp-title { color: var(--ink-soft); }
+.lp-lane { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px 1px 3px; background: #fff1f1; border: 2px solid #f0c4c7; border-radius: 999px; white-space: nowrap; }
+.lp-lane .ico { width: 16px; height: 16px; }
+.lp-lane small { color: var(--ink-soft); font-weight: 700; }
+.lp-lane.empty { background: #f4f2f8; border-color: #ddd8ea; color: var(--ink-soft); }
+.deploy-modal { text-align: left; }
+.deploy-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: -4px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.deploy-sub b { font-size: 16px; color: var(--ink); }
+.deploy-rule { flex-basis: 100%; }
+.deploy-field { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.dlane { display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 190px; padding: 6px 5px; background: linear-gradient(#ffe9e9, #fff 38%, #fff 62%, #e9f9e6); border: 3px solid var(--ink); border-radius: 14px; }
+.dlane.armed { box-shadow: 0 0 0 3px var(--gold); cursor: pointer; animation: lane-armed 0.8s ease-in-out infinite alternate; }
+.dlane.over { box-shadow: 0 0 0 4px var(--green); background: linear-gradient(#ffe9e9, #f2ffe6 40%, #d9f7cf); }
+@keyframes lane-armed { to { box-shadow: 0 0 0 5px var(--gold); } }
+.dlane.empty { justify-content: flex-start; background: repeating-linear-gradient(-45deg, #f4f2f8 0 8px, #ebe7f3 8px 16px); border-style: dashed; color: var(--ink-soft); }
+.dlane-name { font-weight: 800; font-size: 13px; text-align: center; }
+.dlane-name small { color: var(--ink-soft); font-weight: 700; }
+.dlane-emptytxt { margin-top: 30px; text-align: center; font-size: 12px; font-weight: 700; }
+.dlane-foe { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 700; text-align: center; }
+.dlane-foe .ico, .lstr .ico { width: 16px; height: 16px; }
+.ltype { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; }
+.ltype .ico { width: 20px; height: 20px; }
+.lweak { display: inline-flex; align-items: center; gap: 2px; color: var(--green-deep); }
+.lbad { display: inline-flex; align-items: center; gap: 1px; color: var(--red-deep); }
+.lstr { display: inline-flex; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dlane-vs { text-align: center; }
+.lch { display: inline-block; min-width: 46px; padding: 1px 6px; border: 2px solid var(--ink); border-radius: 9px; font-size: 12px; font-weight: 800; }
+.dlane-me { flex: 1; display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: center; gap: 3px; min-height: 44px; }
+.dlane-drop { align-self: center; font-size: 11px; font-weight: 700; color: var(--ink-soft); text-align: center; }
+.squad { position: relative; display: inline-flex; flex-direction: column; align-items: center; gap: 0; width: 64px; padding: 2px 2px 3px; background: var(--card); border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 0 2px 0 var(--ink); cursor: grab; touch-action: none; font-weight: 700; }
+.squad .sq-art { width: 40px; height: 40px; display: block; }
+.squad .sq-art svg { width: 100%; height: 100%; }
+.squad .sq-n { font-size: 12px; line-height: 1; }
+.squad .sq-p { display: inline-flex; align-items: center; gap: 1px; font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.squad .sq-p .ico { width: 13px; height: 13px; }
+.squad.placed { width: 42px; padding: 1px; border-width: 2px; box-shadow: none; }
+.squad.placed .sq-art { width: 30px; height: 30px; }
+.squad.placed .sq-n { font-size: 10.5px; }
+.squad.sel { background: #fff6cf; box-shadow: 0 0 0 3px var(--gold); transform: translateY(-2px); }
+.squad.ghost { position: fixed; z-index: 9999; pointer-events: none; transform: translate(-50%, -60%) scale(1.1) rotate(-4deg); box-shadow: 0 8px 18px rgba(43, 35, 80, 0.35); }
+.deploy-meter { margin-bottom: 8px; }
+.deploy-tray-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 10px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.deploy-tray-head b { font-size: 15px; color: var(--ink); }
+.deploy-tray { display: flex; flex-wrap: wrap; gap: 6px; min-height: 20px; margin-bottom: 10px; }
+.deploy-actions { display: flex; gap: 6px; margin-bottom: 8px; }
+.deploy-actions .btn { flex: 1; min-height: 42px; padding: 6px 8px; font-size: 14px; }
+.deploy-note { margin: 8px 0 0; color: var(--ink-soft); text-align: center; }
+/* korridorer i kampen */
+.battlefield.lanes { display: grid; grid-template-rows: repeat(3, 1fr); }
+.lane-row { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: center; min-height: 0; border-bottom: 2px dashed rgba(43, 35, 80, 0.18); }
+.lane-row:last-of-type { border-bottom: none; }
+.lane-row.empty { opacity: 0.35; }
+.lane-row.alarm { background: linear-gradient(90deg, rgba(239, 79, 90, 0.28), transparent 70%); }
+.lane-tag { position: absolute; left: 2px; top: 2px; z-index: 1; display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; background: rgba(255, 255, 255, 0.75); border-radius: 8px; font-size: 11px; font-weight: 800; }
+.lane-tag .ico { width: 14px; height: 14px; }
+.lane-me, .lane-foe { display: flex; align-items: center; justify-content: center; gap: 4px; height: 100%; }
+.lane-row .fighter { width: auto; height: 82%; max-height: 74px; aspect-ratio: 1; }
+.battle.live.fighting .lane-me { animation: live-r 1.6s ease-in-out infinite alternate; }
+.battle.live.fighting .lane-foe { animation: live-l 1.6s ease-in-out infinite alternate; }
+.lane-result { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.lane-result span { display: inline-flex; align-items: center; gap: 3px; padding: 2px 9px 2px 5px; border: 2px solid var(--ink); border-radius: 999px; font-size: 13px; font-weight: 800; }
+.lane-result .ico { width: 16px; height: 16px; }
+.lane-result .won { background: #e4fbe0; }
+.lane-result .lost { background: #ffe1e3; }
+@media (prefers-reduced-motion: reduce) { .dlane.armed, .battle.live.fighting .lane-me, .battle.live.fighting .lane-foe { animation: none !important; } }
+.dlane { padding: 6px 4px; }
+.dlane-me { gap: 2px; }
+.squad.placed { width: 36px; }
+.squad.placed .sq-art { width: 27px; height: 27px; }
