@@ -42,7 +42,7 @@ export function newState(name = '') {
     boostUntil: 0,
     lastSeen: now,
     created: now,
-    stats: { taps: 0, won: 0, lost: 0, unitsLost: 0, crates: 0, playTime: 0, wins: 0, stars3: 0, blocked: 0, retreats: 0 },
+    stats: { taps: 0, won: 0, lost: 0, unitsLost: 0, crates: 0, playTime: 0, wins: 0, stars3: 0, blocked: 0, retreats: 0, crits: 0, bestCombo: 0, events: 0 },
     prestige: 0,
     general: DEFAULT_GENERAL,
     settings: { sound: true, vibrate: true, lang: 'nb', buyMode: 1, tactic: 'normal' },
@@ -59,7 +59,25 @@ export function newState(name = '') {
     adBoostUntil: 0,
     ads: { lastInterstitial: 0, battlesSince: 0, freeCrateAt: 0, gemDay: '', gemCount: 0, watched: 0 },
     purchases: [],
+    ev: newEvState(),
+    daily: { last: '', streak: 0, total: 0 },
   };
+}
+// Hendelser i basen (se events.js): neste hendelse, den som venter, de siste vi har vist og midlertidige virkninger
+export const newEvState = () => ({ next: 0, cur: null, recent: [], n: 0, buff: {} });
+const num = (v, d = 0) => (Number.isFinite(v) ? v : d);
+function restoreEv(d) {
+  const ev = newEvState();
+  if (!d || typeof d !== 'object') return ev;
+  ev.next = num(d.next);
+  ev.n = Math.max(0, Math.floor(num(d.n)));
+  ev.recent = Array.isArray(d.recent) ? d.recent.filter((x) => typeof x === 'string').slice(-30) : [];
+  if (d.cur && typeof d.cur.id === 'string' && Array.isArray(d.cur.order)) ev.cur = { id: d.cur.id, order: d.cur.order.filter((x) => Number.isInteger(x)).slice(0, 4), at: num(d.cur.at) };
+  for (const k of ['inc', 'tap']) {
+    const b = d.buff && d.buff[k];
+    if (b && Number.isFinite(b.m) && b.m > 0 && b.m <= 5 && Number.isFinite(b.until)) ev.buff[k] = { m: b.m, until: b.until };
+  }
+  return ev;
 }
 
 // Slår sammen et lagret spill med standardverdier (tåler eldre lagringer)
@@ -83,6 +101,9 @@ export function restore(data) {
   s.purchases = Array.isArray(data.purchases) ? data.purchases.slice(-50) : [];
   s.adFree = !!data.adFree;
   s.pu = restorePowerups(data.pu);
+  s.ev = restoreEv(data.ev);
+  const dl = data.daily && typeof data.daily === 'object' ? data.daily : {};
+  s.daily = { last: typeof dl.last === 'string' ? dl.last.slice(0, 10) : '', streak: Math.max(0, Math.floor(num(dl.streak))), total: Math.max(0, Math.floor(num(dl.total))) };
   if (!TACTICS[s.settings.tactic]) s.settings.tactic = 'normal';
   if (!GENERAL_BY_ID[s.general]) s.general = DEFAULT_GENERAL;
   for (const k of ['money', 'totalEarned', 'era', 'tapLevel', 'prestige', 'tut', 'boostUntil', 'lastSeen', 'gems', 'adBoostUntil']) if (!Number.isFinite(s[k])) s[k] = base[k];
@@ -148,7 +169,9 @@ export function baseIncome(s) {
   for (const b of BUILDINGS) { const n = s.buildings[b.id]; if (n) sum += buildingIncome(s, b, n); }
   return sum;
 }
-export const incomePerSec = (s, now = Date.now()) => baseIncome(s) * incomeMult(s) * boostMult(s, now) * puEffect(s, 'income', now);
+// Midlertidig virkning fra en hendelse i basen: key = 'inc' (inntekt) eller 'tap' (per trykk)
+export const evMult = (s, key, now = Date.now()) => { const b = s.ev && s.ev.buff && s.ev.buff[key]; return b && now < b.until ? b.m : 1; };
+export const incomePerSec = (s, now = Date.now()) => baseIncome(s) * incomeMult(s) * boostMult(s, now) * puEffect(s, 'income', now) * evMult(s, 'inc', now);
 
 export function armyPower(s) {
   let sum = 0;
@@ -191,13 +214,27 @@ export function buy(s, kind, id, mode = 1) {
 
 // ---------- trykk ----------
 export function tapValue(s, now = Date.now(), level = s.tapLevel) {
-  return ((1 + 2 * level) * prestigeMult(s) + incomePerSec(s, now) * TAP_PCT * level) * puEffect(s, 'tap', now) * (genPerk(s).tap || 1);
+  return ((1 + 2 * level) * prestigeMult(s) + incomePerSec(s, now) * TAP_PCT * level) * puEffect(s, 'tap', now) * (genPerk(s).tap || 1) * evMult(s, 'tap', now);
 }
 export const tapCost = (level) => 25 * Math.pow(5.2, level);
-export function doTap(s, now = Date.now()) {
-  const v = tapValue(s, now);
+// Kombo: raske trykk etter hverandre bygger opp en multiplikator (faller bort når man slutter å trykke).
+export const COMBO_TIERS = [{ n: 0, m: 1 }, { n: 10, m: 1.5 }, { n: 30, m: 2 }, { n: 60, m: 2.5 }, { n: 120, m: 3 }];
+export const COMBO_GAP = 700; // ms uten trykk før komboen begynner å falle
+export const comboTier = (combo) => { let i = 0; for (let k = 0; k < COMBO_TIERS.length; k++) if (combo >= COMBO_TIERS[k].n) i = k; return i; };
+export const comboMult = (combo) => COMBO_TIERS[comboTier(combo)].m;
+// Kritiske treff: 5 % sjanse for ×5 (+1 prosentpoeng per kombotrinn), og en sjelden megakritt på ×25
+export const CRIT = { chance: 0.05, perTier: 0.01, mult: 5, megaChance: 0.003, megaMult: 25 };
+export const critChance = (combo = 0) => CRIT.chance + CRIT.perTier * comboTier(combo);
+export function doTap(s, now = Date.now(), combo = 0, rnd = Math.random) {
+  const tier = comboTier(combo);
+  const r = rnd();
+  const crit = r < CRIT.megaChance ? 2 : r < CRIT.megaChance + critChance(combo) ? 1 : 0;
+  const mult = COMBO_TIERS[tier].m * (crit === 2 ? CRIT.megaMult : crit === 1 ? CRIT.mult : 1);
+  const v = tapValue(s, now) * mult;
   s.money += v; s.totalEarned += v; s.stats.taps++;
-  return v;
+  if (crit) s.stats.crits = (s.stats.crits || 0) + 1;
+  if (combo > (s.stats.bestCombo || 0)) s.stats.bestCombo = Math.floor(combo);
+  return { v, crit, tier, mult };
 }
 export function buyTap(s) {
   if (s.tapLevel >= TAP_MAX) return false;
@@ -521,6 +558,8 @@ export function prestigeReset(s) {
   n.tut = 99;
   n.gems = s.gems; n.skins = s.skins; n.crates = s.crates; n.adFree = s.adFree; n.ads = s.ads; n.purchases = s.purchases;
   n.social = s.social; n.flags = s.flags; n.general = s.general; n.pu = s.pu; n.genSwitchAt = s.genSwitchAt || 0;
+  n.daily = { ...s.daily }; // den daglige bonusrekka fortsetter
+  n.ev = { ...newEvState(), recent: (s.ev && s.ev.recent) || [], n: (s.ev && s.ev.n) || 0 }; // samme hendelse kommer ikke rett igjen
   n.settings.tactic = s.settings.tactic || 'normal';
   n.stats.lifetimeBase = (s.stats.lifetimeBase || 0) + (s.totalEarned || 0);
   const r = prestigeRewards(n.prestige);

@@ -2,6 +2,8 @@
 import * as E from './engine.js';
 import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, UNIT_BY_ID, regionsOfEra, SPACE_HOMES, TERRAINS, CLASSES, TACTICS, TACTIC_IDS, DOCTRINES, DOC_MAX, docCost, LANE_TYPES } from './data.js';
 import * as PU from './powerups.js';
+import * as EV from './events.js';
+import * as D from './daily.js';
 import * as C from './cosmetics.js';
 import * as M from './monetize.js';
 import { initSocial, social, onSocialChange, LOGIN_PROVIDERS } from './social.js';
@@ -31,6 +33,12 @@ let armyView = 'units';
 let showAllSkins = false;
 let boardCache = { kind: '', rows: null, at: 0 };
 let introGeneral = C.DEFAULT_GENERAL;
+// trykk: kombo bygges opp av raske trykk og faller når man slutter
+let combo = 0, lastTapAt = 0, comboShownTier = 0;
+// basen: daglig bonus vises automatisk én gang per økt, generalen sier noe av og til
+let dailyAutoShown = false, nextQuip = performance.now() + 18000, sayTimer = 0, sayId = 0;
+// #noauto (for tester): ingen automatiske hendelser eller daglig bonus-vindu
+const NOAUTO = /[?#&]noauto/.test(location.href);
 const AD_GEMS = 30;
 const AD_GEMS_PER_DAY = 8;
 const FREE_CRATE_COOLDOWN = 30 * 60 * 1000;
@@ -126,6 +134,7 @@ function applySkins() {
   app.classList.toggle('own-rainbow', flag.fx === 'rainbow');
   const cm = $('#coach svg.mascot');
   if (cm) cm.outerHTML = A.mascot('happy', { crop: true });
+  refreshGeneral();
 }
 // Liten general (overkropp) til små ruter
 const miniGeneral = (mood = 'happy') => A.mascot(mood, { crop: true });
@@ -138,6 +147,7 @@ function skinPreview(k) {
   if (k.cat === 'flag') return A.flagSvg('flag-prev', k.design);
   if (k.cat === 'hat') return A.mascot('happy', { gen: 'buckeye', hat: k.hat, fx: k.fx || '' });
   if (k.cat === 'drip' || k.cat === 'zorgon') return A.mascot('happy', { gen: k.cat, look: k.look, fx: k.fx || '' });
+  if (k.cat === 'tap') return A.tapPreview(k.burst);
   return `<span class="hq-prev hq-fx-${k.fx}">${A.hq(ERAS[S.era].hq)}</span>`;
 }
 
@@ -182,6 +192,7 @@ function updateHUD() {
 }
 
 function updateBadges() {
+  $('#tab-base .badge').hidden = !(S.tut >= 5 && (EV.currentEvent(S) || !D.dailyStatus(S).claimed));
   const canWin = !S.finished && regionsOfEra(S.era).some((r) => !S.conquered[r.id] && E.chanceFor(S, r) >= 1);
   $('#tab-map .badge').hidden = !canWin;
   $('#tab-build .badge').hidden = !(S.era > 0 && (S.seenBuild ?? 0) < S.era);
@@ -199,6 +210,157 @@ function backdrop(era) {
   }
   return `<div class="sun"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
   <svg class="ground" viewBox="0 0 400 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 58Q70 30 140 52T280 46T400 50V100H0z" fill="var(--ground)" opacity=".6"/><path d="M0 76Q110 54 210 72T400 68V100H0z" fill="var(--ground)"/></svg>`;
+}
+
+// ----- livet i basen: generalen inne i hovedkvarteret, innbyggere, hendelser og daglig bonus -----
+const QUIPS = {
+  all: [
+    { nb: 'Jeg har en plan. Den involverer mais.', en: 'I have a plan. It involves corn.' },
+    { nb: 'Har noen sett gåsa? Den skylder meg penger.', en: 'Has anyone seen the goose? It owes me money.' },
+    { nb: 'Noen dager er jeg general. Andre dager er jeg bare en lyd.', en: 'Some days I am a general. Other days I am just a sound.' },
+    { nb: 'Kartet sier at Ohio er overalt.', en: 'The map says Ohio is everywhere.' },
+    { nb: 'I natt drømte jeg at jeg var en låve.', en: 'Last night I dreamt I was a barn.' },
+    { nb: 'Trykker du fort nok, kan du høre fargen grønn.', en: 'If you tap fast enough, you can hear the colour green.' },
+    { nb: 'Strategi er bare planlegging med hatt.', en: 'Strategy is just planning with a hat.' },
+    { nb: 'Jeg har aldri tapt en kamp jeg vant.', en: 'I have never lost a battle I won.' },
+    { nb: 'Fienden er redd. Jeg er også litt redd. Det er greit.', en: 'The enemy is scared. I am a little scared too. That is fine.' },
+    { nb: 'I dag føles som en erobringsdag.', en: 'Today feels like a conquering day.' },
+    { nb: 'Pulten min er laget av gamle fredsavtaler.', en: 'My desk is made of old peace treaties.' },
+    { nb: 'Hvis veggene kunne snakke, hadde de krevd lønn.', en: 'If these walls could talk, they would demand wages.' },
+    { nb: 'Jeg teller soldatene hver morgen. I dag var det én for mye.', en: 'I count the soldiers every morning. Today there was one too many.' },
+    { nb: 'Noen har spist kartet over Indiana. Igjen.', en: 'Someone has eaten the map of Indiana. Again.' },
+  ],
+  drip: [
+    { nb: 'Dette antrekket er dyrere enn hele Lima.', en: 'This outfit costs more than all of Lima.' },
+    { nb: 'Klokka mi går så fort at det allerede er i morgen.', en: 'My watch is so fast it is already tomorrow.' },
+    { nb: 'Drip er en livsstil. Og en militær strategi.', en: 'Drip is a lifestyle. And a military strategy.' },
+    { nb: 'Jeg erobrer ikke land. Jeg tar dem på stil.', en: 'I do not conquer lands. I win them on style.' },
+  ],
+  buckeye: [
+    { nb: 'Jeg er en hard nøtt å knekke. Bokstavelig talt.', en: 'I am a tough nut to crack. Literally.' },
+    { nb: 'Ingen ekorn kommer forbi denne generalen.', en: 'No squirrel gets past this general.' },
+    { nb: 'Ohio er ikke en stat. Det er en følelse.', en: 'Ohio is not a state. It is a feeling.' },
+    { nb: 'Hatten min har sett ting.', en: 'My hat has seen things.' },
+  ],
+  zorgon: [
+    { nb: 'På min planet kalles dette en mandag.', en: 'On my planet, this is called a Monday.' },
+    { nb: 'Jeg savner galaksen min av og til. Den hadde bedre wifi.', en: 'I miss my galaxy sometimes. It had better wifi.' },
+    { nb: 'Monokkelen min ser fire dimensjoner. Den femte er Ohio.', en: 'My monocle sees four dimensions. The fifth is Ohio.' },
+    { nb: 'Jordboere er så … myke.', en: 'Earthlings are so … squishy.' },
+  ],
+};
+const TOWN = [['farmer', 'granny', 'kid', 'chef', 'goose', 'mayor'], ['soldier', 'farmer', 'mayor', 'kid', 'granny', 'chef', 'goose'], ['soldier', 'scientist', 'mayor', 'kid', 'granny', 'chef'], ['robot', 'alien', 'scientist', 'soldier', 'kid']];
+const EMOTES = ['♪', '♥', '?', '!', 'z', '…', '☆', '♪♪'];
+const pickN = (arr, n) => arr.slice().sort(() => Math.random() - 0.5).slice(0, n);
+const multTxt = (m) => '×' + String(m).replace('.', getLang() === 'nb' ? ',' : '.');
+const genMood = () => (EV.currentEvent(S) ? 'sad' : 'happy');
+function hqInsideHTML(era) {
+  const w = A.hqWindow(era.hq);
+  const pos = `left:${w.x / 2}%;top:${(w.y / 172) * 100}%;width:${w.w / 2}%;height:${(w.h / 172) * 100}%`;
+  const ry = ((w.w / 2 / w.h) * 100).toFixed(2);
+  const rad = w.shape === 'circle' ? ';border-radius:50%' : w.shape === 'arch' ? `;border-radius:50% 50% 0 0/${ry}% ${ry}% 0 0` : '';
+  return `<span class="hq-win k-${w.kind} s-${w.shape}" style="${pos}${rad}"><span class="hq-gen g-${A.getGeneral()}" id="hq-gen"><span class="hq-gen-in">${A.mascotWindow(genMood())}</span></span><span class="hq-desk"></span></span>
+    <span class="gen-say" id="gen-say" style="left:${(w.x + w.w / 2) / 2}%;bottom:${(1 - w.y / 172) * 100 + 3}%" hidden></span>`;
+}
+function refreshGeneral() {
+  const g = $('#hq-gen');
+  if (!g || !S) return;
+  g.className = 'hq-gen g-' + A.getGeneral();
+  $('.hq-gen-in', g).innerHTML = A.mascotWindow(genMood());
+}
+function genSay(text, ms = 3800) {
+  const b = $('#gen-say');
+  if (!b || !text) return;
+  const id = ++sayId;
+  b.textContent = text;
+  b.hidden = false;
+  b.classList.remove('out');
+  clearTimeout(sayTimer);
+  sayTimer = setTimeout(() => { b.classList.add('out'); setTimeout(() => { if (id === sayId) b.hidden = true; }, 300); }, ms);
+}
+function genReact(kind) {
+  const g = $('#hq-gen');
+  if (!g || !g.animate || reducedMotion()) return;
+  const K = {
+    bob: [{ transform: 'translateY(0)' }, { transform: 'translateY(-5%)' }, { transform: 'translateY(0)' }],
+    jump: [{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-16%) scale(1.08)' }, { transform: 'translateY(0) scale(1)' }],
+    spin: [{ transform: 'rotate(0) scale(1)' }, { transform: 'translateY(-14%) rotate(-14deg) scale(1.14)' }, { transform: 'translateY(-8%) rotate(12deg) scale(1.1)' }, { transform: 'rotate(0) scale(1)' }],
+  };
+  g.animate(K[kind] || K.bob, { duration: kind === 'bob' ? 170 : kind === 'jump' ? 380 : 620, easing: 'ease-out' });
+}
+function maybeQuip(now) {
+  if (!S || S.tut < 5 || tab !== 'base' || modalCount > 0 || document.hidden || now < nextQuip) return;
+  nextQuip = now + 22000 + Math.random() * 22000;
+  if (EV.currentEvent(S)) { genSay(t('ev_spawn_say')); return; }
+  const pool = [...QUIPS.all, ...(QUIPS[S.general] || [])];
+  genSay(L(pool[Math.floor(Math.random() * pool.length)]));
+}
+function townsfolkHTML() {
+  const pool = TOWN[S.era <= 0 ? 0 : S.era <= 3 ? 1 : S.era === 4 ? 2 : 3];
+  const evOn = !!EV.currentEvent(S);
+  return pickN(pool, 2).map((k, i) => {
+    const d = (18 + Math.random() * 16) * (i ? -1 : 1);
+    const dur = 9 + Math.random() * 6;
+    return `<div class="walker w${i}${i === 0 && evOn ? ' away' : ''}" style="--d:${d.toFixed(0)}px;--dur:${dur.toFixed(1)}s;animation-delay:-${(Math.random() * dur).toFixed(1)}s">
+      <div class="w-in">${A.citizenArt(k)}</div><span class="emote" style="animation-delay:${(2 + Math.random() * 9).toFixed(1)}s">${EMOTES[Math.floor(Math.random() * EMOTES.length)]}</span></div>`;
+  }).join('');
+}
+function eventSpotHTML() {
+  const x = EV.currentEvent(S);
+  if (!x) return '';
+  return `<button type="button" class="ev-citizen" data-action="event-open" aria-label="${t('ev_open')}"><span class="ev-who">${A.citizenArt(x.who)}</span><span class="ev-bang">!</span></button>`;
+}
+function refreshEventSpot() {
+  const spot = $('#ev-spot');
+  if (spot) spot.innerHTML = eventSpotHTML();
+  $('#townsfolk .w0')?.classList.toggle('away', !!EV.currentEvent(S));
+  refreshGeneral();
+}
+function dailyBtnHTML() {
+  if (S.tut < 5) return '';
+  const st = D.dailyStatus(S);
+  return `<button type="button" class="stage-btn daily-btn ${st.claimed ? '' : 'ready'}" data-action="daily-open" aria-label="${t('daily_title')}">${ico('gift')}<span class="dot"></span></button>`;
+}
+function refreshDailyBtn() {
+  const b = $('#daily-slot');
+  if (b) b.innerHTML = dailyBtnHTML();
+}
+function evBuffsHTML() {
+  const now = Date.now();
+  const out = [];
+  for (const [k, lbl] of [['inc', 'ev_buff_inc'], ['tap', 'ev_buff_tap']]) {
+    const b = S.ev.buff && S.ev.buff[k];
+    if (!b || b.until <= now) continue;
+    out.push(`<span class="ev-chip ${b.m >= 1 ? 'good' : 'bad'}">${t(lbl, { m: multTxt(b.m) })} <b>${clock(b.until - now)}</b></span>`);
+  }
+  return out.join('');
+}
+function updateEvBuffs() {
+  const el = $('#ev-buffs');
+  if (!el) return;
+  const h = evBuffsHTML();
+  if (el.innerHTML !== h) el.innerHTML = h;
+}
+function updateCombo() {
+  const el = $('#combo');
+  if (!el) return;
+  const c = Math.floor(combo);
+  const tier = E.comboTier(c);
+  comboShownTier = Math.min(comboShownTier, tier);
+  if (c < 5) { el.hidden = true; return; }
+  const T = E.COMBO_TIERS, next = T[tier + 1];
+  el.hidden = false;
+  el.className = 'tap-combo t' + tier;
+  $('#combo-x', el).textContent = multTxt(T[tier].m);
+  $('#combo-n', el).textContent = c;
+  $('#combo-fill', el).style.width = (next ? Math.min(100, ((c - T[tier].n) / (next.n - T[tier].n)) * 100) : 100) + '%';
+}
+function shakeStage(big) {
+  const st = $('#stage');
+  if (!st || !st.animate || reducedMotion()) return;
+  const a = big ? 6 : 3;
+  st.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${-a}px,${a / 2}px)` }, { transform: `translate(${a}px,${-a / 2}px)` }, { transform: `translate(${-a / 2}px,${a / 3}px)` }, { transform: 'translate(0,0)' }], { duration: big ? 420 : 240 });
+  if (big) { const f = document.createElement('div'); f.className = 'stage-flash'; st.appendChild(f); setTimeout(() => f.remove(), 500); }
 }
 
 function paradeHTML() {
@@ -263,7 +425,8 @@ function tapCardHTML() {
   return `<div class="item-card tap-card">
     <div class="item-art tap-art">${ico('tap')}<span class="count">${S.tapLevel}</span></div>
     <div class="item-body"><div class="item-name">${t('tap_power')}</div><div class="item-desc">${t('tap_desc')}</div>
-    <div class="item-stat">${t('tap_value', { v: money(E.tapValue(S)) })}</div></div>
+    <div class="item-stat">${t('tap_value', { v: money(E.tapValue(S)) })}</div>
+    <div class="item-desc crit-info">${t('tap_crit_info', { c: Math.round(E.CRIT.chance * 100), m: E.CRIT.mult, x: multTxt(E.COMBO_TIERS[E.COMBO_TIERS.length - 1].m) })}</div></div>
     <button class="buy-btn ${!max && S.money >= cost ? '' : 'cant'}" data-action="buytap" ${max ? 'disabled' : ''}><span class="lbl">${max ? t('max') : t('upgrade')}</span><span class="price">${max ? '★' : money(cost)}</span></button>
   </div>`;
 }
@@ -283,9 +446,13 @@ function renderBase() {
   <div class="stage ${era.space ? 'space' : ''}" id="stage">
     ${backdrop(era)}
     <div class="village-sign">${A.flagSvg('sign-flag')}<span>${esc(S.name)}</span>${pBadge(S.prestige, 'small')}</div>
-    <button class="hq hq-fx-${hqFx()}" id="hq" type="button" aria-label="${t('tap_hint')}">${A.hq(era.hq)}</button>
+    <div class="stage-row"><span id="daily-slot">${dailyBtnHTML()}</span><span class="ev-buffs" id="ev-buffs">${evBuffsHTML()}</span></div>
+    <div class="townsfolk" id="townsfolk">${townsfolkHTML()}</div>
+    <button class="hq hq-fx-${hqFx()}" id="hq" type="button" aria-label="${t('tap_hint')}">${A.hq(era.hq)}${hqInsideHTML(era)}</button>
     <div id="stage-extras">${stageExtrasHTML()}</div>
+    <div id="ev-spot">${eventSpotHTML()}</div>
     <div class="tap-hint" id="tap-hint">${t('tap_hint')} <b id="tap-val">+${money(E.tapValue(S))}</b></div>
+    <div class="tap-combo" id="combo" hidden><b id="combo-x">×1</b><span class="combo-lbl">${t('tap_combo')} <i id="combo-n">0</i></span><span class="combo-bar"><i id="combo-fill"></i></span></div>
     <div class="parade" id="parade">${paradeHTML()}</div>
   </div>
   <div class="pad stack">
@@ -306,7 +473,7 @@ const puArt = (id) => (id === 'statue' ? `<span class="pu-statue-wrap">${A.power
 function stageExtrasHTML() {
   const now = Date.now();
   const items = PU.SLOTS && S.pu ? S.pu.slots.map((x, i) => (x && x.until > now ? `<div class="pu-on slot-${i}" data-id="${x.id}">${puArt(x.id)}</div>` : '')).join('') : '';
-  return `${PU.isActive(S, 'shield', now) ? '<div class="shield-dome"></div>' : ''}${items}<div class="stage-general">${A.mascot()}</div>`;
+  return `${PU.isActive(S, 'shield', now) ? '<div class="shield-dome"></div>' : ''}${items}`;
 }
 const puSig = () => S.pu.slots.map((x) => (x && x.until > Date.now() ? x.id : '-')).join(',') + '|' + JSON.stringify(S.pu.inv);
 function puCardHTML() {
@@ -439,15 +606,38 @@ function showPuOdds() {
 function onTap(e) {
   if (e.cancelable) e.preventDefault();
   unlockAudio();
-  const v = E.doTap(S);
-  sfx.tap();
-  if (S.settings.vibrate) buzz(8);
+  const now = performance.now();
+  if (now - lastTapAt > E.COMBO_GAP * 3) combo = 0;
+  combo = Math.floor(combo) + 1;
+  lastTapAt = now;
+  const r = E.doTap(S, Date.now(), combo);
+  const skin = C.equippedSkin(S, 'tap');
   const hq = $('#hq');
   if (hq && hq.animate) hq.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06,.9)' }, { transform: 'scale(.97,1.05)' }, { transform: 'scale(1)' }], { duration: 240, easing: 'ease-out' });
   let x, y;
-  if (e.clientX) { x = e.clientX; y = e.clientY; } else { const r = hq.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 3; }
-  floatText(x + (Math.random() * 30 - 15), y - 10, '+' + money(v), 'ft-money');
-  if (Math.random() < 0.35) coinBurst(x, y);
+  if (e.clientX) { x = e.clientX; y = e.clientY; } else { const b = hq.getBoundingClientRect(); x = b.left + b.width / 2; y = b.top + b.height / 3; }
+  if (r.crit) {
+    sfx.crit(r.crit === 2);
+    if (S.settings.vibrate) buzz(r.crit === 2 ? 60 : 25);
+    floatText(x, y - 30, `${r.crit === 2 ? t('mega_crit') : t('crit')} +${money(r.v)}`, r.crit === 2 ? 'ft-mega' : 'ft-crit');
+    tapBurst(x, y, r.crit === 2 ? 14 : 8, skin.burst);
+    shakeStage(r.crit === 2);
+    genReact(r.crit === 2 ? 'spin' : 'jump');
+  } else {
+    sfx.tap(r.tier);
+    if (S.settings.vibrate) buzz(8);
+    floatText(x + (Math.random() * 30 - 15), y - 10, '+' + money(r.v), 'ft-money ' + (skin.ft || ''));
+    if (Math.random() < 0.3 + r.tier * 0.12) tapBurst(x, y, 3, skin.burst);
+    genReact('bob');
+  }
+  if (r.tier > comboShownTier) {
+    comboShownTier = r.tier;
+    const b = hq.getBoundingClientRect();
+    floatText(b.left + b.width / 2, b.top + 10, t('combo_up', { m: multTxt(r.mult / (r.crit === 2 ? E.CRIT.megaMult : r.crit ? E.CRIT.mult : 1)) }), 'ft-combo');
+    sfx.comboUp(r.tier);
+    if (r.tier >= 3) genSay(t('combo_say_' + Math.min(4, r.tier)), 1600);
+  }
+  updateCombo();
   updateHUD();
   if (S.tut === 0) updateTutorial();
 }
@@ -1594,7 +1784,7 @@ function showBattleResult(ov, r, res) {
     ${res.hits != null ? `<p class="result-stats">${t('battle_stats2', { h: res.hits, c: fmt(Math.round((res.bestCombo || 1) * 100) / 100), b: res.blocked || 0, n: res.specials || 0 })}</p>` : ''}
     ${res.win && res.stars < 3 ? `<p class="tip">${t('star_tip')}</p>` : ''}
     ${!res.win ? `<p class="tip">${t('defeat_tip')}</p>` : ''}
-    ${!res.win && res.lostTotal && M.adsEnabled() ? `<button class="btn btn-ad big" type="button" data-action="ad-revive">${ico(S.adFree ? 'gift' : 'ad')} ${t('revive', { n: fmt(res.lostTotal) })}</button>` : ''}
+    ${!res.win && res.lostTotal && M.adsEnabled() ? `<button class="btn btn-ad big" type="button" data-action="ad-revive">${ico('ad')} ${t('revive', { n: fmt(res.lostTotal) })}</button>` : ''}
     <button class="btn btn-gold big" type="button" data-action="battle-done">${t('continue')}</button>`;
   $('.battle-inner', ov).appendChild(card);
   if (res.win) confetti(ov, res.stars === 3 ? 90 : 40);
@@ -1842,8 +2032,7 @@ function gemAdsLeft() {
   return Math.max(0, AD_GEMS_PER_DAY - (S.ads.gemCount || 0));
 }
 const productPrice = (id) => esc(L(M.PRODUCT_BY_ID[id].price));
-// always = belønningen krever reklame også for reklamefri-kjøpere (gratis kasser og edelstener)
-const adBtn = (action, disabled, always = false) => { const free = S.adFree && !always; return `<button type="button" class="btn btn-ad" data-action="${action}" ${disabled ? 'disabled' : ''}>${ico(free ? 'gift' : 'ad')} ${free ? t('claim') : t('watch')}</button>`; };
+const adBtn = (action, disabled) => `<button type="button" class="btn btn-ad" data-action="${action}" ${disabled ? 'disabled' : ''}>${ico('ad')} ${t('watch')}</button>`;
 
 function renderShop() {
   $('#scr-shop').innerHTML = `<div class="pad stack">
@@ -1863,8 +2052,8 @@ function storeHTML() {
   return `
   ${M.adsEnabled() ? `<div class="section-title">${t('free_rewards')}</div>
   <div class="offer-list">
-    <div class="offer"><div class="offer-art">${A.crateArt('wood')}</div><div class="offer-body"><b>${t('free_crate')}</b><span>${freeLeft > 0 ? t('ready_in', { t: duration(freeLeft / 1000) }) : t('free_crate_desc')}</span></div>${adBtn('ad-crate', freeLeft > 0, true)}</div>
-    <div class="offer"><div class="offer-art gem-art">${ico('gem')}</div><div class="offer-body"><b>+${AD_GEMS} ${t('gems')}</b><span>${t('left_today', { n: gemLeft })}</span></div>${adBtn('ad-gems', gemLeft <= 0, true)}</div>
+    <div class="offer"><div class="offer-art">${A.crateArt('wood')}</div><div class="offer-body"><b>${t('free_crate')}</b><span>${freeLeft > 0 ? t('ready_in', { t: duration(freeLeft / 1000) }) : t('free_crate_desc')}</span></div>${adBtn('ad-crate', freeLeft > 0)}</div>
+    <div class="offer"><div class="offer-art gem-art">${ico('gem')}</div><div class="offer-body"><b>+${AD_GEMS} ${t('gems')}</b><span>${t('left_today', { n: gemLeft })}</span></div>${adBtn('ad-gems', gemLeft <= 0)}</div>
   </div>` : ''}
   <div class="section-title">${t('loot_crates')}</div>
   <div class="crate-list">${C.CRATES.map((c) => `<div class="crate-card crate-${c.id}">
@@ -2077,9 +2266,10 @@ async function buyProduct(id) {
 let adSoundWas = null;
 function onAdStart() { adSoundWas = S ? S.settings.sound : null; setSound(false); M.gameplayStop(); }
 function onAdEnd() { if (adSoundWas !== null) setSound(adSoundWas); adSoundWas = null; M.gameplayStart(); }
-async function watchAd(placement, reward, { always = false } = {}) {
+// Belønningsvideoer krever alltid en reklame, også for dem som har kjøpt reklamefri
+// (reklamefri fjerner bare mellomreklamen).
+async function watchAd(placement, reward) {
   unlockAudio();
-  if (S.adFree && !always) { reward(); persist(); return true; }
   const res = await M.rewardedAd(placement);
   if (res === 'ok') {
     S.ads.watched = (S.ads.watched || 0) + 1;
@@ -2160,7 +2350,7 @@ function boostCardHTML() {
   }
   return `<div class="item-card boost-card"><div class="item-art boost-art">${ico('boost')}</div>
     <div class="item-body"><div class="item-name">${t('boost_title')}</div><div class="item-desc">${t('boost_desc')}</div></div>
-    ${adBtn('ad-boost', false, true)}</div>`;
+    ${adBtn('ad-boost', false)}</div>`;
 }
 
 // ---------------- REISEN (hele spillet som et tre) ----------------
@@ -2398,6 +2588,109 @@ function socialSettingsHTML() {
   </div>`;
 }
 
+// ---------------- hendelser i basen ----------------
+function onEventSpawn() {
+  sfx.event();
+  if (tab === 'base') { refreshEventSpot(); genSay(t('ev_spawn_say')); }
+  updateBadges();
+}
+function openEvent() {
+  const x = EV.currentEvent(S);
+  if (!x) { refreshEventSpot(); return; }
+  unlockAudio();
+  sfx.click();
+  openModal(`<div class="ev-head"><div class="ev-art">${A.citizenArt(x.who)}</div><div class="ev-ttl"><div class="eyebrow">${t('ev_eyebrow', { v: esc(S.name) })}</div><h2 class="h2">${esc(L(x.title))}</h2></div></div>
+    <p class="ev-q">${esc(L(x.q))}</p>
+    <div class="ev-answers">${S.ev.cur.order.map((idx, pos) => `<button type="button" class="ev-ans" data-action="ev-answer" data-pos="${pos}"><span class="ev-n">${'ABC'[pos]}</span><span>${esc(L(x.a[idx].t))}</span></button>`).join('')}</div>
+    <button type="button" class="link-btn ev-later" data-action="close">${t('ev_later')}</button>`, 'ev-modal');
+}
+function fxLabel(res) {
+  const n = res.amount;
+  switch (res.kind) {
+    case 'cash': return `${ico('coin')} +${money(n)}`;
+    case 'loss': return `${ico('coin')} −${money(n)}`;
+    case 'gems': return `${ico('gem')} ${t('fx_gems', { n })}`;
+    case 'buff': case 'slump': return `${ico('boost')} ${t('fx_buff', { m: multTxt(n), n: res.val })}`;
+    case 'tap': case 'tapdown': return `${ico('tap')} ${t('fx_tap', { m: multTxt(n), n: res.val })}`;
+    case 'pu': return `${ico('star')} ${t('fx_pu', { p: L(res.pu.name) })}`;
+    case 'crate': return `${ico('crate')} ${t('fx_crate', { n })}`;
+    case 'medal': return `${ico('medal')} ${t('fx_medal', { n })}`;
+    case 'troops': return `${ico('army')} +${fmt(n)} ${esc(L(res.unit.name))}`;
+    case 'desert': return `${ico('army')} −${fmt(n)} ${esc(L(res.unit.name))}`;
+    default: return '';
+  }
+}
+function answerEvent(btn) {
+  const out = EV.answerEvent(S, Number(btn.dataset.pos));
+  const modal = btn.closest('.modal');
+  if (!out) { closeModal(btn); refreshEventSpot(); return; }
+  const { event: x, answer: a, res } = out;
+  persist();
+  if (res.good) { sfx.milestone(); if (S.settings.vibrate) buzz(20); } else { sfx.nope(); if (S.settings.vibrate) buzz(40); }
+  modal.classList.add('ev-done', res.good ? 'good' : 'bad');
+  modal.innerHTML = `<div class="ev-head"><div class="ev-art">${A.citizenArt(x.who)}</div><div class="ev-ttl"><div class="eyebrow">${esc(L(x.title))}</div><h2 class="h2">${res.good ? t('ev_good') : t('ev_bad')}</h2></div></div>
+    <p class="ev-chosen">«${esc(L(a.t))}»</p>
+    <p class="ev-r">${esc(L(a.r))}</p>
+    <div class="ev-fx ${res.good ? 'good' : 'bad'}">${fxLabel(res)}</div>
+    <button type="button" class="btn ${res.good ? 'btn-gold' : 'btn-soft'} big" data-action="close">OK</button>`;
+  if (res.good) confetti(modal, 36);
+  updateHUD(); updateBadges(); updateEvBuffs(); refreshEventSpot();
+  if (res.kind === 'pu') refreshPu();
+  if (tab === 'base') { const c = $('#target-card'); if (c) c.innerHTML = targetCardHTML(); }
+}
+
+// ---------------- daglig bonus ----------------
+const dailyArt = (r) => (r.kind === 'cash' ? ico('coin') : r.kind === 'gems' ? ico('gem') : r.kind === 'pu' ? ico('star') : A.crateArt(r.crate));
+function dailyLabel(r) {
+  if (r.kind === 'cash') return t('daily_cash', { v: money(D.dailyValue(S, r)) });
+  if (r.kind === 'gems') return '+' + r.n;
+  if (r.kind === 'pu') return t('daily_pu');
+  if (r.kind === 'crate') return L(C.CRATE_BY_ID[r.crate].name);
+  return `${L(C.CRATE_BY_ID[r.crate].name)} + ${r.n}`;
+}
+function dailyHTML(got = null) {
+  const st = D.dailyStatus(S);
+  const tiles = D.DAILY.map((r, i) => {
+    const state = i < st.idx || (st.claimed && i === st.idx) ? 'done' : i === st.idx ? 'today' : 'next';
+    return `<div class="dl-tile ${state}${i === 6 ? ' big' : ''}"><span class="dl-day">${t('day_n', { n: i + 1 })}</span><span class="dl-art">${dailyArt(r)}</span><b>${esc(dailyLabel(r))}</b>${state === 'done' ? `<span class="dl-check">${ico('check')}</span>` : ''}</div>`;
+  }).join('');
+  let gotHTML = '';
+  if (got) {
+    const parts = [];
+    if (got.money) parts.push(`${ico('coin')} +${money(got.money)}`);
+    if (got.gems) parts.push(`${ico('gem')} +${got.gems}`);
+    if (got.crates) parts.push(`${ico('crate')} ${got.crates} × ${esc(L(C.CRATE_BY_ID[got.crate].name))}`);
+    got.pu.forEach((p) => parts.push(`${ico('star')} ${esc(L(p.name))}`));
+    gotHTML = `<div class="dl-got"><b>${t('daily_got', { n: got.idx + 1 })}</b>${parts.map((x) => `<span>${x}</span>`).join('')}${got.crates ? `<small>${t('daily_crate_where')}</small>` : ''}</div>`;
+  }
+  return `<div class="modal-head"><h2 class="h2">${ico('gift')} ${t('daily_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <p class="dl-sub">${st.claimed ? t('daily_come_back') : st.broken ? t('daily_broken') : t('daily_sub', { n: st.idx + 1 })}</p>
+    <div class="dl-grid">${tiles}</div>
+    ${gotHTML}
+    ${st.claimed ? `<button type="button" class="btn btn-gold big" data-action="close">OK</button>`
+    : `<div class="dl-actions"><button type="button" class="btn btn-gold big" data-action="daily-claim">${t('claim')}</button>${M.adsEnabled() ? `<button type="button" class="btn btn-ad" data-action="daily-claim2">${ico('ad')} ${t('daily_double')}</button>` : ''}</div>`}`;
+}
+function openDaily() {
+  unlockAudio();
+  openModal(dailyHTML(), 'daily-modal');
+}
+function claimDaily(btn, mult = 1) {
+  const got = D.claimDaily(S, new Date(), mult);
+  const modal = btn && btn.isConnected ? btn.closest('.modal') : $('.daily-modal');
+  if (!got) { if (modal) modal.innerHTML = dailyHTML(); return; }
+  persist();
+  sfx.crate();
+  if (S.settings.vibrate) buzz(30);
+  if (modal) { modal.innerHTML = dailyHTML(got); confetti(modal, 50); }
+  updateHUD(); updateBadges(); refreshDailyBtn();
+  if (got.pu.length) refreshPu();
+}
+function maybeAutoDaily() {
+  if (NOAUTO || dailyAutoShown || !S || S.tut < 5 || tab !== 'base' || modalCount > 0 || document.hidden) return;
+  dailyAutoShown = true;
+  if (!D.dailyStatus(S).claimed) openDaily();
+}
+
 // ---------------- små effekter ----------------
 function floatText(x, y, text, cls = '') {
   const fx = $('#fx');
@@ -2410,15 +2703,18 @@ function floatText(x, y, text, cls = '') {
   fx.appendChild(el);
   setTimeout(() => el.remove(), 900);
 }
-function coinBurst(x, y) {
+const coinBurst = (x, y) => tapBurst(x, y, 3, 'coin');
+function tapBurst(x, y, n = 3, kind = 'coin') {
   const fx = $('#fx');
-  for (let i = 0; i < 3; i++) {
+  if (!fx || fx.childElementCount > 48) return;
+  const spread = n > 3 ? 230 : 140;
+  for (let i = 0; i < n; i++) {
     const c = document.createElement('div');
     c.className = 'coin-fly';
-    c.innerHTML = ico('coin');
+    c.innerHTML = A.particleArt(kind || 'coin');
     c.style.left = x + 'px'; c.style.top = y + 'px';
     fx.appendChild(c);
-    const dx = (Math.random() - 0.5) * 140, dy = -60 - Math.random() * 60;
+    const dx = (Math.random() - 0.5) * spread, dy = -60 - Math.random() * (n > 3 ? 110 : 60);
     if (c.animate) c.animate([{ transform: 'translate(-50%,-50%) scale(.6)', opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`, opacity: 1, offset: 0.5 }, { transform: `translate(calc(-50% + ${dx * 1.3}px), calc(-50% + ${dy + 80}px)) scale(.8)`, opacity: 0 }], { duration: 700, easing: 'ease-out' });
     setTimeout(() => c.remove(), 700);
   }
@@ -2537,8 +2833,15 @@ function frame(now) {
     E.tick(S, dt);
     liveAcc += dt; saveAcc += dt; badgeAcc += dt;
     if (liveAcc >= 0.12) { liveAcc = 0; updateLive(); }
+    if (combo > 0 && now - lastTapAt > E.COMBO_GAP) {
+      combo = Math.max(0, combo - dt * Math.max(14, combo * 1.6));
+      if (combo < 1) combo = 0;
+      updateCombo();
+    }
     if (badgeAcc >= 1) {
       badgeAcc = 0;
+      if (!NOAUTO && EV.eventDue(S)) { EV.startEvent(S); persist(); onEventSpawn(); }
+      if (tab === 'base') { updateEvBuffs(); maybeQuip(now); maybeAutoDaily(); }
       updateBadges();
       if (S.tut === 2) updateTutorial();
       const gone = PU.expirePowerups(S);
@@ -2725,14 +3028,14 @@ function onAction(e) {
       break;
     case 'ad-crate':
       if (Date.now() < (S.ads.freeCrateAt || 0)) break;
-      watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; C.addCrate(S, 'wood'); persist(); updateBadges(); if (tab === 'shop') renderShop(); gotCrateModal('wood'); }, { always: true });
+      watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; C.addCrate(S, 'wood'); persist(); updateBadges(); if (tab === 'shop') renderShop(); gotCrateModal('wood'); });
       break;
     case 'ad-gems':
       if (gemAdsLeft() <= 0) break;
-      watchAd('gems', () => { gemAdsLeft(); S.ads.gemCount++; S.gems += AD_GEMS; toast(t('gems_toast', { n: AD_GEMS }), 'boost'); sfx.coin(); updateHUD(); renderShop(); }, { always: true });
+      watchAd('gems', () => { gemAdsLeft(); S.ads.gemCount++; S.gems += AD_GEMS; toast(t('gems_toast', { n: AD_GEMS }), 'boost'); sfx.coin(); updateHUD(); renderShop(); });
       break;
     case 'ad-boost':
-      watchAd('boost', () => { S.adBoostUntil = Date.now() + E.AD_BOOST_SECS * 1000; toast(t('boost_toast'), 'boost'); sfx.milestone(); lastSig.boost = null; updateHUD(); }, { always: true });
+      watchAd('boost', () => { S.adBoostUntil = Date.now() + E.AD_BOOST_SECS * 1000; toast(t('boost_toast'), 'boost'); sfx.milestone(); lastSig.boost = null; updateHUD(); });
       break;
     case 'ad-double': {
       const amt = Number(btn.dataset.amount) || 0;
@@ -2740,9 +3043,14 @@ function onAction(e) {
         S.money += amt * 2; S.totalEarned += amt * 2;
         sfx.coin();
         closeModal(btn); updateHUD(); persist();
-      }, { always: true });
+      });
       break;
     }
+    case 'event-open': openEvent(); break;
+    case 'ev-answer': answerEvent(btn); break;
+    case 'daily-open': openDaily(); break;
+    case 'daily-claim': claimDaily(btn, 1); break;
+    case 'daily-claim2': watchAd('daily_double', () => claimDaily(btn, 2)); break;
     case 'ad-revive': {
       const res = lastBattle;
       if (!res || !res.lostTotal) break;
@@ -2827,6 +3135,10 @@ function boot(hotData) {
       gems: (n) => { S.gems += n; updateHUD(); },
       social: () => social(),
       playtime: (secs) => { S.stats.playTime = secs; },
+      event: (id) => { EV.startEvent(S, Date.now(), Math.random, id || null); persist(); onEventSpawn(); return S.ev.cur; },
+      daily: (last = '', streak = 0) => { S.daily = { last, streak, total: S.daily.total || 0 }; refreshDailyBtn(); updateBadges(); },
+      combo: (n) => { combo = n; lastTapAt = performance.now(); updateCombo(); },
+      gen: (g) => { S.general = g; applySkins(); renderTab(); },
     };
   }
   try {

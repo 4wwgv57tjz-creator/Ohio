@@ -25,9 +25,11 @@ utbetalinger krever også en voksen. Snakk med en forelder før du starter – d
 Alt er allerede bygget inn, og styres fra `monetize.config.json`:
 
 - **Belønningsreklame** (spilleren velger selv å se en video): gratis trekasse hvert 30. minutt, +30 edelstener
-  (8 per dag), 2× inntekt i 10 minutter, dobbel inntekt for tiden man var borte, og soldatene tilbake etter et tap.
-  Dette gir mest per visning. Kasser, edelstener og dobbel inntekt krever reklame også for dem som har kjøpt
-  reklamefri.
+  (8 per dag), 2× inntekt i 10 minutter, dobbel inntekt for tiden man var borte, dobbel daglig bonus og soldatene
+  tilbake etter et tap. Dette gir mest per visning. Alle videoene krever reklame også for dem som har kjøpt
+  reklamefri – reklamefri fjerner bare mellomreklamen.
+- **Daglig bonus og hendelser** får spillerne til å komme tilbake hver dag og bli lenger, og det gir flere
+  reklamevisninger.
 - **Mellomreklame** (bare for dem som ikke har kjøpt reklamefri), i naturlige pauser:
   - etter annenhver kamp (`interstitialEvery`), med minst 3 minutter mellom (`interstitialMinGap`)
   - ved fanebytte når det har gått 4 minutter siden forrige reklame (`interstitialTimer`, 0 slår det av)

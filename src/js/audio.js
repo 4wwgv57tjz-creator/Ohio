@@ -55,7 +55,16 @@ function noise(dur, { vol = 0.4, freq = 900, delay = 0 } = {}) {
 }
 
 export const sfx = {
-  tap() { tone(620 + Math.random() * 120, 0.07, { type: 'triangle', vol: 0.22, slide: 260 }); },
+  // tonen stiger med kombotrinnet
+  tap(tier = 0) { tone(620 + tier * 90 + Math.random() * 120, 0.07, { type: 'triangle', vol: 0.22, slide: 260 }); },
+  crit(mega = false) {
+    tone(mega ? 1568 : 1319, 0.08, { type: 'square', vol: 0.14 });
+    tone(mega ? 2093 : 1760, 0.16, { type: 'square', vol: 0.13, delay: 0.06 });
+    noise(mega ? 0.3 : 0.14, { vol: mega ? 0.35 : 0.2, freq: 3000 });
+    if (mega) [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.12, { type: 'triangle', vol: 0.12, delay: 0.14 + i * 0.07 }));
+  },
+  comboUp(tier = 1) { [0, 1, 2].forEach((i) => tone(523 * Math.pow(1.26, tier + i * 0.5), 0.09, { type: 'square', vol: 0.11, delay: i * 0.06 })); },
+  event() { tone(880, 0.12, { type: 'triangle', vol: 0.2 }); tone(1175, 0.18, { type: 'triangle', vol: 0.2, delay: 0.14 }); tone(988, 0.24, { type: 'triangle', vol: 0.16, delay: 0.3 }); },
   buy() { tone(660, 0.08, { type: 'square', vol: 0.14 }); tone(990, 0.12, { type: 'square', vol: 0.14, delay: 0.07 }); },
   recruit() { tone(330, 0.07, { type: 'square', vol: 0.16 }); tone(495, 0.1, { type: 'square', vol: 0.16, delay: 0.06 }); },
   nope() { tone(180, 0.16, { type: 'sawtooth', vol: 0.12, slide: -60 }); },

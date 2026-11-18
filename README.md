@@ -10,7 +10,9 @@ tegneseriestil, og lydene lages direkte i nettleseren – det er ingen bilde- el
 
 ## Slik spiller du
 
-1. **Trykk på hovedkvarteret** (låven) for å tjene penger.
+1. **Trykk på hovedkvarteret** (låven) for å tjene penger. Trykker du fort, bygges en **kombo** opp (×1,5 etter
+   10 trykk, ×2 etter 30, ×2,5 etter 60 og ×3 etter 120), og den faller hvis du stopper. Hvert trykk har 5 % sjanse for
+   et **kritisk treff** (×5, sjansen øker med komboen) og en sjelden **megakritt** (×25).
 2. **Bygg** økonomi: maisåkre, kufjøs, fabrikker, banker … De tjener penger hele tiden, også når du er borte
    (opptil 8 timer).
 3. **Hær**: rekrutter enheter. Hver enhetstype gir hærstyrke og hører til en klasse: infanteri, kjøretøy, fly eller
@@ -52,7 +54,19 @@ Tips:
     *Nøtteregn* – treffer alle fiendene på skjermen.
   - **Keiser Zorgon** (romkeiseren som byttet side): teknologi – +25 % fly, raskere artilleri og tidligere varsel.
     Evne: *Laserstråle* – stor skade og lammer fienden i to sekunder.
-  Generalen står ved hovedkvarteret, viser deg hva du skal gjøre i starten og har sine egne skins.
+  Generalen er inne i hovedkvarteret (i låvedøra, borgporten, lobbyen eller koøyet), reagerer når du trykker, sier
+  rare ting av og til, viser deg hva du skal gjøre i starten og har sine egne skins.
+- **Livet i basen**: innbyggere går rundt (bønder, bestemødre, kokker, forskere, soldater, roboter, romvesener og en
+  gås), og av og til skjer det **rare ting i byen**. Da står noen med et utropstegn ved hovedkvarteret – trykk på dem.
+  Hver hendelse har tre svar, og hvert svar er enten bra eller dårlig, men spillet sier ikke hvilket før du har valgt
+  (og rekkefølgen stokkes). Det finnes 47 hendelser, som at folket sulter og det eneste som er igjen er én uendelig
+  lang spagetti, at en gås vil bli statsminister, eller at hovedkvarteret har gått i søvne. Utfallet kan være penger,
+  edelstener, en powerup, en kasse, en medalje, flere soldater, ×1,5 inntekt eller ×3 per trykk en stund – eller tap
+  av penger, soldater som stikker av, eller lavere inntekt en stund. Den første hendelsen kommer litt etter
+  opplæringen, og deretter én hvert 4.–7. minutt.
+- **Daglig bonus**: logg inn hver dag for større belønninger i sju dager (penger, edelstener, trekasse, powerup og en
+  gullkasse med 50 edelstener på dag 7). Hopper du over en dag, starter rekka på nytt. Se en video for å få dobbelt.
+  Gaveknappen på Base viser bonusen.
 - **Krigsskolen** (Hær → Krigsskole): bruk medaljer på ni retninger med fem nivåer hver – infanteri, panser, fly og
   marine (+10 % per nivå), artilleri, logistikk (færre tap), etterretning (svakere fiender og tidligere varsel),
   økonomi og plyndring (mer krigsbytte og flere powerups). Medaljene rekker ikke til alt, så du må velge en strategi.
@@ -74,11 +88,12 @@ Tips:
 
 ## Butikk, skins, lootkasser og reklame
 
-- **Skins**: hær (43 fargedrakter på alle enhetene), flagg (32 – spillerflagget, fargen på erobret land på kartet og
-  flagget ditt på leaderboardet), hovedkvarter (23), og egne skins til hver general: hatter til Buckeye (25), antrekk
-  til Drip (17, blant annet Italia-drip, Gull-drip og Is-drip) og kapper og kroner til Zorgon (15). 155 skins fordelt
-  på Vanlig, Sjelden, Episk, Legendarisk og Mytisk, pluss seks Prestisje-skins. Skins er bare utseende – de gir ingen
-  fordel i kamp.
+- **Skins**: hær (49 fargedrakter på alle enhetene), flagg (36 – spillerflagget, fargen på erobret land på kartet og
+  flagget ditt på leaderboardet), hovedkvarter (27), **trykkeffekter** (14 – det som spruter ut når du trykker:
+  mynter, hjerter, pizza, spøkelser, lyn, planeter, regnbue …), og egne skins til hver general: hatter til Buckeye
+  (33, blant annet kasserolle, trafikkjegle og mini-UFO), antrekk til Drip (25, blant annet Ku-drip, Kode-drip og
+  Galakse-drip) og kapper og kroner til Zorgon (23). 207 skins fordelt på Vanlig, Sjelden, Episk, Legendarisk og
+  Mytisk, pluss seks Prestisje-skins. Skins er bare utseende – de gir ingen fordel i kamp.
 - **Mine ting** (Butikk → Mine ting) viser kassene og skinsene du eier. Kjøpte kasser havner her, så du kan åpne dem
   med en gang eller spare dem til senere. Du får også en gullkasse hver gang du fullfører et kapittel.
 - **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
@@ -87,13 +102,13 @@ Tips:
 - **Edelstener** tjenes ved å erobre områder, fullføre kapitler, fra forsyningskasser og ved å se reklame – og kan
   kjøpes i butikken. De brukes på lootkasser og «tidshopp» (få 1 eller 4 timer med inntekt med en gang).
 - **Belønningsreklame** (frivillig): gratis trekasse hvert 30. minutt, +30 edelstener (8 per dag), 2× inntekt i
-  10 minutter, dobbel inntekt mens du var borte, og få tilbake soldatene etter et tap.
+  10 minutter, dobbel inntekt mens du var borte, dobbel daglig bonus, og få tilbake soldatene etter et tap.
 - **Mellomreklame** (bare for dem som ikke har kjøpt reklamefri) i naturlige pauser: etter annenhver kamp (minst
   3 minutter mellom), ved fanebytte når det har gått 4 minutter siden forrige reklame, og når et kapittel er ferdig.
   Aldri i opplæringen eller de første 4 minuttene.
-- **Reklamefri**: fjerner all mellomreklame, og soldatene kommer tilbake etter et tap uten reklame. Gratis kasser,
-  edelstener og dobbel inntekt (2× i 10 minutter og dobbel inntekt for tiden man var borte) krever fortsatt at man
-  ser en reklame. Finnes også i en startpakke sammen med 500 edelstener og en kosmisk kasse.
+- **Reklamefri**: fjerner all mellomreklame. Alle belønningsvideoene over (kasser, edelstener, dobbel inntekt, dobbel
+  daglig bonus og soldatene tilbake etter et tap) krever fortsatt at man ser en reklame. Finnes også i en startpakke
+  sammen med 500 edelstener og en kosmisk kasse.
 - **Personvern**: innstillingene har lenke til personvernerklæringen (`docs/personvern.html`, et utkast som må fylles
   ut) og, i app-versjonen, «Reklamevalg» der spilleren kan endre samtykket til reklame.
 
@@ -172,8 +187,8 @@ Når universet er erobret kan du ta **prestisje**: du starter på nytt som en li
 
 - +50 % inntekt og hærstyrke for alltid (★2 gir +100 %, ★3 +150 % osv.)
 - +300 edelstener og en kosmisk kasse
-- du beholder skins, kasser, edelstener, venner og reklamefri, mens bygninger, hær, trykk-kraft og erobrede områder
-  starter på nytt
+- du beholder skins, kasser, edelstener, venner, den daglige bonusrekka og reklamefri, mens bygninger, hær,
+  trykk-kraft og erobrede områder starter på nytt
 - eksklusive prestisje-skins som ikke finnes i kasser: Prestisjeflagg (★1), et prestisje-skin til hver general (★2),
   Stjernepalasset (★3) og Stjernehæren (★5)
 - powerups på lager og i hovedkvarteret, og generalen du har valgt, blir med videre; Krigsskolen og medaljene starter
@@ -240,7 +255,7 @@ Du kan også åpne `docs/index.html` direkte i en nettleser på PC-en.
 ## For utviklere
 
 Spillet er skrevet i ren JavaScript uten rammeverk. Byggesteget pakker alt (kode, stil, fonter) inn i én
-HTML-fil på rundt 275 KB.
+HTML-fil på rundt 620 KB.
 
 ```
 src/
@@ -252,6 +267,8 @@ src/
   js/mapdata.js   forenklede kart (generert fra kartdata)
   js/cosmetics.js generaler, skins, sjeldenhet og lootkasser (sjanser og garanti)
   js/powerups.js  powerups i hovedkvarteret (sjanser, plasser og effekter)
+  js/events.js    hendelser i basen: 47 rare spørsmål med svar og utfall (norsk og engelsk)
+  js/daily.js     daglig innloggingsbonus (sju dager, rekke)
   js/monetize.js  reklame (demo, AdSense, CrazyGames, Poki) og kjøp
   js/social*.js   leaderboard, venner og innlogging (demo og Firebase)
   js/i18n.js      tekster og tallformatering
@@ -291,7 +308,9 @@ første by til et par minutter i verdensrommet. Nye bygninger og enheter i hvert
 inntekten spilleren har når kapitlet starter. Ønsket tempo står øverst i `tools/simulate.mjs`.
 
 For testing: åpne spillet med `#debug` på slutten av adressen. Da finnes `window.__ohio` i konsollen med
-hjelpere som `give(1e6)`, `gems(500)`, `power(100)`, `win()` og `era(4)`.
+hjelpere som `give(1e6)`, `gems(500)`, `power(100)`, `win()`, `era(4)`, `event('hunger')` (start en hendelse),
+`daily('', 0)` (nullstill daglig bonus), `combo(120)` og `gen('zorgon')`. Med `#debug&noauto` kommer det ingen
+hendelser eller daglig bonus-vindu av seg selv (nyttig i automatiske tester).
 
 ## Lisenser og kreditering
 

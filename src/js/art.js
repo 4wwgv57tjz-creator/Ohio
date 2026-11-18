@@ -69,6 +69,10 @@ function flagInner(design, red) {
     case 'pizza': return `<rect width="30" height="18" fill="#ffe680"/><path d="M4 2l22 7-22 7z" fill="#ffc861" stroke="${INK}" stroke-width=".8"/><circle cx="10" cy="7" r="1.6" fill="#e5484d"/><circle cx="9" cy="12" r="1.6" fill="#e5484d"/><circle cx="16" cy="9.4" r="1.6" fill="#e5484d"/>`;
     case 'wave': return `<rect width="30" height="18" fill="#56c2ff"/><path d="M0 11q4-4 8 0t8 0 8 0 8 0V18H0z" fill="#3559d6"/><path d="M0 8q4-4 8 0t8 0 8 0 8 0" fill="none" stroke="#fff" stroke-width="1.4"/>`;
     case 'sun': return `<rect width="30" height="18" fill="#ff9f1c"/><circle cx="12" cy="9" r="4.4" fill="#ffe14d" stroke="${INK}" stroke-width=".8"/>${[0, 45, 90, 135, 180, 225, 270, 315].map((d) => `<path d="M12 2.2v2" stroke="#ffe14d" stroke-width="1.4" stroke-linecap="round" transform="rotate(${d} 12 9)"/>`).join('')}`;
+    case 'goose': return `<rect width="30" height="18" fill="#4fae3c"/><ellipse cx="9" cy="12" rx="6" ry="3.6" fill="#fff" stroke="${INK}" stroke-width=".8"/><path d="M12 11q2-6 1-8" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M12 11q2-6 1-8" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M13.6 3.4l3 .8-3 .9z" fill="#ffa21f"/>`;
+    case 'eye': return `<rect width="30" height="18" fill="#7a2fb0"/><path d="M2 9q9-8 18 0-9 8-18 0z" fill="#fff" stroke="${INK}" stroke-width=".9"/><circle cx="11" cy="9" r="3.4" fill="#56e0ff" stroke="${INK}" stroke-width=".8"/><circle cx="11" cy="9" r="1.6" fill="${INK}"/><circle cx="10" cy="8" r=".7" fill="#fff"/>`;
+    case 'spiral': return `<rect width="30" height="18" fill="#fff"/><path d="M11 9m-1 0a1 1 0 0 1 2 0a2 2 0 0 1-4 0a3 3 0 0 1 6 0a4 4 0 0 1-8 0a5 5 0 0 1 10 0a6 6 0 0 1-12 0a7 7 0 0 1 14 0" fill="none" stroke="#2b2350" stroke-width="1.3"/>`;
+    case 'cheese': return `<rect width="30" height="18" fill="#ffd23f"/>${[[5, 5, 2.2], [13, 11, 3], [21, 4, 1.8], [8, 14, 1.5], [24, 13, 2.4]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#e8b416"/>`).join('')}`;
     default: return `<rect width="30" height="18" fill="${red}"/><path d="M1 6h22M1 12h22" stroke="#fff" stroke-width="2.2"/><path d="M0 0l15 9L0 18z" fill="#3559d6" ${st(2)}/><circle cx="5.5" cy="9" r="2.6" fill="#fff"/><circle cx="5.5" cy="9" r="1.2" fill="${red}"/>`;
   }
 }
@@ -515,6 +519,44 @@ const BUILDINGS = {
 };
 
 // ================= HOVEDKVARTER (trykk for penger) =================
+// Hvert hovedkvarter har en åpning (dør, port, lobby eller koøye) der man ser generalen inne i basen.
+// Rommet bak tegnes her; generalen og pulten legges oppå i HTML (se hqWindow og main.js).
+const HQW = {
+  barn: { x: 73, y: 105, w: 54, h: 49, shape: 'rect', kind: 'barn' },
+  fort: { x: 76, y: 104, w: 48, h: 50, shape: 'arch', kind: 'fort' },
+  tower: { x: 80, y: 110, w: 40, h: 44, shape: 'rect', kind: 'tower' },
+  station: { x: 78, y: 54, w: 44, h: 44, shape: 'circle', kind: 'space' },
+  ship: { x: 80, y: 72, w: 48, h: 48, shape: 'circle', kind: 'space' },
+};
+const hqType = (era) => (era <= 0 ? 'barn' : era <= 3 ? 'fort' : era === 4 ? 'tower' : era === 5 ? 'station' : 'ship');
+export const hqWindow = (era) => HQW[hqType(era)];
+const winPath = ({ x, y, w, h, shape }) => (shape === 'circle' ? `M${x} ${y + h / 2}a${w / 2} ${h / 2} 0 1 0 ${w} 0a${w / 2} ${h / 2} 0 1 0 ${-w} 0z`
+  : shape === 'arch' ? `M${x} ${y + h}V${y + w / 2}a${w / 2} ${w / 2} 0 0 1 ${w} 0V${y + h}z` : `M${x} ${y}h${w}v${h}h${-w}z`);
+function interior(W) {
+  const { x, y, w, h, kind } = W;
+  const g = nid('hqi'), c = nid('hqc');
+  const pal = { barn: ['#ffe6b8', '#e7a35e'], fort: ['#ffe2b0', '#c48a52'], tower: ['#fff6e0', '#ffcf8a'], space: ['#3d3c98', '#141438'] }[kind];
+  let deco = '';
+  if (kind === 'barn') {
+    for (let i = 1; i < 6; i++) deco += `<path d="M${x + (w / 6) * i} ${y}v${h}" stroke="#d08f52" stroke-width="1.6" opacity=".55"/>`;
+    deco += `<rect x="${x + 4}" y="${y + 6}" width="13" height="10" rx="1" fill="#fff8e6" ${st(1.4)}/><path d="M${x + 7} ${y + 13}q2-5 5-3t3-1" fill="none" stroke="#e5484d" stroke-width="1.4"/>
+      <path d="M${x + w - 9} ${y}v5" ${st(1.2)}/><circle cx="${x + w - 9}" cy="${y + 9}" r="8" fill="#fff3a6" opacity=".45"/><circle cx="${x + w - 9}" cy="${y + 8}" r="3.2" fill="#ffd23f" ${st(1.2)}/>`;
+  } else if (kind === 'fort') {
+    for (let r = 0; r < 4; r++) deco += `<path d="M${x} ${y + 14 + r * 11}h${w}" stroke="#b37a45" stroke-width="1.4" opacity=".5"/>`;
+    deco += `<path d="M${x + 5} ${y + 22}h9v12l-4.5-3-4.5 3z" fill="#e5484d" ${st(1.2)}/>
+      <path d="M${x + w - 8} ${y + 30}v-6" ${st(1.6)}/><path d="M${x + w - 8} ${y + 24}q-3-4 0-8 3 4 0 8z" fill="#ffb347" ${st(1)}/><circle cx="${x + w - 8}" cy="${y + 20}" r="8" fill="#fff0a0" opacity=".35"/>`;
+  } else if (kind === 'tower') {
+    deco += `<rect x="${x + 3}" y="${y + 4}" width="${w - 6}" height="15" fill="#bfe6ff" ${st(1.2)}/>${[1, 2, 3, 4].map((i) => `<path d="M${x + 3} ${y + 4 + i * 3}h${w - 6}" stroke="#7cc8ff" stroke-width="1"/>`).join('')}
+      <circle cx="${x + w - 7}" cy="${y + 27}" r="4" fill="#4fae3c" ${st(1)}/><path d="M${x + w - 7} ${y + 31}v6" stroke="#9b6a3a" stroke-width="2"/>`;
+  } else {
+    for (let i = 0; i < 9; i++) deco += `<circle cx="${(x + 4 + ((i * 37) % (w - 8))).toFixed(1)}" cy="${(y + 4 + ((i * 23) % (h * 0.45))).toFixed(1)}" r="${i % 3 ? 0.7 : 1.1}" fill="#fff"/>`;
+    deco += `<rect x="${x + w / 2 - 12}" y="${y + h * 0.18}" width="24" height="13" rx="2" fill="#0d3a4a" stroke="#7ffcff" stroke-width="1.2"/><circle cx="${x + w / 2}" cy="${y + h * 0.18 + 6.5}" r="4.5" fill="none" stroke="#7ffcff" stroke-width=".8"/><path d="M${x + w / 2} ${y + h * 0.18 + 6.5}l3.5-2.5" stroke="#7ffcff" stroke-width=".9" class="blink"/>`;
+  }
+  return `<defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${pal[0]}"/><stop offset="1" stop-color="${pal[1]}"/></linearGradient><clipPath id="${c}"><path d="${winPath(W)}"/></clipPath></defs>
+  <g clip-path="url(#${c})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${g})"/>${deco}</g>`;
+}
+const porthole = (W, ring) => `<path d="${winPath({ ...W, x: W.x - 2.5, y: W.y - 2.5, w: W.w + 5, h: W.h + 5 })}" fill="none" stroke="${INK}" stroke-width="8"/><path d="${winPath({ ...W, x: W.x - 2.5, y: W.y - 2.5, w: W.w + 5, h: W.h + 5 })}" fill="none" stroke="${ring}" stroke-width="4.4"/>
+  ${[0, 60, 120, 180, 240, 300].map((d) => { const r = W.w / 2 + 2.5, cx = W.x + W.w / 2, cy = W.y + W.h / 2, t = (d * Math.PI) / 180; return `<circle cx="${(cx + Math.cos(t) * r).toFixed(1)}" cy="${(cy + Math.sin(t) * r).toFixed(1)}" r="1.3" fill="${INK}"/>`; }).join('')}`;
 function hqBarn() {
   return `<ellipse cx="100" cy="158" rx="94" ry="12" fill="#57b947" ${st()}/>
   <rect x="16" y="58" width="34" height="96" rx="4" fill="#d6dde8" ${st()}/>
@@ -524,10 +566,10 @@ function hqBarn() {
   <path d="M64 96v58M136 96v58" stroke="#c43c41" stroke-width="2.4"/>
   <path d="M50 94l50-47 50 47-8 5-42-39-42 39z" fill="#7a2e3a" ${st()}/>
   <rect x="88" y="74" width="24" height="18" rx="2" fill="#fff" ${st()}/><path d="M88 74l24 18M112 74L88 92" stroke="${INK}" stroke-width="2.4"/>
-  <rect x="74" y="108" width="52" height="46" fill="#fff" ${st()}/>
-  <rect x="79" y="113" width="20" height="41" fill="#e5484d"/><rect x="101" y="113" width="20" height="41" fill="#e5484d"/>
-  <path d="M79 113l20 41M99 113l-20 41M101 113l20 41M121 113l-20 41" stroke="#fff" stroke-width="3"/>
-  <path d="M100 113v41" ${st(3)}/>
+  <rect x="68" y="100" width="64" height="54" fill="#fff" ${st()}/>
+  ${interior(HQW.barn)}<path d="M73 105h54v49H73z" fill="none" ${st(2.4)}/>
+  <path d="M68 101L55 107V154H68z" fill="#e5484d" ${st(2.6)}/><path d="M57 110l9 42M66 105l-9 47" stroke="#fff" stroke-width="2.2"/>
+  <path d="M132 101L145 107V154H132z" fill="#e5484d" ${st(2.6)}/><path d="M143 110l-9 42M134 105l9 47" stroke="#fff" stroke-width="2.2"/>
   <path d="M100 48V16" ${st(3)}/>${burgee(100, 14, 0.9)}
   <rect x="146" y="128" width="34" height="24" rx="5" fill="#f2c94c" ${st()}/><path d="M152 136h22M152 144h22" stroke="#d9a62e" stroke-width="2.4"/>
   <path d="M30 156l3-8 3 8M176 156l3-8 3 8" fill="#3e9a32" ${st(2)}/>`;
@@ -544,7 +586,10 @@ function hqFort(era) {
   ${cren(12, 50, 84)}${cren(150, 188, 84)}
   <rect x="12" y="82" width="36" height="72" fill="#b78f5a" ${st()}/><rect x="152" y="82" width="36" height="72" fill="#b78f5a" ${st()}/>
   <rect x="24" y="98" width="12" height="16" rx="6" fill="${INK}"/><rect x="164" y="98" width="12" height="16" rx="6" fill="${INK}"/>
-  <path d="M80 154v-24q0-20 20-20t20 20v24z" fill="#6b4a2b" ${st()}/><path d="M100 112v42M82 132h36" stroke="#4e3420" stroke-width="2.4"/>
+  <path d="M70 154V128a30 30 0 0 1 60 0V154z" fill="#a7834f" ${st(2.4)}/>
+  ${interior(HQW.fort)}<path d="${winPath(HQW.fort)}" fill="none" ${st(2.6)}/>
+  <path d="M76 116L63 121V154H76z" fill="#6b4a2b" ${st(2.4)}/><path d="M64 131h11M64 142h11" stroke="#4e3420" stroke-width="2"/>
+  <path d="M124 116L137 121V154H124z" fill="#6b4a2b" ${st(2.4)}/><path d="M125 131h11M125 142h11" stroke="#4e3420" stroke-width="2"/>
   ${era >= 2 ? `<path d="M170 82v-12" ${st(3)}/><path d="M156 60q14 16 28 0z" fill="#d6dde8" ${st(2.6)} transform="rotate(-20 170 64)"/>` : ''}
   ${era >= 3 ? `<path d="M30 82V64" ${st(3)}/><circle cx="30" cy="60" r="5" fill="#ff5d5d" ${st(2)} class="blink"/>` : ''}
   <path d="M40 156q8-8 16 0M144 156q8-8 16 0" fill="#c2b07a" ${st(2.4)}/>`;
@@ -556,6 +601,8 @@ function hqTower() {
   <path d="M70 154V40l30-18 30 18v114z" fill="#7cc8ff" ${st()}/>
   <path d="M82 46v100M100 34v112M118 46v100M70 64h60M70 88h60M70 112h60M70 136h60" stroke="#c9ecff" stroke-width="2"/>
   <g transform="translate(84 66) scale(.16)"><path d="${MAPS.ohioOutline}" fill="#e5484d" stroke="${INK}" stroke-width="14"/></g>
+  <rect x="76" y="106" width="48" height="48" fill="#e3e9f2" ${st(2.6)}/>
+  ${interior(HQW.tower)}<path d="M80 110h40v44H80z" fill="none" ${st(2.2)}/>
   <ellipse cx="100" cy="20" rx="24" ry="5" fill="#4b4b60" ${st(2.6)}/><path d="M92 20h16M100 16v8" stroke="#ffd23f" stroke-width="2.4"/>
   <path d="M100 15V2" ${st(2.4)}/><circle cx="100" cy="2" r="3" fill="#ff5d5d" class="blink"/>
   ${burgee(132, 30, 0.7)}<path d="M132 30v12" ${st(2)}/>`;
@@ -568,7 +615,7 @@ function hqStation() {
   <path d="M40 75h24M136 75h24" ${st(5)}/>
   <circle cx="100" cy="76" r="38" fill="#e3e9f2" ${st()}/>
   <path d="M66 62q34-14 68 0M64 90q36 14 72 0" fill="none" stroke="#a9b4c6" stroke-width="3"/>
-  <circle cx="100" cy="76" r="14" fill="#7ffcff" ${st(2.6)} class="blink"/><circle cx="96" cy="72" r="4" fill="#fff"/>
+  ${interior(HQW.station)}${porthole(HQW.station, '#c4cddb')}
   ${[[76, 60], [124, 60], [72, 92], [128, 92]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.4" fill="#ffe680" ${st(1.6)}/>`).join('')}
   <path d="M100 38V18" ${st(3)}/>${burgee(100, 14, 0.8)}
   <rect x="92" y="114" width="16" height="22" rx="3" fill="#a9b4c6" ${st()}/><path class="flame" d="M94 138q6 14 12 0z" fill="#7ffcff" ${st(2)}/>`;
@@ -579,8 +626,9 @@ function hqMothership() {
     <path d="${MAPS.ohioOutline}" fill="#cfd7e3" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
     <path d="${MAPS.ohioOutline}" fill="none" stroke="#4fb843" stroke-width="6" transform="translate(100 100) scale(.84) translate(-100 -100)"/>
   </g>
-  ${Array.from({ length: 16 }, (_, i) => `<rect x="${52 + (i % 6) * 18}" y="${44 + Math.floor(i / 6) * 34}" width="8" height="5" rx="1.4" fill="#ffe680" ${st(1.4)}/>`).join('')}
-  <circle cx="104" cy="96" r="22" fill="#7ffcff" ${st(3)} class="blink"/><circle cx="104" cy="96" r="9" fill="#fff"/>
+  ${Array.from({ length: 16 }, (_, i) => [52 + (i % 6) * 18, 44 + Math.floor(i / 6) * 34]).filter(([x, y]) => Math.hypot(x + 4 - 104, y + 2.5 - 96) > 30).map(([x, y]) => `<rect x="${x}" y="${y}" width="8" height="5" rx="1.4" fill="#ffe680" ${st(1.4)}/>`).join('')}
+  <circle cx="104" cy="96" r="31" fill="#7ffcff" opacity=".28" class="blink"/>
+  ${interior(HQW.ship)}${porthole(HQW.ship, '#cfd7e3')}
   ${burgee(150, 10, 0.9)}<path d="M150 10v26" ${st(2.6)}/>`;
 }
 export function hq(era) {
@@ -624,6 +672,14 @@ const HATS = {
   detective: `<path d="M24 42q0-24 26-24t26 24z" fill="#a0855b" ${st()}/><path d="M26 34h48M29 27h42M50 18v24" fill="none" stroke="#7a6240" stroke-width="2"/><path d="M75 39q13 1 15 9-10 1-17-4z" fill="#a0855b" ${st(2.4)}/><path d="M25 39q-13 1-15 9 10 1 17-4z" fill="#a0855b" ${st(2.4)}/><circle cx="50" cy="17" r="3" fill="#7a6240" ${st(1.4)}/>`,
   knight: `<path d="M24 46q0-30 26-30t26 30z" fill="#c4cddb" ${st()}/><path d="M25 40h50" stroke="#8a96ab" stroke-width="4.4"/><path d="M50 16v24" stroke="#8a96ab" stroke-width="3"/><path d="M30 30q5-9 14-11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/><path d="M50 16q4-13 18-12-7 4-9 14z" fill="#e5484d" ${st(2.2)}/>`,
   dino: `<path d="M18 52q-3-36 32-36t32 36q-9-14-32-14T18 52z" fill="#5fc94a" ${st()}/><path d="M33 21l4-9 4 7 4-10 5 10 4-7 4 9 4-6" fill="#ffd23f" ${st(2)}/><circle cx="35" cy="28" r="4.2" fill="#fff" ${st(1.6)}/><circle cx="65" cy="28" r="4.2" fill="#fff" ${st(1.6)}/><circle cx="36" cy="28.6" r="2" fill="${INK}"/><circle cx="64" cy="28.6" r="2" fill="${INK}"/><path d="M24 44l3 4 3-4 3 4 3-4M64 44l3 4 3-4 3 4 3-4" fill="#fff" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/>`,
+  pumpkin: `<path d="M22 46q-4-30 28-31 32 1 28 31-14-8-28-8t-28 8z" fill="#ff8a1f" ${st()}/><path d="M36 20q-6 12-4 24M50 16v22M64 20q6 12 4 24" fill="none" stroke="#d96a0c" stroke-width="2.6" stroke-linecap="round"/><path d="M48 17q0-8 4-10l3 2q-3 3-3 8z" fill="#4fae3c" ${st(2)}/><path d="M54 9q8-4 12 2-6 3-12-2z" fill="#7be07b" ${st(1.6)}/>`,
+  cake: `<rect x="28" y="26" width="44" height="20" rx="5" fill="#ff9fd0" ${st()}/><path d="M28 32q4 6 8 0t7 0 7 0 7 0 7 0 8 0" fill="#fff" ${st(2)}/><path d="M48 26V13h4v13z" fill="#7fd3ff" ${st(2)}/><path d="M50 4q-5 5 0 9 5-4 0-9z" fill="#ffd23f" ${st(1.6)}/>${[36, 64].map((x) => `<circle cx="${x}" cy="38" r="2.2" fill="#e5484d"/>`).join('')}`,
+  cone: `<path d="M50 3L36 42h28z" fill="#ff7a1f" ${st()}/><path d="M44.6 19h10.8M40.6 31h18.8" stroke="#fff" stroke-width="4.4"/><rect x="26" y="40" width="48" height="7" rx="2" fill="#ff7a1f" ${st(2.6)}/>`,
+  pot: `<path d="M28 22h44v20q0 5-5 5H33q-5 0-5-5z" fill="#a9b4c6" ${st()}/><path d="M24 24h52" ${st(4)}/><path d="M28 30q-9 0-9 6M72 30q9 0 9 6" fill="none" ${st(3)}/><path d="M34 26v16" stroke="#e3e9f2" stroke-width="3" stroke-linecap="round"/><rect x="45" y="15" width="10" height="7" rx="2" fill="#7c899f" ${st(2)}/>`,
+  mushroom: `<path d="M14 42q2-30 36-30t36 30q-10-6-36-6t-36 6z" fill="#e5484d" ${st()}/>${[[30, 28, 4], [48, 20, 5], [66, 28, 4], [40, 34, 2.6], [58, 34, 2.6]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" ${st(1.4)}/>`).join('')}`,
+  antlers: `<path d="M38 40q-6-14-14-20M30 28q-10 0-14-8M26 22q2-8 0-14M62 40q6-14 14-20M70 28q10 0 14-8M74 22q-2-8 0-14" fill="none" stroke="${INK}" stroke-width="8" stroke-linecap="round"/><path d="M38 40q-6-14-14-20M30 28q-10 0-14-8M26 22q2-8 0-14M62 40q6-14 14-20M70 28q10 0 14-8M74 22q-2-8 0-14" fill="none" stroke="#b47538" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="44" r="0" fill="none"/>`,
+  cheese: `<path d="M20 44L32 16l48 12v16z" fill="#ffd23f" ${st()}/><path d="M32 16l48 12" ${st(2.4)}/>${[[38, 34, 4], [56, 36, 3], [68, 34, 2.6], [46, 26, 2.4]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#e8b416" ${st(1.4)}/>`).join('')}`,
+  ufo: `<path d="M38 22L24 46h52L62 22z" fill="#b5fffd" opacity=".4"/><path d="M38 12q0-9 12-9t12 9z" fill="#c9f1ff" ${st(2.4)}/><ellipse cx="50" cy="14" rx="24" ry="6" fill="#b8c2d3" ${st(2.6)}/>${[34, 44, 56, 66].map((x, i) => `<circle cx="${x}" cy="15" r="1.8" fill="#fff59a" class="blink" style="animation-delay:${i * 0.2}s"/>`).join('')}`,
   prestige: `<path d="M22 44l2-26 11 11 15-20 15 20 11-11 2 26z" fill="#7a5cff" ${st()}/><path d="M24 44l1-12 10 9 15-17 15 17 10-9 1 12z" fill="#ffd23f" ${st(2)}/><path d="M23 40h54" stroke="#e8a91c" stroke-width="3.4"/>${star(50, 32, 5, '#fff', 1.2)}<circle cx="35" cy="36" r="2.6" fill="#ef4f5a" ${st(1.1)}/><circle cx="65" cy="36" r="2.6" fill="#56e0ff" ${st(1.1)}/><circle cx="50" cy="8" r="3" fill="#ffd23f" ${st(1.4)}/>`,
 };
 
@@ -797,11 +853,83 @@ export function mascot(mood = 'happy', opts = {}) {
   const vb = opts.crop && gen === 'drip' ? '23 2 54 54' : opts.crop && gen === 'zorgon' ? '21 0 58 58' : '0 0 100 100';
   return wrap(inner, vb, `mascot gen-${gen}${fx ? ' fx-' + fx : ''}`);
 }
+// Generalen sett gjennom vinduet i hovedkvarteret: hode og overkropp
+export function mascotWindow(mood = 'happy') {
+  const gen = mascotChar;
+  const inner = gen === 'drip' ? dripArt(mood, mascotLooks.drip) : gen === 'zorgon' ? zorgonArt(mood, mascotLooks.zorgon) : buckeyeArt(mood, mascotHat);
+  const vb = gen === 'drip' ? '22 1 56 56' : gen === 'zorgon' ? '20 -1 60 60' : '0 0 100 100';
+  return wrap(inner, vb, `mascot gen-${gen}${mascotFx[gen] ? ' fx-' + mascotFx[gen] : ''}`);
+}
 // Den valgte generalen med utstyrt skin (brukes i generalvelgeren)
 export const mascotOf = (gen, mood = 'happy', crop = false) => wrap(
   gen === 'drip' ? dripArt(mood, mascotLooks.drip) : gen === 'zorgon' ? zorgonArt(mood, mascotLooks.zorgon) : buckeyeArt(mood, mascotHat),
   crop && gen === 'drip' ? '23 2 54 54' : crop && gen === 'zorgon' ? '21 0 58 58' : '0 0 100 100',
   `mascot gen-${gen}${mascotFx[gen] ? ' fx-' + mascotFx[gen] : ''}`);
+
+// ================= INNBYGGERE I BYEN =================
+// Brukes i basen (de går rundt) og i hendelser (de kommer med problemer).
+const legs = (c = '#3a4150') => `<path d="M44 76v13M56 76v13" ${st(6)}/><path d="M44 76v13M56 76v13" stroke="${c}" stroke-width="3" stroke-linecap="round"/><ellipse cx="43" cy="90" rx="4.4" ry="2.6" fill="${INK}"/><ellipse cx="57" cy="90" rx="4.4" ry="2.6" fill="${INK}"/>`;
+const torso = (c) => `<path d="M35 60q0-12 15-12t15 12v14q0 6-6 6H41q-6 0-6-6z" fill="${c}" ${st()}/>`;
+const arms = (c, skin) => `${line('M37 56l-7 13', 3.6, c)}${line('M63 56l7 13', 3.6, c)}<circle cx="30" cy="70" r="3.2" fill="${skin}" ${st(1.6)}/><circle cx="70" cy="70" r="3.2" fill="${skin}" ${st(1.6)}/>`;
+const head = (skin, y = 33, r = 13) => `<circle cx="50" cy="${y}" r="${r}" fill="${skin}" ${st()}/><circle cx="45.4" cy="${y + 1}" r="1.9" fill="${INK}"/><circle cx="54.6" cy="${y + 1}" r="1.9" fill="${INK}"/><circle cx="45.9" cy="${y + 0.4}" r=".6" fill="#fff"/><circle cx="55.1" cy="${y + 0.4}" r=".6" fill="#fff"/><path d="M46.5 ${y + 6}q3.5 3 7 0" fill="none" ${st(1.8)}/>`;
+const person = (o) => `${shadow(50, 92, 16, 3.4)}${legs(o.legs)}${torso(o.body)}${o.over || ''}${arms(o.arm || o.body, o.skin)}${o.back || ''}${head(o.skin)}${o.top || ''}`;
+const CITIZEN = {
+  farmer: () => person({ skin: '#f2c08f', body: '#e5484d', legs: '#3d6fd6', arm: '#e5484d',
+    over: `<path d="M41 62h18v16H41z" fill="#3d6fd6" ${st(2.2)}/><path d="M42 62l-3-12M58 62l3-12" stroke="#3d6fd6" stroke-width="3"/><circle cx="45" cy="66" r="1.3" fill="#ffd23f"/><circle cx="55" cy="66" r="1.3" fill="#ffd23f"/>`,
+    top: `<ellipse cx="50" cy="24" rx="21" ry="4.6" fill="#f2c94c" ${st(2.4)}/><path d="M39 23q0-11 11-11t11 11z" fill="#f2c94c" ${st(2.4)}/><path d="M39.6 20.5h20.8" stroke="#e5484d" stroke-width="2.6"/><path d="M72 71q4-6 2-12" fill="none" stroke="#4fae3c" stroke-width="2"/><ellipse cx="72" cy="66" rx="2.8" ry="5.6" fill="#ffd23f" ${st(1.4)}/>` }),
+  granny: () => person({ skin: '#f5cfa8', body: '#9a6bd6', legs: '#5d5486',
+    over: `<path d="M50 50v28" stroke="#7a4fbf" stroke-width="2"/>${[56, 64, 72].map((y) => `<circle cx="50" cy="${y}" r="1.4" fill="#ffd23f"/>`).join('')}`,
+    top: `<path d="M37 31q0-12 13-12t13 12q-6-6-13-6t-13 6z" fill="#d6dde8" ${st(2)}/><circle cx="50" cy="16" r="6" fill="#d6dde8" ${st(2.2)}/><circle cx="45.4" cy="34" r="3.6" fill="none" ${st(1.4)}/><circle cx="54.6" cy="34" r="3.6" fill="none" ${st(1.4)}/><path d="M49 34h2" ${st(1.2)}/><circle cx="41" cy="38" r="2" fill="#ff9fb0" opacity=".7"/><circle cx="59" cy="38" r="2" fill="#ff9fb0" opacity=".7"/>` }),
+  kid: () => `<g transform="translate(50 92) scale(.86) translate(-50 -92)">${person({ skin: '#ffd2a8', body: '#56c2ff', legs: '#2b4a8a',
+    over: `<path d="M36 60h28M35.5 67h29M36 74h28" stroke="#fff" stroke-width="2.4"/>`,
+    top: `<path d="M37 30q0-13 13-13t13 13z" fill="#e5484d" ${st(2.2)}/><path d="M38 29h-12q0-4 4-4h9z" fill="#e5484d" ${st(2)}/><circle cx="50" cy="17" r="2" fill="#fff" ${st(1)}/>` })}</g>`,
+  scientist: () => person({ skin: '#f2c08f', body: '#f4f7fb', legs: '#3a4150',
+    over: `<path d="M44 50l6 10 6-10" fill="#56c2ff" ${st(1.8)}/><path d="M50 60v18" stroke="#c8d2e0" stroke-width="2"/><rect x="55" y="64" width="6" height="7" rx="1" fill="#c8d2e0" ${st(1.2)}/>`,
+    top: `<path d="M36 30l-3-9 6 4 1-9 5 7 5-9 4 9 5-7 1 9 6-4-3 9z" fill="#c8d2e0" ${st(2)}/><path d="M37 26h26" stroke="#7a5cff" stroke-width="3"/><circle cx="44" cy="25.5" r="3.6" fill="#7ffcff" ${st(1.4)}/><circle cx="56" cy="25.5" r="3.6" fill="#7ffcff" ${st(1.4)}/><path d="M70 72l-3-9h6z" fill="#7be07b" ${st(1.4)}/><circle cx="70" cy="60" r="1.6" fill="#7be07b" opacity=".8" class="blink"/>` }),
+  soldier: () => person({ skin: '#e0a878', body: '#4f7d3a', legs: '#3a5a2a',
+    over: `<path d="M41 58h18" stroke="#3a5a2a" stroke-width="2"/>${star(50, 66, 3.6, '#ffd23f', 1)}`,
+    top: `<path d="M35 31q0-15 15-15t15 15z" fill="#5d8a44" ${st(2.4)}/><path d="M32 31h36" ${st(4)}/><path d="M32 31h36" stroke="#5d8a44" stroke-width="2"/><path d="M41 22q3-3 7-3" fill="none" stroke="#8fbf6e" stroke-width="2" stroke-linecap="round"/>` }),
+  mayor: () => person({ skin: '#f5cfa8', body: '#2b2d42', legs: '#1d1b29',
+    over: `<path d="M45 49l5 9 5-9" fill="#fff" ${st(1.6)}/><path d="M38 52l22 24" stroke="#e5484d" stroke-width="5"/><circle cx="57" cy="68" r="3" fill="#ffd23f" ${st(1.2)}/>`,
+    top: `<rect x="40" y="6" width="20" height="16" rx="2" fill="#2b2d42" ${st(2.2)}/><path d="M34 22h32" ${st(4)}/><path d="M40 17h20" stroke="#e5484d" stroke-width="2.6"/><path d="M43 38q3.5-3 7 0 3.5-3 7 0" fill="#5d3a24" ${st(1.4)}/>` }),
+  chef: () => person({ skin: '#f2c08f', body: '#fff', legs: '#3a4150',
+    over: `${[56, 63, 70].map((y) => `<circle cx="46" cy="${y}" r="1.3" fill="${INK}"/><circle cx="54" cy="${y}" r="1.3" fill="${INK}"/>`).join('')}<path d="M44 49q6 4 12 0" fill="none" stroke="#e5484d" stroke-width="3"/>`,
+    top: `<path d="M39 23v-6q-6-2-4-8t8-3q2-6 7-6t7 6q6-3 8 3t-4 8v6z" fill="#fff" ${st(2.2)}/><path d="M43 38q3.5-3 7 0 3.5-3 7 0" fill="#3d2414" ${st(1.4)}/>` }),
+  goose: () => `${shadow(50, 92, 18, 3.4)}<path d="M44 80v10M54 80v10" stroke="#ffa21f" stroke-width="3" stroke-linecap="round"/><path d="M40 91h6M50 91h7" stroke="#ffa21f" stroke-width="3" stroke-linecap="round"/>
+    <path d="M26 66q-6-6-2-12 8 4 14 6" fill="#f4f7fb" ${st(2.4)}/><ellipse cx="46" cy="68" rx="22" ry="14" fill="#fff" ${st()}/><path d="M36 66q10 8 22 2" fill="none" stroke="#c8d2e0" stroke-width="2.4" stroke-linecap="round"/>
+    ${line('M60 60q6-14 2-28', 8, '#fff')}<circle cx="62" cy="28" r="8" fill="#fff" ${st()}/><path d="M68 26l12 3-12 4z" fill="#ffa21f" ${st(2)}/><circle cx="63" cy="26" r="1.8" fill="${INK}"/><path d="M58 21l7 2" ${st(1.8)}/>`,
+  robot: () => `${shadow(50, 92, 16, 3.4)}<rect x="41" y="76" width="6" height="13" rx="1" fill="#8a96ab" ${st(2)}/><rect x="53" y="76" width="6" height="13" rx="1" fill="#8a96ab" ${st(2)}/>
+    ${line('M36 58l-7 12', 3.6, '#a9b4c6')}${line('M64 58l7 12', 3.6, '#a9b4c6')}<rect x="35" y="50" width="30" height="28" rx="5" fill="#cdd6e3" ${st()}/><circle cx="50" cy="63" r="5" fill="#ffd23f" ${st(1.6)}/>
+    <path d="M50 18V9" ${st(2.2)}/><circle cx="50" cy="8" r="3" fill="#ef4f5a" ${st(1.4)} class="blink"/><rect x="37" y="18" width="26" height="26" rx="6" fill="#e3e9f2" ${st()}/><rect x="41" y="23" width="18" height="13" rx="3" fill="#1d2a3a"/><circle cx="46" cy="29.5" r="2" fill="#7ffcff"/><circle cx="54" cy="29.5" r="2" fill="#7ffcff"/><path d="M46 39h8" stroke="#8a96ab" stroke-width="1.6"/>`,
+  alien: () => `${shadow(50, 92, 16, 3.4)}${legs('#5b3fb0')}${torso('#7a5cff')}<path d="M44 52h12" stroke="#ffd23f" stroke-width="2.4"/>${arms('#7a5cff', '#7be07b')}
+    <path d="M41 22q-5-9-11-10M59 22q5-9 11-10" fill="none" ${st(2.2)}/><circle cx="29.5" cy="11.5" r="3.4" fill="#7be07b" ${st(1.6)}/><circle cx="70.5" cy="11.5" r="3.4" fill="#7be07b" ${st(1.6)}/>
+    <ellipse cx="50" cy="32" rx="16" ry="14" fill="#7be07b" ${st()}/><ellipse cx="44" cy="31" rx="4.4" ry="6" fill="${INK}" transform="rotate(-18 44 31)"/><ellipse cx="56" cy="31" rx="4.4" ry="6" fill="${INK}" transform="rotate(18 56 31)"/><circle cx="43" cy="29" r="1.4" fill="#fff"/><circle cx="55" cy="29" r="1.4" fill="#fff"/><path d="M47 40q3 2 6 0" fill="none" ${st(1.6)}/>`,
+};
+export const CITIZEN_IDS = Object.keys(CITIZEN);
+export const citizenArt = (kind) => wrap((CITIZEN[kind] || CITIZEN.farmer)(), '0 0 100 100', 'citizen c-' + kind);
+
+// Partikler for trykkeffekter (skins i kategorien «Trykkeffekt»)
+const PTCL = {
+  coin: () => ICONS.coin,
+  heart: () => `<path d="M12 21q-9-5.6-8.4-11.4.6-4 4.4-4 2.6 0 4 2.4 1.4-2.4 4-2.4 3.8 0 4.4 4 .6 5.8-8.4 11.4z" fill="#ff5d8f" ${st(1.8)}/><path d="M7.4 8.6q.8-1.4 2.2-1.6" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/>`,
+  star: () => ICONS.star,
+  corn: () => `<path d="M12 22q-6-4-4-10M12 22q6-4 4-10" fill="#7be07b" ${st(1.4)}/><ellipse cx="12" cy="10" rx="4.4" ry="8.4" fill="#ffd23f" ${st(1.6)}/><path d="M9.5 6h5M8.4 10h7.2M9.5 14h5" stroke="#e8a91c" stroke-width="1.2"/>`,
+  nut: () => `<circle cx="12" cy="12.6" r="9" fill="#7b4a2a" ${st(1.8)}/><ellipse cx="12.6" cy="14.4" rx="5.6" ry="4.6" fill="#e2bd8f"/><ellipse cx="8.4" cy="8.4" rx="2" ry="1.2" fill="#fff" opacity=".35" transform="rotate(-30 8.4 8.4)"/>`,
+  pizza: () => `<path d="M3 5.5q9-4 18 0L12 22z" fill="#ffd98a" ${st(1.6)}/><path d="M3 5.5q9-4 18 0" fill="none" stroke="#e8a35f" stroke-width="3" stroke-linecap="round"/><circle cx="10" cy="9.6" r="1.8" fill="#e5484d"/><circle cx="14.4" cy="12" r="1.6" fill="#e5484d"/><circle cx="11.8" cy="16" r="1.3" fill="#e5484d"/>`,
+  bubble: () => `<circle cx="12" cy="12" r="9" fill="#bfe8ff" fill-opacity=".45" stroke="#56c2ff" stroke-width="1.8"/><path d="M7.4 9q1.4-2.6 4-3" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>`,
+  bolt: () => ICONS.boost,
+  flame: () => `<path d="M12 22q-7-1-7-8 0-5 4-8 0 4 3 5-1-5 3-9 0 5 3 7 3 3 2 7-1 6-8 6z" fill="#ff7a1f" ${st(1.6)}/><path d="M12 21q-3.6-.6-3.6-4 0-2.6 2.6-4 0 2.6 2.2 3 .4-2 2-3 .8 5-3.2 8z" fill="#ffd23f"/>`,
+  gem: () => ICONS.gem,
+  planet: () => `<circle cx="12" cy="12" r="6.4" fill="#b38cff" ${st(1.6)}/><ellipse cx="12" cy="12" rx="11" ry="3.4" fill="none" stroke="${INK}" stroke-width="3" transform="rotate(-18 12 12)"/><ellipse cx="12" cy="12" rx="11" ry="3.4" fill="none" stroke="#ffd23f" stroke-width="1.4" transform="rotate(-18 12 12)"/>`,
+  ghost: () => `<path d="M5 21V11q0-8 7-8t7 8v10l-2.4-2-2.3 2-2.3-2-2.3 2-2.3-2z" fill="#f4f7fb" fill-opacity=".9" ${st(1.6)}/><circle cx="9.6" cy="11" r="1.4" fill="${INK}"/><circle cx="14.4" cy="11" r="1.4" fill="${INK}"/><ellipse cx="12" cy="15" rx="1.4" ry="1.8" fill="${INK}"/>`,
+  note: () => `<path d="M9 18V5l11-2.4V16" fill="none" ${st(2)}/><ellipse cx="6.4" cy="18" rx="3.4" ry="2.6" fill="#4fae3c" ${st(1.6)}/><ellipse cx="17.4" cy="16" rx="3.4" ry="2.6" fill="#4fae3c" ${st(1.6)}/><path d="M9 8l11-2.4" ${st(2)}/>`,
+  rainbow: () => `<path d="M2 18a10 10 0 0 1 20 0" fill="none" stroke="#ff4d6d" stroke-width="2.4"/><path d="M4.6 18a7.4 7.4 0 0 1 14.8 0" fill="none" stroke="#ffd23f" stroke-width="2.4"/><path d="M7.2 18a4.8 4.8 0 0 1 9.6 0" fill="none" stroke="#4dd06a" stroke-width="2.4"/><path d="M9.6 18a2.4 2.4 0 0 1 4.8 0" fill="none" stroke="#4d9fff" stroke-width="2.4"/>`,
+};
+export const particleArt = (kind) => wrap((PTCL[kind] || PTCL.coin)(), '0 0 24 24', 'ptcl p-' + kind);
+// Forhåndsvisning av en trykkeffekt i butikken
+export const tapPreview = (kind) => wrap(`<circle cx="50" cy="52" r="30" fill="#fff" opacity=".55"/>
+  ${[[22, 22, 0.9, -14], [62, 12, 1.1, 10], [12, 56, 0.8, 8], [68, 54, 1, -6], [40, 70, 0.75, 16]].map(([x, y, sc, r]) => `<g transform="translate(${x} ${y}) scale(${sc}) rotate(${r} 12 12)">${(PTCL[kind] || PTCL.coin)()}</g>`).join('')}
+  <g transform="translate(32 30) scale(1.5)">${ICONS.tap}</g>`, '0 0 100 100', 'tap-prev');
 
 // ================= POWERUPS I HOVEDKVARTERET =================
 const PU_ART = {
