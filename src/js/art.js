@@ -63,6 +63,12 @@ function flagInner(design, red) {
     case 'galaxy': return `<rect width="30" height="18" fill="#2a1a5e"/><path d="M3 13q5-11 17-5" stroke="#c28dff" stroke-width="3" fill="none" opacity=".85"/><path d="M5 6q8 9 16 2" stroke="#56e0ff" stroke-width="1.6" fill="none" opacity=".8"/>${star(8, 4, 1.4, '#fff', 0.4)}${star(17, 13, 1.6, '#ffe680', 0.4)}${star(20, 4, 1.1, '#fff', 0.4)}`;
     case 'diamond': return `<rect width="30" height="18" fill="#56e0ff"/><path d="M0 9l5-9 5 9-5 9zM10 9l5-9 5 9-5 9zM20 9l5-9 5 9-5 9z" fill="#b5fffd" stroke="#2fa8c7" stroke-width=".8"/><path d="M3 4l1.4-2" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>`;
     case 'stars': return `<rect width="30" height="18" fill="#1f2a6b"/><path d="M0 15.5h30" stroke="#ffd23f" stroke-width="2"/>${star(6, 7, 3.4, '#ffd23f', 0.8)}${star(14, 5, 2.4, '#ffd23f', 0.6)}${star(13, 11, 2, '#fff', 0.5)}`;
+    case 'drip': return `<rect width="30" height="18" fill="#1d1b29"/><path d="M5 5q6 9 12 0" fill="none" stroke="#ffd23f" stroke-width="1.8"/><circle cx="11" cy="9.6" r="2" fill="#ffd23f" stroke="${INK}" stroke-width=".6"/><text x="22" y="13" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="6" fill="#fff">USA</text>`;
+    case 'zorgon': return `<rect width="30" height="18" fill="#7a2fb0"/><path d="M5 12l1-6 2.4 2 2.6-4 2.6 4 2.4-2 1 6z" fill="#ffd23f" stroke="${INK}" stroke-width=".7"/><ellipse cx="22" cy="9" rx="4.4" ry="5" fill="#b38cff" stroke="${INK}" stroke-width=".7"/><ellipse cx="20.6" cy="9.4" rx="1.1" ry="1.6" fill="${INK}"/><ellipse cx="23.4" cy="9.4" rx="1.1" ry="1.6" fill="${INK}"/>`;
+    case 'stripes': return `<rect width="30" height="18" fill="#fff"/>${[0, 2, 4, 6].map((i) => `<rect y="${i * 2.6 + 0.6}" width="30" height="1.6" fill="#e5484d"/>`).join('')}<rect width="12" height="9" fill="#3559d6"/>${star(6, 4.5, 2.6, '#fff', 0.5)}`;
+    case 'pizza': return `<rect width="30" height="18" fill="#ffe680"/><path d="M4 2l22 7-22 7z" fill="#ffc861" stroke="${INK}" stroke-width=".8"/><circle cx="10" cy="7" r="1.6" fill="#e5484d"/><circle cx="9" cy="12" r="1.6" fill="#e5484d"/><circle cx="16" cy="9.4" r="1.6" fill="#e5484d"/>`;
+    case 'wave': return `<rect width="30" height="18" fill="#56c2ff"/><path d="M0 11q4-4 8 0t8 0 8 0 8 0V18H0z" fill="#3559d6"/><path d="M0 8q4-4 8 0t8 0 8 0 8 0" fill="none" stroke="#fff" stroke-width="1.4"/>`;
+    case 'sun': return `<rect width="30" height="18" fill="#ff9f1c"/><circle cx="12" cy="9" r="4.4" fill="#ffe14d" stroke="${INK}" stroke-width=".8"/>${[0, 45, 90, 135, 180, 225, 270, 315].map((d) => `<path d="M12 2.2v2" stroke="#ffe14d" stroke-width="1.4" stroke-linecap="round" transform="rotate(${d} 12 9)"/>`).join('')}`;
     default: return `<rect width="30" height="18" fill="${red}"/><path d="M1 6h22M1 12h22" stroke="#fff" stroke-width="2.2"/><path d="M0 0l15 9L0 18z" fill="#3559d6" ${st(2)}/><circle cx="5.5" cy="9" r="2.6" fill="#fff"/><circle cx="5.5" cy="9" r="1.2" fill="${red}"/>`;
   }
 }
@@ -582,9 +588,17 @@ export function hq(era) {
   return wrap(inner, '0 0 200 172', 'hq-art');
 }
 
-// ================= MASKOT: General Buckeye =================
+// ================= GENERALER =================
+// Tre generaler å velge mellom, hver med egne skins:
+// Buckeye (Ohio-nøtta – hatter), Drip (helfigur – antrekk) og Keiser Zorgon (helfigur – kapper og kroner).
+let mascotChar = 'buckeye';
 let mascotHat = 'general';
+const mascotLooks = { drip: {}, zorgon: {} };
+const mascotFx = { buckeye: '', drip: '', zorgon: '' };
+export const setGeneral = (g) => { mascotChar = GENERALS[g] ? g : 'buckeye'; };
+export const getGeneral = () => mascotChar;
 export const setHat = (h) => { mascotHat = h || 'general'; };
+export const setLook = (gen, look, fx = '') => { if (gen in mascotFx) { if (mascotLooks[gen]) mascotLooks[gen] = look || {}; mascotFx[gen] = fx || ''; } };
 const HATS = {
   general: `<path d="M22 36q28-24 56 0v6H22z" fill="#3f6a3a" ${st()}/><path d="M22 40h56" stroke="#ffd23f" stroke-width="4"/><path d="M18 42h64q-4 9-32 9T18 42z" fill="${INK}"/>${star(50, 30, 6, '#ffd23f', 1.8)}`,
   cap: `<path d="M26 41q1-23 24-23t24 23z" fill="#e5484d" ${st()}/><path d="M50 41h34q3 1 0 5H50z" fill="#c43c41" ${st(2.4)}/><circle cx="50" cy="18" r="2.6" fill="#c43c41" ${st(1.4)}/><circle cx="48" cy="31" r="5.4" fill="#fff" ${st(1.6)}/><circle cx="48" cy="31" r="2.4" fill="#e5484d"/>`,
@@ -606,30 +620,253 @@ const HATS = {
   bunny: `<path d="M38 36q-10-30-2-34 8 2 10 32z" fill="#fff" ${st()}/><path d="M39 30q-6-20-1-25 5 2 5 24z" fill="#ffb3c1"/><path d="M62 36q10-30 2-34-8 2-10 32z" fill="#fff" ${st()}/><path d="M61 30q6-20 1-25-5 2-5 24z" fill="#ffb3c1"/><path d="M28 40q22-10 44 0" fill="none" stroke="#ff8fc8" stroke-width="5" stroke-linecap="round"/>`,
   fire: `<path d="M22 42q0-27 28-27t28 27z" fill="#e5484d" ${st()}/><path d="M16 42h68q2 5-4 6H20q-6-1-4-6z" fill="#c43c41" ${st(2.6)}/><path d="M50 15v27" stroke="#c43c41" stroke-width="3"/><path d="M42 22h16v13q-8 5-16 0z" fill="#ffd23f" ${st(2.2)}/><path d="M50 24v9M46 28h8" stroke="#e5484d" stroke-width="2.4"/>`,
   halo: `<ellipse cx="50" cy="20" rx="24" ry="7" fill="none" stroke="#fff6a8" stroke-width="10" opacity=".55"/><ellipse cx="50" cy="20" rx="24" ry="7" fill="none" stroke="${INK}" stroke-width="7"/><ellipse cx="50" cy="20" rx="24" ry="7" fill="none" stroke="#ffd23f" stroke-width="4"/>`,
+  sombrero: `<ellipse cx="50" cy="41" rx="45" ry="8" fill="#f2c94c" ${st()}/><path d="M10 42q40 11 80 0" fill="none" stroke="#e5484d" stroke-width="2.6"/><path d="M36 40q0-23 14-23t14 23z" fill="#f2c94c" ${st()}/><path d="M36.6 33.6h26.8" stroke="#e5484d" stroke-width="4.4"/><path d="M38 33.6l3-3 3 3 3-3 3 3 3-3 3 3 3-3 3 3" fill="none" stroke="#3fbf3f" stroke-width="1.6"/>`,
+  detective: `<path d="M24 42q0-24 26-24t26 24z" fill="#a0855b" ${st()}/><path d="M26 34h48M29 27h42M50 18v24" fill="none" stroke="#7a6240" stroke-width="2"/><path d="M75 39q13 1 15 9-10 1-17-4z" fill="#a0855b" ${st(2.4)}/><path d="M25 39q-13 1-15 9 10 1 17-4z" fill="#a0855b" ${st(2.4)}/><circle cx="50" cy="17" r="3" fill="#7a6240" ${st(1.4)}/>`,
+  knight: `<path d="M24 46q0-30 26-30t26 30z" fill="#c4cddb" ${st()}/><path d="M25 40h50" stroke="#8a96ab" stroke-width="4.4"/><path d="M50 16v24" stroke="#8a96ab" stroke-width="3"/><path d="M30 30q5-9 14-11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/><path d="M50 16q4-13 18-12-7 4-9 14z" fill="#e5484d" ${st(2.2)}/>`,
+  dino: `<path d="M18 52q-3-36 32-36t32 36q-9-14-32-14T18 52z" fill="#5fc94a" ${st()}/><path d="M33 21l4-9 4 7 4-10 5 10 4-7 4 9 4-6" fill="#ffd23f" ${st(2)}/><circle cx="35" cy="28" r="4.2" fill="#fff" ${st(1.6)}/><circle cx="65" cy="28" r="4.2" fill="#fff" ${st(1.6)}/><circle cx="36" cy="28.6" r="2" fill="${INK}"/><circle cx="64" cy="28.6" r="2" fill="${INK}"/><path d="M24 44l3 4 3-4 3 4 3-4M64 44l3 4 3-4 3 4 3-4" fill="#fff" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/>`,
   prestige: `<path d="M22 44l2-26 11 11 15-20 15 20 11-11 2 26z" fill="#7a5cff" ${st()}/><path d="M24 44l1-12 10 9 15-17 15 17 10-9 1 12z" fill="#ffd23f" ${st(2)}/><path d="M23 40h54" stroke="#e8a91c" stroke-width="3.4"/>${star(50, 32, 5, '#fff', 1.2)}<circle cx="35" cy="36" r="2.6" fill="#ef4f5a" ${st(1.1)}/><circle cx="65" cy="36" r="2.6" fill="#56e0ff" ${st(1.1)}/><circle cx="50" cy="8" r="3" fill="#ffd23f" ${st(1.4)}/>`,
 };
-export function mascot(mood = 'happy', hat = mascotHat) {
-  const mouth = mood === 'sad' ? `<path d="M44 74q6-5 12 0" fill="none" ${st(2.4)}/>` : `<path d="M42 71q8 8 16 0" fill="#ff8f8f" ${st(2.4)}/>`;
+
+// tynn «tau»-strek med kontur (dreads, kjeder)
+const rope = (d, w, c) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 1.8}" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+const camo = (id, base, a, b) => `<g clip-path="url(#${id})"><rect x="0" y="0" width="100" height="100" fill="${base}"/>${[[38, 64, 4], [46, 72, 3.4], [56, 66, 4.2], [42, 82, 3.6], [58, 80, 4], [52, 88, 3], [30, 46, 4], [70, 48, 4], [34, 56, 3], [66, 56, 3.4]].map(([x, y, r], i) => `<ellipse cx="${x}" cy="${y}" rx="${r * 1.4}" ry="${r}" fill="${i % 2 ? a : b}" transform="rotate(${i * 37} ${x} ${y})"/>`).join('')}</g>`;
+const flames = (id, base) => `<g clip-path="url(#${id})"><rect width="100" height="100" fill="${base}"/><path d="M20 64q4-8 2-14 6 5 6 12 3-6 2-12 7 6 6 14 4-4 3-10 6 7 4 16 5-5 4-12 7 8 4 18 4-4 4-10 6 9 2 18H20z" fill="#ff8a3d"/><path d="M24 64q3-5 2-9 4 4 4 9 3-4 2-8 5 5 3 10 4-3 3-7 4 5 2 11 4-3 3-7 4 6 1 11z" fill="#ffd23f"/></g>`;
+
+// ---------- General Drip ----------
+const DRIP = {
+  skin: '#8a5a3c', jacket: '#1f1d2b', jacketHi: '#6a6688', jacketLine: '#3b3852', jacketPattern: '',
+  shirt: '#263a78', text: 'USA', textC: '#ffffff', band: '', collar: '#ffffff', collarAcc: '#e5484d',
+  pants: '#4467ad', pantsLine: '#2f4b85', pantsPattern: '', camoA: '#7d7a4a', camoB: '#c9b98a',
+  shoes: '#ffffff', shoeAcc: '#e5484d', hat: 'beanie', hatC: '#1d1b29', hatCuff: '#2b2838', hatAcc: '#e5484d', crest: '#ffd23f',
+  shades: '', lens: '#1d1b29', chain: '#ffd23f', watch: '#ffd23f', dreads: '#3b261b',
+};
+function dripArt(mood, look) {
+  const o = { ...DRIP, ...look };
+  const pantsD = 'M38.5 60L61.5 60L63.5 90.5L52.5 90.5L50 71L47.5 90.5L36.5 90.5Z';
+  const pid = nid('dp'), jl = nid('dj'), jr = nid('dj');
+  const jacketL = 'M39 34Q33 34.5 29.5 38L28.6 61.5Q34 63.5 39.6 62L41.2 41Z';
+  const jacketR = 'M61 34Q67 34.5 70.5 38L71.4 61.5Q66 63.5 60.4 62L58.8 41Z';
+  const pants = o.pantsPattern === 'camo' ? `<clipPath id="${pid}"><path d="${pantsD}"/></clipPath>${camo(pid, o.pants, o.camoA, o.camoB)}<path d="${pantsD}" fill="none" ${st(2.2)}/>`
+    : o.pantsPattern === 'stripe' ? `<path d="${pantsD}" fill="${o.pants}" ${st(2.2)}/><path d="M39.6 61l-2 29M60.4 61l2 29" stroke="${o.pantsLine}" stroke-width="2.2"/>`
+    : `<path d="${pantsD}" fill="${o.pants}" ${st(2.2)}/><path d="M41 76q3 1.5 6 0M53 76q3 1.5 6 0M50 61v10" fill="none" stroke="${o.pantsLine}" stroke-width="1.4"/>`;
+  const panel = (d, id) => (o.jacketPattern === 'camo' ? `<clipPath id="${id}"><path d="${d}"/></clipPath>${camo(id, o.jacket, o.camoA, o.camoB)}<path d="${d}" fill="none" ${st(2.2)}/>`
+    : o.jacketPattern === 'flames' ? `<clipPath id="${id}"><path d="${d}"/></clipPath>${flames(id, o.jacket)}<path d="${d}" fill="none" ${st(2.2)}/>`
+    : `<path d="${d}" fill="${o.jacket}" ${st(2.2)}/>`);
+  const quilt = (x0, x1) => `<path d="M${x0} 44q${(x1 - x0) / 2} 1.6 ${x1 - x0} .5M${x0 - 0.3} 51q${(x1 - x0) / 2} 1.6 ${x1 - x0 + 0.4} .5M${x0 - 0.5} 57.5q${(x1 - x0) / 2} 1.6 ${x1 - x0 + 0.8} .5" fill="none" stroke="${o.jacketLine}" stroke-width="1.4"/>`;
+  const jacket = o.jacket ? `
+  <path d="M30 38Q25.5 40 24.8 47L24.4 58Q28 60.5 31.6 59.6L32.6 47Z" fill="${o.jacket}" ${st(2.2)}/>
+  <path d="M24.8 46.5q3.5 1 7.6.4M24.5 52.5q3.6 1 7.6.4" fill="none" stroke="${o.jacketLine}" stroke-width="1.4"/>
+  <path d="M70 38Q74.5 40 75.2 47L75.8 57.6Q72.2 59.8 68.4 59L67.4 47Z" fill="${o.jacket}" ${st(2.2)}/>
+  <path d="M75.2 46.5q-3.5 1-7.6.4M75.5 52.5q-3.6 1-7.6.4" fill="none" stroke="${o.jacketLine}" stroke-width="1.4"/>
+  ${panel(jacketL, jl)}${panel(jacketR, jr)}
+  ${o.jacketPattern ? '' : quilt(29.5, 39.5) + quilt(60.5, 70.5)}
+  <path d="M31 40.5q2.5-1.6 5-1.8M64 38.7q2.5.2 5 1.8M26.4 44q.6-2.4 2.2-3.6" fill="none" stroke="${o.jacketHi}" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M37 35Q36 29.5 41 28.5Q50 31 59 28.5Q64 29.5 63 35Q50 38.5 37 35Z" fill="${o.jacket}" ${st(1.8)}/>
+  <path d="M39.5 33.4Q50 36.4 60.5 33.4" fill="none" stroke="${o.jacketLine}" stroke-width="1.2"/>`
+    : `
+  <path d="M39 34.5Q33 35.5 30 40L28.6 46.5Q32 48.2 35.4 47.4L37.8 42Z" fill="${o.shirt}" ${st(2)}/>
+  <path d="M29 46.6L27.8 58.4Q30.2 60 32.6 59.2L34.6 47.6Z" fill="${o.skin}" ${st(1.8)}/>
+  <path d="M61 34.5Q67 35.5 70 40L71.4 46.5Q68 48.2 64.6 47.4L62.2 42Z" fill="${o.shirt}" ${st(2)}/>
+  <path d="M71 46.6L72.4 57.6Q70 59.4 67.4 58.6L65.4 47.6Z" fill="${o.skin}" ${st(1.8)}/>`;
+  const hand = `<circle cx="${o.jacket ? 72.4 : 70.2}" cy="${o.jacket ? 61.5 : 60.8}" r="3.3" fill="${o.skin}" ${st(1.8)}/>
+  <rect x="${o.jacket ? 68.9 : 66.7}" y="${o.jacket ? 57.4 : 56.6}" width="7" height="3.2" rx="1.2" fill="${o.watch}" ${st(1.3)}/><circle cx="${o.jacket ? 72.4 : 70.2}" cy="${o.jacket ? 59 : 58.2}" r=".9" fill="#fff"/>`;
+  const shirtText = o.band
+    ? `<rect x="38.4" y="44" width="23.2" height="7.6" fill="${o.band}"/><path d="M38.4 44h23.2M38.4 51.6h23.2" stroke="${INK}" stroke-width="1"/><text x="50" y="50" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="5.6" fill="${o.textC}">${o.text}</text>`
+    : o.text ? `<text x="50" y="${o.jacket ? 51 : 50}" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="${o.text.length > 4 ? 5.6 : 7}" fill="${o.textC}" stroke="${INK}" stroke-width=".5" paint-order="stroke">${o.text}</text>` : '';
+  const hat = o.hat === 'beanie'
+    ? `<path d="M41.2 16.6Q41 7.4 50 7.2Q59 7.4 58.8 16.6Z" fill="${o.hatC}" ${st(1.8)}/><path d="M43.6 10.4q6.4-3.6 12.8 0" fill="none" stroke="${o.hatAcc}" stroke-width="2.2" stroke-linecap="round"/>
+       <rect x="40.4" y="13.4" width="19.2" height="4.4" rx="2" fill="${o.hatCuff}" ${st(1.6)}/>
+       <path d="M48.4 9.6h3.2v2q0 1.7-1.6 2.5-1.6-.8-1.6-2.5z" fill="${o.crest}" ${st(1)}/>`
+    : o.hat === 'cap'
+      ? `<path d="M41.4 15.8q0-8.4 8.6-8.6 8.6.2 8.6 8.6z" fill="${o.hatC}" ${st(1.8)}/><path d="M49 15.8h11.6q1.8.8 0 2.4H49z" fill="${o.hatCuff}" ${st(1.6)}/><circle cx="50" cy="7.4" r="1" fill="${o.hatAcc}"/><path d="M46 12h8" stroke="${o.hatAcc}" stroke-width="1.6" stroke-linecap="round"/>`
+      : o.hat === 'crown'
+        ? `<path d="M42 14.4l1-7.4 3.4 3.2 3.6-5.4 3.6 5.4 3.4-3.2 1 7.4z" fill="#ffd23f" ${st(1.6)}/><circle cx="50" cy="11.2" r="1.3" fill="#ef4f5a"/>`
+        : o.hat === 'santa'
+          ? `<path d="M41.4 15.4q1-8.6 9.4-8.4 6 .4 8.6 6l2.4 5-3.4-1.2q-1.6-4.6-6.6-4.4-3.4.2-4.2 3z" fill="#e5484d" ${st(1.6)}/><circle cx="61.4" cy="18.6" r="2" fill="#fff" ${st(1.2)}/><rect x="40.4" y="13.2" width="19.2" height="4.2" rx="2" fill="#fff" ${st(1.4)}/>`
+          : `<path d="M41.6 15q.4-6.6 8.4-6.8 8 .2 8.4 6.8" fill="${o.dreads}" ${st(1.6)}/><circle cx="50" cy="6.8" r="3" fill="${o.dreads}" ${st(1.4)}/>`;
+  const shades = o.shades ? `<rect x="43.8" y="16.9" width="5.2" height="3.5" rx="1.4" fill="${o.lens}" stroke="${o.shades}" stroke-width="1.3"/><rect x="51" y="16.9" width="5.2" height="3.5" rx="1.4" fill="${o.lens}" stroke="${o.shades}" stroke-width="1.3"/><path d="M49 18.4h2" stroke="${o.shades}" stroke-width="1.2"/><path d="M44.6 17.8l1.4-.6" stroke="#fff" stroke-width=".8" opacity=".7"/>` : '';
+  return `<ellipse cx="50" cy="96.5" rx="22" ry="2.8" fill="#1b1340" opacity=".18"/>
+  ${rope('M42.4 16Q39 26 37.4 36', 2, o.dreads)}${rope('M45.4 17Q43 28 41.6 37.6', 2, o.dreads)}${rope('M54.6 17Q57 28 58.4 37.6', 2, o.dreads)}${rope('M57.6 16Q61 26 62.6 36', 2, o.dreads)}
+  ${pants}
+  <path d="M35 90.5h13.5q1.5 0 1.5 2.2v2.3H34q-1.8 0-1.6-1.8.3-2.7 2.6-2.7z" fill="${o.shoes}" ${st(1.6)}/><path d="M38 92.4q3 1 6-.4" fill="none" stroke="${o.shoeAcc}" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M51.5 90.5H65q2.3 0 2.6 2.7.2 1.8-1.6 1.8H50v-2.3q0-2.2 1.5-2.2z" fill="${o.shoes}" ${st(1.6)}/><path d="M56 92q3 1.4 6 .4" fill="none" stroke="${o.shoeAcc}" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M39 34.5Q50 31.5 61 34.5L62.5 62L37.5 62Z" fill="${o.shirt}" ${st(2.2)}/>
+  ${shirtText}
+  ${jacket}
+  ${hand}
+  <path d="M46.5 27.5h7v6.5q-3.5 2.2-7 0z" fill="${o.skin}" ${st(1.8)}/>
+  <path d="M44.5 33.6l5.5 4.4 5.5-4.4-1.4-1.6-4.1 2.4-4.1-2.4z" fill="${o.collar}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>
+  ${o.chain ? `${rope('M45 34.6Q50 41.4 55 34.6', 1.2, o.chain)}<circle cx="50" cy="38.4" r="1.7" fill="${o.chain}" ${st(1)}/>` : `<path d="M47 35.4l3 2.4 3-2.4" fill="none" stroke="${o.collarAcc}" stroke-width="1.2"/>`}
+  <ellipse cx="41.4" cy="20.5" rx="1.9" ry="2.6" fill="${o.skin}" ${st(1.6)}/><ellipse cx="58.6" cy="20.5" rx="1.9" ry="2.6" fill="${o.skin}" ${st(1.6)}/>
+  <circle cx="41.2" cy="23.4" r=".9" fill="#fff" ${st(.6)}/><circle cx="58.8" cy="23.4" r=".9" fill="#fff" ${st(.6)}/>
+  <ellipse cx="50" cy="19.6" rx="8.4" ry="9.8" fill="${o.skin}" ${st(2)}/>
+  <ellipse cx="46.2" cy="15.4" rx="2.4" ry="1.4" fill="#fff" opacity=".16" transform="rotate(-20 46.2 15.4)"/>
+  ${o.shades ? '' : `<ellipse cx="46.6" cy="18.6" rx="1.7" ry="1.9" fill="#fff" stroke="${INK}" stroke-width="1"/><ellipse cx="53.4" cy="18.6" rx="1.7" ry="1.9" fill="#fff" stroke="${INK}" stroke-width="1"/><circle cx="46.9" cy="18.9" r=".95" fill="${INK}"/><circle cx="53.7" cy="18.9" r=".95" fill="${INK}"/>
+  <path d="M44.6 15.9q2-1 3.8-.2M51.6 15.7q1.8-.8 3.8.2" fill="none" stroke="#24150e" stroke-width="1.4" stroke-linecap="round"/>`}
+  ${shades}
+  <path d="M50 19.8q-1.2 2.4.8 2.8" fill="none" stroke="${INK}" stroke-width=".9" stroke-linecap="round"/>
+  ${mood === 'sad' ? `<path d="M46.5 25.8q3.5-2.2 7 0" fill="none" stroke="${INK}" stroke-width="1.4" stroke-linecap="round"/>`
+    : `<path d="M45.4 23Q50 28 54.6 23Z" fill="#fff" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round"/><rect x="51" y="23.3" width="1.8" height="1.7" rx=".4" fill="#ffd23f" stroke="${INK}" stroke-width=".5"/>`}
+  ${hat}
+  ${rope('M41.8 16.6Q40.4 21 40.2 26.4', 1.7, o.dreads)}${rope('M58.2 16.6Q59.6 21 59.8 26.4', 1.7, o.dreads)}`;
+}
+
+// ---------- Keiser Zorgon ----------
+const ZORG = {
+  skin: '#b38cff', skinDark: '#8f66e0', cape: '#7a2fb0', capeIn: '#e5484d', robe: '#5b2a8a', trim: '#ffd23f',
+  orb: '#ff5dd6', crown: 'crown', crownC: '#ffd23f', eye: INK, monocle: true, pattern: '',
+};
+function zorgonArt(mood, look) {
+  const o = { ...ZORG, ...look };
+  const capeD = 'M33 36Q20 60 16 94Q50 99 84 94Q80 60 67 36Z';
+  const cid = nid('zc');
+  const pattern = o.pattern === 'stars'
+    ? `<g clip-path="url(#${cid})">${[[24, 70], [30, 84], [76, 72], [70, 86], [22, 88], [78, 58], [26, 56]].map(([x, y], i) => star(x, y, i % 2 ? 2.2 : 3, i % 3 ? '#fff' : '#ffe680', 0.8)).join('')}</g>`
+    : o.pattern === 'flames' ? `<g clip-path="url(#${cid})"><path d="M14 94q2-14 6-20 2 8 5 10 1-10 6-16 2 10 5 12 3-8 7-12 1 10 4 14 4-10 8-12 0 10 4 12 3-8 7-10 1 12 4 16 4-6 7-8 2 10 3 14z" fill="#ff8a3d"/><path d="M18 95q2-8 4-12 2 5 4 6 1-6 4-10 2 6 4 8 3-5 5-8 1 6 3 9 3-6 5-8 1 6 3 8 3-5 5-6 1 7 3 10 3-4 5-5 1 6 2 9z" fill="#ffd23f"/></g>`
+    : o.pattern === 'rainbow' ? `<g clip-path="url(#${cid})">${['#ff4d8d', '#ff9a3d', '#ffe14d', '#5fe07a', '#4dd8ff', '#7a5cff'].map((c, i) => `<path d="M10 ${58 + i * 7}Q50 ${50 + i * 7} 90 ${58 + i * 7}" fill="none" stroke="${c}" stroke-width="7"/>`).join('')}</g>` : '';
+  const crowns = {
+    crown: `<path d="M42.4 11.2L43.4 4.6L46.6 7.4L50 2.8L53.4 7.4L56.6 4.6L57.6 11.2Z" fill="${o.crownC}" ${st(1.4)}/><circle cx="50" cy="8.4" r="1.3" fill="${o.orb}" ${st(.7)}/>`,
+    ice: `<path d="M42.4 11.4l.6-8 2.6 4.4L48 1.4l2 5.4 2-5.4 2.4 6.4 2.6-4.4.6 8z" fill="#bfefff" ${st(1.4)}/><path d="M45 9.4h10" stroke="#fff" stroke-width="1.2"/>`,
+    pirate: `<path d="M36 11.6q14-12 28 0q-14-3.6-28 0z" fill="#2b2d42" ${st(1.4)}/><path d="M39 10.4q11-9.6 22 0" fill="#2b2d42" ${st(1.4)}/><circle cx="50" cy="7.6" r="1.6" fill="#fff"/>`,
+    party: `<path d="M44.6 11.4L50 .8l5.4 10.6z" fill="#ff5d8f" ${st(1.4)}/><path d="M46.6 7.4l6-1.6" stroke="#ffd23f" stroke-width="1.4"/><circle cx="50" cy="1.2" r="1.6" fill="#ffd23f" ${st(.8)}/>`,
+    santa: `<path d="M41.6 11.6q1-8 9-8 6 0 8.4 5.4l2 4.6-3.2-1.2q-1.4-4-5.6-4-4 0-5 3.2z" fill="#e5484d" ${st(1.4)}/><circle cx="61" cy="13.4" r="1.9" fill="#fff" ${st(1.1)}/><rect x="41" y="9.6" width="18" height="3.4" rx="1.7" fill="#fff" ${st(1.2)}/>`,
+    halo: `<ellipse cx="50" cy="3.6" rx="8" ry="2.2" fill="none" stroke="${INK}" stroke-width="2.6"/><ellipse cx="50" cy="3.6" rx="8" ry="2.2" fill="none" stroke="#ffd23f" stroke-width="1.4"/>`,
+    horns: `<path d="M42 11q-4-5-2-10 2 4 5 6zM58 11q4-5 2-10-2 4-5 6z" fill="#ef4f5a" ${st(1.3)}/>`,
+    helmet: `<path d="M38.6 16.6Q38.6 4.6 50 4.6T61.4 16.6z" fill="#cdd6e3" ${st(1.6)}/><path d="M40 13.2h20" stroke="#7c899f" stroke-width="1.6"/><circle cx="50" cy="8.4" r="1.6" fill="#7ffcff" ${st(.8)}/>`,
+  };
+  return `<ellipse cx="50" cy="96.5" rx="27" ry="3" fill="#1b1340" opacity=".18"/>
+  <clipPath id="${cid}"><path d="${capeD}"/></clipPath>
+  <path d="${capeD}" fill="${o.cape}" ${st(2.2)}/>${pattern}
+  <path d="M30 44Q22 66 20 93.6L27 94.6Q28 68 35 46Z" fill="${o.capeIn}" ${st(1.6)}/><path d="M70 44Q78 66 80 93.6L73 94.6Q72 68 65 46Z" fill="${o.capeIn}" ${st(1.6)}/>
+  <path d="M38.5 37L61.5 37L66 93.5Q50 96 34 93.5Z" fill="${o.robe}" ${st(2.2)}/>
+  <path d="M34.6 89.4Q50 92 65.4 89.4" fill="none" stroke="${o.trim}" stroke-width="2.6"/><path d="M50 40v49" stroke="${o.trim}" stroke-width="1.6"/>
+  <rect x="38.4" y="58" width="23.2" height="4.4" rx="1.6" fill="${o.trim}" ${st(1.4)}/><circle cx="50" cy="60.2" r="1.7" fill="${o.orb}" ${st(.8)}/>
+  <path d="M38.5 39Q31 42 28 52L31.6 54.4Q35 47.6 40 45.6Z" fill="${o.robe}" ${st(1.8)}/>
+  <circle cx="28.6" cy="54.6" r="3.2" fill="${o.skin}" ${st(1.6)}/>
+  <path d="M71.5 28v64" stroke="${INK}" stroke-width="3.6" stroke-linecap="round"/><path d="M71.5 28v64" stroke="${o.trim}" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="71.5" cy="25" r="5.4" fill="${o.orb}" opacity=".3" class="pulse"/><circle cx="71.5" cy="25" r="4" fill="${o.orb}" ${st(1.6)}/><circle cx="70.2" cy="23.6" r="1.2" fill="#fff"/>
+  <path d="M61.5 39Q68 42 71 51L67.6 53.6Q65 47.6 60.6 45.4Z" fill="${o.robe}" ${st(1.8)}/>
+  <circle cx="71.2" cy="53.4" r="3.2" fill="${o.skin}" ${st(1.6)}/>
+  <path d="M36 38Q34 28 41 26L44 33Q50 35.5 56 33L59 26Q66 28 64 38Q50 42 36 38Z" fill="${o.trim}" ${st(1.8)}/><circle cx="50" cy="38.6" r="1.8" fill="${o.orb}" ${st(.9)}/>
+  <path d="M46.6 30h6.8v6q-3.4 1.8-6.8 0z" fill="${o.skinDark}" ${st(1.6)}/>
+  <path d="M44.6 9.6Q42 5.6 39 4.6" fill="none" stroke="${INK}" stroke-width="1.5" stroke-linecap="round"/><circle cx="38.6" cy="4.6" r="1.7" fill="${o.skin}" ${st(1)}/>
+  <path d="M55.4 9.6Q58 5.6 61 4.6" fill="none" stroke="${INK}" stroke-width="1.5" stroke-linecap="round"/><circle cx="61.4" cy="4.6" r="1.7" fill="${o.skin}" ${st(1)}/>
+  <path d="M38.4 20.6Q38.4 8 50 8Q61.6 8 61.6 20.6Q61.6 28 56.6 32Q53.4 34.4 50 34.4Q46.6 34.4 43.4 32Q38.4 28 38.4 20.6Z" fill="${o.skin}" ${st(2)}/>
+  <ellipse cx="44" cy="14.6" rx="3.2" ry="1.6" fill="#fff" opacity=".25" transform="rotate(-25 44 14.6)"/>
+  <ellipse cx="45.2" cy="22.4" rx="3.3" ry="4.6" fill="${o.eye}" transform="rotate(-24 45.2 22.4)"/><ellipse cx="54.8" cy="22.4" rx="3.3" ry="4.6" fill="${o.eye}" transform="rotate(24 54.8 22.4)"/>
+  <circle cx="44.4" cy="20.8" r="1" fill="#fff"/><circle cx="54" cy="20.8" r="1" fill="#fff"/>
+  <path d="M41 16.6l6 2.2M59 16.6l-6 2.2" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>
+  ${o.monocle ? `<circle cx="54.8" cy="22.4" r="5.4" fill="none" stroke="${o.trim}" stroke-width="1.4"/><path d="M59.8 24.6q2.6 4 1.4 9" fill="none" stroke="${o.trim}" stroke-width=".9"/>` : ''}
+  ${mood === 'sad' ? `<path d="M46.6 30.4q3.4-2 6.8 0" fill="none" stroke="${INK}" stroke-width="1.4" stroke-linecap="round"/>` : `<path d="M46.4 28.8q3.6 2.4 7.2-.4" fill="none" stroke="${INK}" stroke-width="1.4" stroke-linecap="round"/>`}
+  ${crowns[o.crown] || ''}`;
+}
+
+const buckeyeArt = (mood, hat) => {
   const bubble = hat === 'astro'
     ? `<path d="M50 15V4" ${st(2.6)}/><circle cx="50" cy="4" r="3.4" fill="#ff5d5d" ${st(1.6)} class="blink"/>
        <circle cx="50" cy="57" r="42" fill="#bfe8ff" fill-opacity=".26" ${st(3)}/>
        <path d="M22 44q7-19 27-24" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" opacity=".85"/>
        <path d="M17 82q33 17 66 0" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round"/><path d="M17 82q33 17 66 0" fill="none" stroke="#c4cddb" stroke-width="6" stroke-linecap="round"/>`
     : '';
-  return wrap(`<ellipse cx="50" cy="96" rx="26" ry="3.6" fill="#1b1340" opacity=".16"/>
+  return `<ellipse cx="50" cy="96" rx="26" ry="3.6" fill="#1b1340" opacity=".16"/>
   <circle cx="18" cy="70" r="7" fill="#fff" ${st(2.4)}/>
   <ellipse cx="50" cy="60" rx="33" ry="31" fill="#7b4a2a" ${st()}/>
   <ellipse cx="34" cy="46" rx="8" ry="5" fill="#fff" opacity=".22" transform="rotate(-30 34 46)"/>
   <ellipse cx="51" cy="63" rx="22" ry="20" fill="#e2bd8f" ${st(2.4)}/>
   ${eye(43, 57, 4.4, 0.6, 0.4)}${eye(59, 57, 4.4, 0.6, 0.4)}
   <path d="M36 49q6-4 12-1M54 48q6-3 12 1" fill="none" stroke="#3d2414" stroke-width="3.4" stroke-linecap="round"/>
-  ${mouth}
+  ${mood === 'sad' ? `<path d="M44 74q6-5 12 0" fill="none" ${st(2.4)}/>` : `<path d="M42 71q8 8 16 0" fill="#ff8f8f" ${st(2.4)}/>`}
   <path d="M32 67q9-9 18-2 9-7 18 2-7 4-18 0-11 4-18 0z" fill="#3d2414" ${st(1.6)}/>
   ${HATS[hat] ?? HATS.general}
   <circle cx="82" cy="40" r="7" fill="#fff" ${st(2.4)}/>
   <path d="M40 92l4-6 6 4 6-4 4 6" fill="#ffd23f" ${st(1.8)}/>
-  ${bubble}`, '0 0 100 100', 'mascot');
+  ${bubble}`;
+};
+const GENERALS = { buckeye: true, drip: true, zorgon: true };
+export const GENERAL_IDS = Object.keys(GENERALS);
+// mascot(mood) tegner valgt general med utstyrte skins.
+// opts = { gen, hat, look, fx } brukes til forhåndsvisninger; crop: true viser overkroppen (små ruter)
+export function mascot(mood = 'happy', opts = {}) {
+  if (typeof opts === 'string') opts = { hat: opts };
+  const gen = opts.gen || mascotChar;
+  const preview = !!(opts.look || opts.hat || opts.gen);
+  const inner = gen === 'drip' ? dripArt(mood, opts.look || (preview && opts.gen ? {} : mascotLooks.drip))
+    : gen === 'zorgon' ? zorgonArt(mood, opts.look || (preview && opts.gen ? {} : mascotLooks.zorgon))
+    : buckeyeArt(mood, opts.hat || (preview && opts.gen ? 'general' : mascotHat));
+  const fx = opts.fx ?? (preview ? '' : mascotFx[gen]);
+  const vb = opts.crop && gen === 'drip' ? '23 2 54 54' : opts.crop && gen === 'zorgon' ? '21 0 58 58' : '0 0 100 100';
+  return wrap(inner, vb, `mascot gen-${gen}${fx ? ' fx-' + fx : ''}`);
 }
+// Den valgte generalen med utstyrt skin (brukes i generalvelgeren)
+export const mascotOf = (gen, mood = 'happy', crop = false) => wrap(
+  gen === 'drip' ? dripArt(mood, mascotLooks.drip) : gen === 'zorgon' ? zorgonArt(mood, mascotLooks.zorgon) : buckeyeArt(mood, mascotHat),
+  crop && gen === 'drip' ? '23 2 54 54' : crop && gen === 'zorgon' ? '21 0 58 58' : '0 0 100 100',
+  `mascot gen-${gen}${mascotFx[gen] ? ' fx-' + mascotFx[gen] : ''}`);
+
+// ================= POWERUPS I HOVEDKVARTERET =================
+const PU_ART = {
+  printer: () => `${shadow(50, 93, 30, 4)}
+  <rect x="22" y="82" width="8" height="10" rx="2" fill="#7c899f" ${st(2)}/><rect x="70" y="82" width="8" height="10" rx="2" fill="#7c899f" ${st(2)}/>
+  <rect x="16" y="40" width="68" height="44" rx="7" fill="#a9b4c6" ${st()}/>
+  <rect x="24" y="28" width="52" height="16" rx="4" fill="#cdd6e3" ${st(2.4)}/>
+  <rect x="24" y="50" width="26" height="14" rx="2.4" fill="#7ffcff" ${st(2)}/><path d="M29 57h3M36 57h3M43 57h3" stroke="#2a9a2f" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="64" cy="57" r="5" fill="#ef4f5a" ${st(1.8)}/><circle cx="64" cy="57" r="1.8" fill="#fff"/>
+  <path d="M28 76h44" ${st(3)}/>
+  <g class="pu-bill"><rect x="32" y="72" width="36" height="16" rx="2" fill="#7fd36b" ${st(2)}/><circle cx="50" cy="80" r="4.6" fill="#4fae3c" ${st(1.4)}/><text x="50" y="83" text-anchor="middle" font-size="7" font-weight="900" fill="#fff" font-family="Arial, sans-serif">$</text></g>`,
+  button: () => `${shadow(50, 93, 34, 4)}
+  <path d="M14 76v8q36 17 72 0v-8" fill="#e8a91c" ${st()}/><ellipse cx="50" cy="76" rx="36" ry="12" fill="#ffd23f" ${st()}/>
+  <path d="M27 55v12q23 11 46 0V55" fill="#c43c41" ${st()}/><ellipse cx="50" cy="55" rx="23" ry="9.5" fill="#ef4f5a" ${st()}/>
+  <ellipse cx="42" cy="52" rx="8" ry="3" fill="#fff" opacity=".45"/>
+  <path d="M52 44l-7 12h6l-3 10 9-14h-6z" fill="#ffd23f" ${st(1.6)}/>`,
+  magnet: () => `${shadow(50, 93, 20, 4)}
+  <path d="M46 72h8v20h-8z" fill="#7c899f" ${st(2)}/>
+  <path d="M24 26v26a26 26 0 0 0 52 0V26H58v26a8 8 0 0 1-16 0V26z" fill="#ef4f5a" ${st()}/>
+  <rect x="24" y="18" width="18" height="11" fill="#e3e9f2" ${st(2.4)}/><rect x="58" y="18" width="18" height="11" fill="#e3e9f2" ${st(2.4)}/>
+  <path class="blink" d="M18 10l4 6-5 1 4 7M82 10l-4 6 5 1-4 7M50 4v8" fill="none" stroke="#ffd23f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`,
+  cannon: () => `${shadow(50, 94, 26, 4)}
+  <rect x="28" y="46" width="44" height="46" fill="#c4cddb" ${st()}/>
+  <path d="M28 60h44M28 74h44M40 46v14M58 60v14M44 74v18" stroke="#8a96ab" stroke-width="2"/>
+  <path d="M26 46h48v-9h-8v5h-6v-5h-6v5h-6v-5h-6v5h-6v-5h-6v5h-4z" fill="#d6dde8" ${st(2.4)}/>
+  <path d="M44 33l32-15 4 9-32 15z" fill="#3d3756" ${st(2.4)}/><circle cx="80" cy="22" r="3" fill="#2b2350"/>
+  <circle cx="46" cy="37" r="8" fill="#5b5480" ${st(2.4)}/><circle cx="46" cy="37" r="2.6" fill="#ffd23f"/>
+  <path d="M44 92v-10q6-6 12 0v10z" fill="#5d5486" ${st(2)}/>`,
+  radar: () => `${shadow(50, 94, 22, 4)}
+  <path d="M36 92l14-34 14 34M41 80h18" fill="none" ${st(3)}/>
+  <g class="pu-radar"><ellipse cx="50" cy="44" rx="30" ry="13" fill="#e3e9f2" ${st()} transform="rotate(-22 50 44)"/>
+  <ellipse cx="50" cy="44" rx="20" ry="8" fill="#cdd6e3" transform="rotate(-22 50 44)"/>
+  <path d="M50 44l12-22" ${st(2.4)}/><circle cx="62" cy="21" r="3.6" fill="#ef4f5a" ${st(1.6)} class="blink"/></g>
+  <path class="pu-wave" d="M74 14q8 8 2 18M80 8q12 12 3 28" fill="none" stroke="#7ffcff" stroke-width="3" stroke-linecap="round"/>`,
+  shield: () => `${shadow(50, 94, 20, 4)}
+  <path d="M36 92l6-36h16l6 36z" fill="#5b6476" ${st()}/><path d="M40 74h20" stroke="#7ffcff" stroke-width="3"/>
+  <circle cx="50" cy="42" r="22" fill="#7ffcff" opacity=".25" class="pulse"/>
+  <circle cx="50" cy="42" r="14" fill="#7ffcff" ${st(2.6)}/><circle cx="45" cy="37" r="4" fill="#fff" opacity=".8"/>
+  <path d="M30 30q-6 12 0 24M70 30q6 12 0 24" fill="none" stroke="#7ffcff" stroke-width="3" stroke-linecap="round" opacity=".7"/>`,
+  hospital: () => `${shadow(50, 93, 36, 4)}
+  <path d="M12 90L50 26l38 64z" fill="#f4f7fb" ${st()}/>
+  <path d="M50 26v64" stroke="#d6dde8" stroke-width="2.4"/><path d="M41 90l9-24 9 24z" fill="#5d5486" ${st(2.2)}/>
+  <path d="M50 60q-10-6-10-13 0-5 5-5 3 0 5 3 2-3 5-3 5 0 5 5 0 7-10 13z" fill="#ef4f5a" ${st(2)}/>
+  <path d="M50 26V12" ${st(2.4)}/><path d="M50 12h10l-3 3 3 3H50z" fill="#4fb843" ${st(1.6)}/>`,
+  drill: () => `${shadow(50, 94, 26, 4)}
+  <path d="M30 92L46 30h8l16 62M36 70h28M40 52h20" fill="none" ${st(3)}/>
+  <rect x="44" y="60" width="12" height="20" rx="2" fill="#ffd23f" ${st(2.2)}/>
+  <path class="pu-drillbit" d="M47 80h6l-3 12z" fill="#a9b4c6" ${st(1.8)}/>
+  <g transform="translate(50 18)"><path d="M-12 -6h24l7 8-19 20-19-20z" fill="#56e0ff" ${st(2.2)}/><path d="M-19 2h38M-6 2l6-8 6 8-6 18z" fill="none" stroke="${INK}" stroke-width="1.6"/></g>`,
+  rocket: () => `${shadow(50, 94, 32, 4)}
+  <rect x="16" y="70" width="68" height="14" rx="4" fill="#5d6b3a" ${st()}/><circle cx="30" cy="86" r="6" fill="#3d3756" ${st(2.2)}/><circle cx="70" cy="86" r="6" fill="#3d3756" ${st(2.2)}/>
+  <path d="M30 70l30-28 8 9-28 26z" fill="#7c899f" ${st(2.4)}/>
+  ${[0, 1, 2].map((i) => `<g transform="translate(${36 + i * 9} ${58 - i * 9}) rotate(-43)"><rect x="-4" y="-2" width="24" height="8" rx="4" fill="#eef2f7" ${st(1.8)}/><path d="M20 -2q8 6 0 8z" fill="#ef4f5a" ${st(1.6)}/></g>`).join('')}`,
+  satellite: () => `<g class="pu-float">
+  <rect x="8" y="38" width="30" height="16" fill="#3559d6" ${st(2.4)}/><path d="M18 38v16M28 38v16M8 46h30" stroke="#8fb0ff" stroke-width="1.6"/>
+  <rect x="62" y="38" width="30" height="16" fill="#3559d6" ${st(2.4)}/><path d="M72 38v16M82 38v16M62 46h30" stroke="#8fb0ff" stroke-width="1.6"/>
+  <path d="M38 46h24" ${st(3)}/>
+  <rect x="40" y="34" width="20" height="26" rx="4" fill="#e3e9f2" ${st()}/><circle cx="50" cy="44" r="4" fill="#7ffcff" ${st(1.6)} class="blink"/>
+  <path d="M44 34q2-14 16-14" fill="none" ${st(2.4)}/><circle cx="60" cy="20" r="3" fill="#ef4f5a" ${st(1.4)}/>
+  <path class="pu-wave" d="M50 64q-6 6 0 12M50 64q6 6 0 12M42 70q8 12 16 0" fill="none" stroke="#7ffcff" stroke-width="2.4" stroke-linecap="round"/></g>`,
+  pedestal: () => `${shadow(50, 95, 30, 4)}<path d="M24 80h52l-4 14H28z" fill="#e8a91c" ${st()}/><rect x="20" y="74" width="60" height="8" rx="2" fill="#ffd23f" ${st(2.4)}/>`,
+  ufo: () => `<path d="M38 60L24 96h52L62 60z" fill="#b5fffd" opacity=".45" class="pulse"/><g class="pu-float">${ENEMIES.ufo('#ffd23f')}</g>`,
+};
+export const missileArt = () => wrap(`<path d="M8 50h56l18 0q-6-10-18-10H20z" fill="none"/><path d="M14 44h52q14 0 22 6-8 6-22 6H14z" fill="#eef2f7" ${st(2.6)}/><path d="M66 44q14 0 22 6-8 6-22 6z" fill="#ef4f5a" ${st(2.4)}/><path d="M18 44l-8-8h10l8 8M18 56l-8 8h10l8-8" fill="#7c899f" ${st(2.2)}/><path class="flame" d="M14 46q-12 4 0 8" fill="#ffd23f" ${st(1.8)}/>`, '0 0 100 100', 'missile');
+export const powerupArt = (id) => wrap(PU_ART[id] ? PU_ART[id]() : '', '0 0 100 100', 'pu-art pu-' + id);
 
 // ================= LOOTKASSER =================
 export function crateArt(kind = 'wood') {
@@ -760,6 +997,12 @@ const ICONS = {
   minus: `<path d="M4.5 12h15" stroke="${INK}" stroke-width="3.6" stroke-linecap="round"/>`,
   vibrate: `<rect x="8" y="3" width="8" height="18" rx="2" fill="#c4cddb" ${st(1.8)}/><path d="M4 8v8M20 8v8M2 10v4M22 10v4" ${st(1.6)}/>`,
   download: `<path d="M12 3v11M7.5 10l4.5 4.5 4.5-4.5" fill="none" ${st(2.4)}/><path d="M4 16v4h16v-4" fill="none" ${st(2.2)}/>`,
+  cls_inf: `<path d="M3.5 15q0-10 8.5-10t8.5 10z" fill="#4fb843" ${st(2)}/><path d="M2 15h20" ${st(2.6)}/><path d="M8 9q2-2 4-2" fill="none" stroke="#a3e394" stroke-width="1.8" stroke-linecap="round"/><path d="M7 15v3q5 4 10 0v-3" fill="none" ${st(1.8)}/>`,
+  cls_veh: `<rect x="2.5" y="13" width="19" height="7" rx="3.5" fill="#7c899f" ${st(1.8)}/><path d="M6 13v-3.5h9V13" fill="#4fb843" ${st(1.8)}/><path d="M15 10.5h7" ${st(2.2)}/><circle cx="7" cy="16.5" r="1.4" fill="#fff"/><circle cx="12" cy="16.5" r="1.4" fill="#fff"/><circle cx="17" cy="16.5" r="1.4" fill="#fff"/>`,
+  cls_air: `<path d="M12 2.5q1.6 0 1.6 3.5v3.4l7.4 4.3v2.2l-7.4-2.2v4l2.6 1.8V21l-4.2-1.1L7.8 21v-1.5l2.6-1.8v-4L3 15.9v-2.2l7.4-4.3V6q0-3.5 1.6-3.5z" fill="#8fd3ff" ${st(1.6)}/>`,
+  cls_sea: `<path d="M2.5 14.5h19l-3.2 5.5H5.7z" fill="#3559d6" ${st(1.8)}/><path d="M7 14.5V10h9v4.5" fill="#e3e9f2" ${st(1.8)}/><path d="M11.5 10V5.5" ${st(1.8)}/><path d="M11.5 5.5h4l-1.2 1.4 1.2 1.4h-4" fill="#ef4f5a" ${st(1.2)}/>`,
+  boom: `<path d="M12 1.5l2.2 5.4 5.6-2.4-2.4 5.6 5.4 2.2-5.4 2.2 2.4 5.6-5.6-2.4L12 22.5l-2.2-5.4-5.6 2.4 2.4-5.6L1.2 11.8l5.4-2.2-2.4-5.6 5.6 2.4z" fill="#ff8a3d" ${st(1.6)}/><circle cx="12" cy="12" r="4" fill="#ffd23f" ${st(1.4)}/>`,
+  target: `<circle cx="12" cy="12" r="9.5" fill="#fff" ${st(2)}/><circle cx="12" cy="12" r="6" fill="#ef4f5a" ${st(1.6)}/><circle cx="12" cy="12" r="2.4" fill="#fff" ${st(1.2)}/>`,
   gem: `<path d="M7 3.5h10l4.5 5.5L12 21 2.5 9z" fill="#56e0ff" ${st(1.8)}/><path d="M2.5 9h19M9.5 9L12 3.8 14.5 9 12 21 9.5 9" fill="none" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.4 8l1.8-2.6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>`,
   shop: `<path d="M3 9l2-5h14l2 5z" fill="#ff5d8f" ${st(1.8)}/><path d="M3 9q1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0 1.5 2.6 3 0" fill="#fff" ${st(1.4)}/><rect x="4.5" y="11.4" width="15" height="9.6" rx="1.4" fill="#fff4d6" ${st(1.8)}/><rect x="10" y="14" width="4.6" height="7" fill="#8fd3ff" ${st(1.3)}/>`,
   tree: `<path d="M12 22v-7" stroke="${INK}" stroke-width="5.4" stroke-linecap="round"/><path d="M12 22v-7" stroke="#9b6334" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="9.5" r="7.6" fill="#5fc94a" ${st(1.8)}/><circle cx="9" cy="8" r="1.7" fill="#ffd23f" ${st(1)}/><circle cx="14.6" cy="11.4" r="1.7" fill="#ff5d5d" ${st(1)}/>`,

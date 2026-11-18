@@ -89,10 +89,44 @@ export const ERAS = [
   },
 ];
 
+// ---------- STRATEGI: enhetsklasser, terreng og taktikk ----------
+// Hver enhet hører til en klasse. Hvert område har et terreng som gir bonus til noen klasser,
+// så det lønner seg å bygge en hær som passer til målene. Bonusene er bare positive.
+export const CLASSES = {
+  inf: { name: { nb: 'Infanteri', en: 'Infantry' } },
+  veh: { name: { nb: 'Kjøretøy', en: 'Vehicles' } },
+  air: { name: { nb: 'Fly', en: 'Air' } },
+  sea: { name: { nb: 'Skip', en: 'Navy' } },
+};
+const UNIT_CLASS = {'militia': 'inf', 'hunter': 'inf', 'truck': 'veh', 'soldier': 'inf', 'tank': 'veh', 'heli': 'air', 'jet': 'air', 'ship': 'sea', 'drone': 'air', 'carrier': 'sea', 'mech': 'veh', 'rocket': 'air', 'spacemarine': 'inf', 'spacefighter': 'air', 'laser': 'veh', 'megamech': 'veh', 'ohiostar': 'air'};
+export const TERRAINS = {
+  city: { color: '#c9b8ff', name: { nb: 'By', en: 'City' }, bonus: { inf: 0.5 } },
+  plains: { color: '#c5e86c', name: { nb: 'Slette', en: 'Plains' }, bonus: { veh: 0.5 } },
+  forest: { color: '#7fd36b', name: { nb: 'Skog', en: 'Forest' }, bonus: { inf: 0.5, air: 0.25 } },
+  swamp: { color: '#9ccf8a', name: { nb: 'Sump', en: 'Swamp' }, bonus: { inf: 0.5, air: 0.25 } },
+  mountain: { color: '#c4cddb', name: { nb: 'Fjell', en: 'Mountains' }, bonus: { air: 0.5, inf: 0.25 } },
+  coast: { color: '#8fd3ff', name: { nb: 'Kyst', en: 'Coast' }, bonus: { sea: 0.5, air: 0.25 } },
+  islands: { color: '#6cc4ff', name: { nb: 'Øyer', en: 'Islands' }, bonus: { sea: 0.5, air: 0.5 } },
+  desert: { color: '#ffd98a', name: { nb: 'Ørken', en: 'Desert' }, bonus: { veh: 0.5, air: 0.25 } },
+  jungle: { color: '#5fc94a', name: { nb: 'Jungel', en: 'Jungle' }, bonus: { inf: 0.5, air: 0.25 } },
+  ice: { color: '#e6f6ff', name: { nb: 'Is og snø', en: 'Ice & Snow' }, bonus: { veh: 0.5, sea: 0.25 } },
+  crater: { color: '#d6d0e6', name: { nb: 'Krater', en: 'Craters' }, bonus: { veh: 0.5, inf: 0.25 } },
+  gas: { color: '#ffc28a', name: { nb: 'Gasskjempe', en: 'Gas Giant' }, bonus: { air: 0.5 } },
+  space: { color: '#b39dff', name: { nb: 'Verdensrommet', en: 'Deep Space' }, bonus: { air: 0.5 } },
+};
+const REGION_TERRAIN = {'lima': 'plains', 'dayton': 'city', 'toledo': 'plains', 'athens': 'forest', 'cincinnati': 'city', 'akron': 'plains', 'cleveland': 'city', 'columbus': 'city', 'midwest': 'plains', 'south': 'forest', 'florida': 'swamp', 'northeast': 'city', 'plains': 'plains', 'texas': 'desert', 'desert': 'desert', 'westcoast': 'mountain', 'alaska': 'ice', 'capital': 'city', 'caribbean': 'islands', 'central': 'jungle', 'mexico': 'desert', 'canada_e': 'coast', 'canada_w': 'mountain', 'canada_n': 'ice', 'greenland': 'ice', 'colombia': 'jungle', 'venezuela': 'coast', 'peru': 'mountain', 'bolivia': 'plains', 'chile': 'coast', 'argentina': 'plains', 'amazonas': 'jungle', 'brasil': 'coast', 'norden': 'mountain', 'westeu': 'city', 'easteu': 'plains', 'nafrica': 'desert', 'savanna': 'plains', 'mideast': 'desert', 'steppes': 'plains', 'russia': 'ice', 'southasia': 'jungle', 'eastasia': 'city', 'oceania': 'islands', 'antarctica': 'ice', 'moon': 'crater', 'mars': 'desert', 'venus': 'gas', 'mercury': 'crater', 'jupiter': 'gas', 'saturn': 'space', 'neptune': 'ice', 'pluto': 'space', 'zorg': 'city', 'krystallia': 'crater', 'godteri': 'plains', 'magmus': 'crater', 'blobbus': 'swamp', 'robotron': 'city', 'mothership': 'space'};
+// Taktikk velges før angrep: mer styrke koster flere soldater, og omvendt
+export const TACTICS = {
+  blitz: { power: 1.25, loss: 1.6, weaken: 1, name: { nb: 'Lynangrep', en: 'Blitz' }, desc: { nb: '+25 % styrke, men flere tap', en: '+25% power, but more losses' } },
+  normal: { power: 1, loss: 1, weaken: 1, name: { nb: 'Angrep', en: 'Attack' }, desc: { nb: 'Vanlig angrep', en: 'A regular attack' } },
+  siege: { power: 0.85, loss: 0.45, weaken: 1.6, name: { nb: 'Beleiring', en: 'Siege' }, desc: { nb: '−15 % styrke, færre tap, og svekker fienden mer hvis du taper', en: '−15% power, fewer losses, and weakens the enemy more if you lose' } },
+};
+export const TACTIC_IDS = Object.keys(TACTICS);
+
 // ---------- REGIONER ----------
 // enemy: 'army' = fiendtlige versjoner av epokens enheter, ellers spesialfiender.
 // color: farge på kartet før erobring. pos/planet: kun for romkart.
-const R = (id, era, nb, en, fnb, fen, color, enemy = 'army', extra = {}) => ({ id, era, name: { nb, en }, flavor: { nb: fnb, en: fen }, color, enemy, ...extra });
+const R = (id, era, nb, en, fnb, fen, color, enemy = 'army', extra = {}) => ({ id, era, name: { nb, en }, flavor: { nb: fnb, en: fen }, color, enemy, terrain: REGION_TERRAIN[id] || 'plains', ...extra });
 
 export const REGIONS = [
   // Ohio
@@ -191,7 +225,7 @@ export const BUILDINGS = [
 ];
 
 // ---------- ENHETER (hær) ----------
-const U = (id, era, cost, power, nb, en, dnb, den) => ({ id, era, cost, power, name: { nb, en }, desc: { nb: dnb, en: den } });
+const U = (id, era, cost, power, nb, en, dnb, den) => ({ id, era, cost, power, cls: UNIT_CLASS[id] || 'inf', name: { nb, en }, desc: { nb: dnb, en: den } });
 export const UNITS = [
   U('militia', 0, 12, 1, 'Milits', 'Militia', 'Bønder med høygafler. Modige, men litt rotete.', 'Farmers with pitchforks. Brave, but a bit messy.'),
   U('hunter', 0, 140, 13, 'Jeger', 'Hunter', 'Treffer et ekorn på hundre meter.', 'Can hit a squirrel at a hundred metres.'),

@@ -13,10 +13,14 @@ tegneseriestil, og lydene lages direkte i nettleseren – det er ingen bilde- el
 1. **Trykk på hovedkvarteret** (låven) for å tjene penger.
 2. **Bygg** økonomi: maisåkre, kufjøs, fabrikker, banker … De tjener penger hele tiden, også når du er borte
    (opptil 8 timer).
-3. **Hær**: rekrutter enheter. Hver enhetstype gir hærstyrke.
-4. **Kart**: velg et område og trykk **Angrip!** Vinnersjansen vises i prosent. Med 1,5 ganger så stor hær som
-   forsvaret er seieren sikker, og du mister færre soldater. Taper du, blir fienden svekket til neste gang.
-5. Hvert område du erobrer gir mer inntekt. Ta alle områdene i et kapittel for å låse opp neste kapittel med
+3. **Hær**: rekrutter enheter. Hver enhetstype gir hærstyrke og hører til en klasse: infanteri, kjøretøy, fly eller
+   skip.
+4. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent. Med 1,5 ganger så stor
+   hær som forsvaret er seieren sikker, og du mister færre soldater. Taper du, blir fienden svekket til neste gang.
+5. **Kampen** varer i omtrent 8 sekunder. Trykk på fiendene som dukker opp med røde sikter, og bruk artilleriet når
+   det er klart. Uten å gjøre noe blir sjansen som vist; med god innsats kan du vinne kamper du ellers ville tapt, og du
+   mister færre soldater. **Hopp over** avgjør kampen med en gang.
+6. Hvert område du erobrer gir mer inntekt. Ta alle områdene i et kapittel for å låse opp neste kapittel med
    nye bygninger og enheter.
 
 Tips:
@@ -27,7 +31,18 @@ Tips:
 - **Zoom mellom kapitlene** på kartet: trykk **−** (eller knip fingrene sammen) for å zoome ut og se kapitlene som
   venter, med områdene du ikke har erobret ennå. Trykk **+** (eller knip helt inn på hjemområdet ditt) for å zoome inn
   til kapitlene du allerede har erobret. Prikkene mellom knappene viser alle kapitlene – trykk på en for å hoppe dit.
-- **General Buckeye** (Ohio-nøtta med generalhatt) viser deg hva du skal gjøre i starten.
+- **Tre generaler** å velge mellom, ved start eller i Butikk → Mine ting: **General Drip** (dunjakke, USA-genser og
+  gullklokke), **General Buckeye** (Ohio-nøtta med generalhatt) og **Keiser Zorgon** (romkeiseren som byttet side).
+  Generalen står ved hovedkvarteret, viser deg hva du skal gjøre i starten og har sine egne skins.
+- **Strategi**: hvert område har et terreng (by, slette, fjell, kyst, øyer, ørken, jungel, is …) som gir bonus til
+  noen enhetsklasser – for eksempel får fly +50 % i fjellet og skip +50 % på øyer. Bygg hæren etter målene dine.
+  **Taktikk** velges før angrep: Lynangrep (+25 % styrke, flere tap), Angrep, eller Beleiring (−15 % styrke, færre tap,
+  og fienden svekkes mer hvis du taper).
+- **Powerups i hovedkvarteret** (på Base): kjøp en tilfeldig powerup for penger (koster tre minutter med inntekt) eller
+  en superboks for 40 edelstener (minst Sjelden). Sett den inn i en av tre plasser i hovedkvarteret, så står den der
+  og virker i 10 minutter (UFO-en i 15): pengetrykkeri, turboknapp, kassemagnet, kanontårn, radar, skjoldgenerator,
+  feltsykehus, diamantbor, rakettutskyter (luftangrep i kampene), spionsatellitt, gullstatue av generalen din og en
+  fanget UFO. Like effekter stables ikke – den sterkeste teller.
 - **Reisen** (Kart → Reisen, eller «Se hele reisen» på Base) viser hele spillet som et tre: alle 7 kapitler og
   60 områder, og hvor du er nå.
 - **Topp** (egen fane) er leaderboardet: konkurrer mot venner og alle andre, legg til venner med vennekode og logg
@@ -35,10 +50,11 @@ Tips:
 
 ## Butikk, skins, lootkasser og reklame
 
-- **Skins** i fire kategorier: hær (31 fargedrakter på alle enhetene), flagg (26 – spillerflagget, fargen på erobret
-  land på kartet og flagget ditt på leaderboardet), hovedkvarter (19) og hatter til General Buckeye (21, blant annet
-  vikinghjelm, russelue og glorie). 97 skins fordelt på Vanlig, Sjelden, Episk, Legendarisk og Mytisk, pluss fire
-  Prestisje-skins. Skins er bare utseende – de gir ingen fordel i kamp.
+- **Skins**: hær (43 fargedrakter på alle enhetene), flagg (32 – spillerflagget, fargen på erobret land på kartet og
+  flagget ditt på leaderboardet), hovedkvarter (23), og egne skins til hver general: hatter til Buckeye (25), antrekk
+  til Drip (17, blant annet Italia-drip, Gull-drip og Is-drip) og kapper og kroner til Zorgon (15). 155 skins fordelt
+  på Vanlig, Sjelden, Episk, Legendarisk og Mytisk, pluss seks Prestisje-skins. Skins er bare utseende – de gir ingen
+  fordel i kamp.
 - **Mine ting** (Butikk → Mine ting) viser kassene og skinsene du eier. Kjøpte kasser havner her, så du kan åpne dem
   med en gang eller spare dem til senere. Du får også en gullkasse hver gang du fullfører et kapittel.
 - **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
@@ -124,8 +140,9 @@ Når universet er erobret kan du ta **prestisje**: du starter på nytt som en li
 - +300 edelstener og en kosmisk kasse
 - du beholder skins, kasser, edelstener, venner og reklamefri, mens bygninger, hær, trykk-kraft og erobrede områder
   starter på nytt
-- eksklusive prestisje-skins som ikke finnes i kasser: Prestisjeflagg (★1), Prestisjekrone (★2), Stjernepalasset (★3) og
-  Stjernehæren (★5)
+- eksklusive prestisje-skins som ikke finnes i kasser: Prestisjeflagg (★1), et prestisje-skin til hver general (★2),
+  Stjernepalasset (★3) og Stjernehæren (★5)
+- powerups på lager og i hovedkvarteret, og generalen du har valgt, blir med videre
 
 Stjernen vises ved bygd-skiltet, på profilen og på leaderboardet.
 
@@ -194,11 +211,12 @@ HTML-fil på rundt 275 KB.
 src/
   js/main.js      grensesnitt, spill-løkke, lagring
   js/engine.js    spillmotor (ren logikk, ingen DOM) – økonomi, kamp, lagring/gjenoppretting
-  js/data.js      kapitler, regioner, bygninger og enheter (tekst på norsk og engelsk)
+  js/data.js      kapitler, regioner, terreng, taktikk, bygninger og enheter (tekst på norsk og engelsk)
   js/balance.js   priser, inntekt, styrke og forsvar (generert av simulatoren)
-  js/art.js       all grafikk som SVG: enheter, bygninger, hovedkvarter, maskot, planeter, ikoner
+  js/art.js       all grafikk som SVG: enheter, bygninger, hovedkvarter, generaler, powerups, planeter, ikoner
   js/mapdata.js   forenklede kart (generert fra kartdata)
-  js/cosmetics.js skins, sjeldenhet og lootkasser (sjanser og garanti)
+  js/cosmetics.js generaler, skins, sjeldenhet og lootkasser (sjanser og garanti)
+  js/powerups.js  powerups i hovedkvarteret (sjanser, plasser og effekter)
   js/monetize.js  reklame (demo, AdSense, CrazyGames, Poki) og kjøp
   js/social*.js   leaderboard, venner og innlogging (demo og Firebase)
   js/i18n.js      tekster og tallformatering

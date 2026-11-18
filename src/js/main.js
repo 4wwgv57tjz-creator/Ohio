@@ -1,6 +1,7 @@
 // Take over the world Ohio – brukergrensesnitt, spill-løkke og lagring.
 import * as E from './engine.js';
-import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, regionsOfEra, SPACE_HOMES } from './data.js';
+import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, regionsOfEra, SPACE_HOMES, TERRAINS, CLASSES, TACTICS, TACTIC_IDS } from './data.js';
+import * as PU from './powerups.js';
 import * as C from './cosmetics.js';
 import * as M from './monetize.js';
 import { initSocial, social, onSocialChange, LOGIN_PROVIDERS } from './social.js';
@@ -28,6 +29,7 @@ let lastBattle = null;
 let topView = 'friends';
 let showAllSkins = false;
 let boardCache = { kind: '', rows: null, at: 0 };
+let introGeneral = C.DEFAULT_GENERAL;
 const AD_GEMS = 30;
 const AD_GEMS_PER_DAY = 8;
 const FREE_CRATE_COOLDOWN = 30 * 60 * 1000;
@@ -92,7 +94,7 @@ function buildShell() {
     <div id="crates"></div>
   </main>
   <nav class="tabbar">
-    <div class="coach" id="coach" hidden>${A.mascot()}<div class="coach-bubble" id="coach-text"></div></div>
+    <div class="coach" id="coach" hidden>${A.mascot('happy', { crop: true })}<div class="coach-bubble" id="coach-text"></div></div>
     ${tabs.map(([k, i]) => `<button class="tab ${k === 'base' ? 'active' : ''}" id="tab-${k}" type="button" data-action="tab" data-tab="${k}">${ico(i)}<span class="tab-label"></span><span class="badge" hidden></span></button>`).join('')}
   </nav>
   <div id="toasts"></div>
@@ -115,12 +117,17 @@ function applySkins() {
   const flag = C.equippedSkin(S, 'flag');
   A.setFlagDesign(flag.design);
   A.setHat(C.equippedSkin(S, 'hat').hat);
+  A.setLook('buckeye', null, C.equippedSkin(S, 'hat').fx);
+  for (const g of ['drip', 'zorgon']) { const k = C.equippedSkin(S, g); A.setLook(g, k.look, k.fx); }
+  A.setGeneral(S.general);
   const app = $('#app');
   app.style.setProperty('--own', flag.own);
   app.classList.toggle('own-rainbow', flag.fx === 'rainbow');
   const cm = $('#coach svg.mascot');
-  if (cm) cm.outerHTML = A.mascot();
+  if (cm) cm.outerHTML = A.mascot('happy', { crop: true });
 }
+// Liten general (overkropp) til små ruter
+const miniGeneral = (mood = 'happy') => A.mascot(mood, { crop: true });
 const hqFx = () => C.equippedSkin(S, 'hq').fx || '';
 const pBadge = (n, cls = '') => (n > 0 ? `<span class="pstar ${cls}" title="${t('prestige_level', { n })}">★${n > 1 ? n : ''}</span>` : '');
 const rowFlag = (id) => A.flagSvg('row-flag', (C.SKIN_BY_ID[id] && C.SKIN_BY_ID[id].design) || 'ohio');
@@ -128,7 +135,8 @@ const rarityChip = (r) => `<span class="rarity r-${r}">${esc(L(C.RARITY[r].name)
 function skinPreview(k) {
   if (k.cat === 'army') return A.unitArt('soldier', 'me', k);
   if (k.cat === 'flag') return A.flagSvg('flag-prev', k.design);
-  if (k.cat === 'hat') return A.mascot('happy', k.hat);
+  if (k.cat === 'hat') return A.mascot('happy', { gen: 'buckeye', hat: k.hat, fx: k.fx || '' });
+  if (k.cat === 'drip' || k.cat === 'zorgon') return A.mascot('happy', { gen: k.cat, look: k.look, fx: k.fx || '' });
   return `<span class="hq-prev hq-fx-${k.fx}">${A.hq(ERAS[S.era].hq)}</span>`;
 }
 
@@ -203,6 +211,20 @@ function paradeHTML() {
   return list.map((id, i) => `<div class="marcher" style="animation-delay:${(-i * dur) / slots}s;animation-duration:${dur}s"><div class="m-in" style="animation-delay:${i * 0.13}s">${A.unitArt(id, 'me')}</div></div>`).join('');
 }
 
+// ---------------- STRATEGI ----------------
+function terrainHTML(r) {
+  const T = TERRAINS[r.terrain];
+  if (!T) return '';
+  return `<div class="terrain-row"><span class="terrain-chip" style="--tc:${T.color}">${esc(L(T.name))}</span><span class="terrain-best">${t('strong_here')}</span>${Object.entries(T.bonus).map(([c, b]) => `<span class="cls-chip">${ico('cls_' + c)}${esc(L(CLASSES[c].name))} +${Math.round(b * 100)} %</span>`).join('')}</div>`;
+}
+function tacticHTML(r) {
+  const cur = E.tacticId(S);
+  return `<div class="tactic-pick" role="radiogroup" aria-label="${t('tactic')}">${TACTIC_IDS.map((id) => {
+    const ch = E.chanceFor(S, r, id);
+    return `<button type="button" class="tactic ${cur === id ? 'on' : ''}" role="radio" aria-checked="${cur === id}" data-action="tactic" data-t="${id}"><b>${esc(L(TACTICS[id].name))}</b><span class="tactic-ch ${chanceClass(ch)}">${pct(ch)}</span></button>`;
+  }).join('')}</div><p class="tactic-desc">${esc(L(TACTICS[cur].desc))}</p>`;
+}
+
 function targetCardHTML() {
   if (S.finished) {
     return `<div class="tc-head"><div class="tc-art">${A.logo()}</div><div class="tc-info"><div class="eyebrow">${t('final_title')}</div><h3>${t('universe_yours')}</h3><p class="flavor">${t('final_text')}</p></div></div>
@@ -210,14 +232,16 @@ function targetCardHTML() {
     <div class="tc-actions one"><button class="btn btn-gold" data-action="prestige-ask">${ico('star')} ${t('take_prestige', { n: S.prestige + 1 })}</button></div>`;
   }
   const r = E.nextTarget(S);
-  if (!r) return `<div class="tc-head"><div class="tc-art">${A.mascot()}</div><div class="tc-info"><h3>${esc(L(ERAS[S.era].won))}</h3></div></div>
+  if (!r) return `<div class="tc-head"><div class="tc-art">${miniGeneral()}</div><div class="tc-info"><h3>${esc(L(ERAS[S.era].won))}</h3></div></div>
     <div class="tc-actions"><button class="btn btn-gold" data-action="era-done">${ico('star')} ${t('continue')}</button></div>`;
-  const P = E.armyPower(S), D = E.regionDef(S, r), ch = E.winChance(P, D);
+  const P = E.battlePower(S, r), D = E.battleDef(S, r), ch = E.winChance(P, D);
   const fill = Math.min(100, (P / (D * E.SAFE_RATIO)) * 100);
   return `<div class="tc-head"><div class="tc-art">${enemyArtFor(r)}</div>
     <div class="tc-info"><div class="eyebrow">${t('next_target')}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
     <div class="vs-row"><span class="vs-me">${ico('swords')}<b>${fmt(P)}</b></span><span class="vs-mid">${t('vs')}</span><span class="vs-foe"><b>${fmt(D)}</b>${ico('skull')}</span></div>
     <div class="meter"><div class="meter-fill ${chanceClass(ch)}" style="width:${fill}%"></div><span>${pct(ch)} ${t('win_chance')}</span></div>
+    ${terrainHTML(r)}
+    ${tacticHTML(r)}
     <div class="tc-actions">
       <button class="btn btn-attack" data-action="attack" data-id="${r.id}" ${ch <= 0 ? 'disabled' : ''}>${ico('swords')} ${t('attack')}</button>
       <button class="btn btn-soft" data-action="tab" data-tab="${ch >= 1 ? 'map' : 'army'}">${ch >= 1 ? t('to_map') : t('to_army')}</button>
@@ -251,17 +275,156 @@ function renderBase() {
     ${backdrop(era)}
     <div class="village-sign">${A.flagSvg('sign-flag')}<span>${esc(S.name)}</span>${pBadge(S.prestige, 'small')}</div>
     <button class="hq hq-fx-${hqFx()}" id="hq" type="button" aria-label="${t('tap_hint')}">${A.hq(era.hq)}</button>
+    <div id="stage-extras">${stageExtrasHTML()}</div>
     <div class="tap-hint" id="tap-hint">${t('tap_hint')} <b id="tap-val">+${money(E.tapValue(S))}</b></div>
     <div class="parade" id="parade">${paradeHTML()}</div>
   </div>
   <div class="pad stack">
     <div class="card target-card" id="target-card">${targetCardHTML()}</div>
+    ${S.tut >= 5 ? `<div class="card pu-card" id="pu-card">${puCardHTML()}</div>` : ''}
     ${S.tut >= 5 ? `<div id="boost-wrap">${boostCardHTML()}</div>` : ''}
     <div id="tap-card-wrap">${tapCardHTML()}</div>
   </div>`;
   const hq = $('#hq');
   hq.addEventListener('pointerdown', onTap);
   hq.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(e); } });
+}
+
+// ---------------- POWERUPS I HOVEDKVARTERET ----------------
+const clock = (ms) => { const sec = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+// Gullstatuen er en statue av generalen din
+const puArt = (id) => (id === 'statue' ? `<span class="pu-statue-wrap">${A.powerupArt('pedestal')}<span class="pu-statue">${A.mascot()}</span></span>` : A.powerupArt(id));
+function stageExtrasHTML() {
+  const now = Date.now();
+  const items = PU.SLOTS && S.pu ? S.pu.slots.map((x, i) => (x && x.until > now ? `<div class="pu-on slot-${i}" data-id="${x.id}">${puArt(x.id)}</div>` : '')).join('') : '';
+  return `${PU.isActive(S, 'shield', now) ? '<div class="shield-dome"></div>' : ''}${items}<div class="stage-general">${A.mascot()}</div>`;
+}
+const puSig = () => S.pu.slots.map((x) => (x && x.until > Date.now() ? x.id : '-')).join(',') + '|' + JSON.stringify(S.pu.inv);
+function puCardHTML() {
+  const now = Date.now();
+  const price = PU.boxPrice(E.baseIncome(S));
+  const inv = Object.entries(S.pu.inv).filter(([, n]) => n > 0);
+  return `<div class="pu-head"><div><div class="eyebrow">${t('pu_title')}</div><h3>${t('pu_sub')}</h3></div><button type="button" class="link-btn" data-action="pu-odds">${ico('info')} ${t('see_odds')}</button></div>
+  <div class="pu-slots">${S.pu.slots.map((x, i) => {
+    if (x && x.until > now) {
+      const q = PU.PU_BY_ID[x.id];
+      const left = x.until - now;
+      return `<button type="button" class="pu-slot on r-${q.rarity}" data-action="pu-slot" data-i="${i}"><span class="pu-slot-art">${puArt(q.id)}</span><b>${esc(L(q.name))}</b><span class="pu-time" data-i="${i}">${clock(left)}</span><span class="pu-bar"><span data-i="${i}" style="width:${(left / x.total) * 100}%"></span></span></button>`;
+    }
+    return `<button type="button" class="pu-slot empty" data-action="pu-slot" data-i="${i}"><span class="pu-plus">${ico('plus')}</span><span>${t('pu_empty')}</span></button>`;
+  }).join('')}</div>
+  ${inv.length ? `<div class="pu-inv-title">${t('pu_stock')}</div><div class="pu-inv">${inv.map(([id, n]) => {
+    const q = PU.PU_BY_ID[id];
+    return `<button type="button" class="pu-chip r-${q.rarity}${PU.isActive(S, id, now) ? ' active' : ''}" data-action="pu-install" data-id="${id}"><span class="pu-chip-art">${puArt(id)}</span><b>${esc(L(q.name))}</b><span class="pu-n">×${n}</span></button>`;
+  }).join('')}</div>` : ''}
+  <div class="pu-buy">
+    <button type="button" class="btn btn-gold pu-buy-money ${S.money >= price ? '' : 'cant'}" data-action="pu-buy" data-kind="money"><span>${ico('crate')} ${t('pu_buy')}</span><small id="pu-price">${money(price)}</small></button>
+    <button type="button" class="btn btn-gem ${(S.gems || 0) >= PU.GEM_BOX ? '' : 'cant'}" data-action="pu-buy" data-kind="gems"><span>${t('pu_super')}</span><small>${ico('gem')} ${PU.GEM_BOX}</small></button>
+  </div>`;
+}
+function refreshPu() {
+  if (!S || tab !== 'base') return;
+  const c = $('#pu-card');
+  if (c) c.innerHTML = puCardHTML();
+  const x = $('#stage-extras');
+  if (x) x.innerHTML = stageExtrasHTML();
+  lastSig.pu = puSig();
+}
+function updatePuLive() {
+  const now = Date.now();
+  S.pu.slots.forEach((x, i) => {
+    if (!x) return;
+    const el = $(`.pu-time[data-i="${i}"]`);
+    if (el) el.textContent = clock(x.until - now);
+    const bar = $(`.pu-bar span[data-i="${i}"]`);
+    if (bar) bar.style.width = Math.max(0, (x.until - now) / x.total) * 100 + '%';
+  });
+  const price = PU.boxPrice(E.baseIncome(S));
+  const pe = $('#pu-price');
+  if (pe) { const txt = money(price); if (pe.textContent !== txt) pe.textContent = txt; }
+  $('.pu-buy-money')?.classList.toggle('cant', S.money < price);
+  $('.pu-card .btn-gem')?.classList.toggle('cant', (S.gems || 0) < PU.GEM_BOX);
+}
+function buyPowerupFlow(kind) {
+  unlockAudio();
+  const price = PU.boxPrice(E.baseIncome(S));
+  const q = PU.buyBox(S, kind, price);
+  if (!q) { sfx.nope(); toast(kind === 'gems' ? t('not_enough_gems') : t('pu_need_money')); return; }
+  persist(); updateHUD(); refreshPu(); sfx.crate();
+  const reel = [];
+  for (let i = 0; i < 16; i++) reel.push(PU.POWERUPS[Math.floor(Math.random() * PU.POWERUPS.length)]);
+  reel.push(q);
+  const m = openModal(`<div class="pu-roll-head"><div class="eyebrow">${kind === 'gems' ? t('pu_super') : t('pu_box')}</div><h2 class="h2">${t('pu_rolling')}</h2></div>
+    <div class="pu-reel-wrap"><div class="pu-reel">${reel.map((x) => `<div class="pu-reel-item r-${x.rarity}">${puArt(x.id)}</div>`).join('')}</div><div class="pu-reel-mark"></div></div>
+    <div class="pu-result"></div>`, 'pu-modal');
+  const el = $('.pu-reel', m);
+  const fast = reducedMotion();
+  if (!fast) {
+    requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transform = `translateX(calc(var(--pu-item) * -${reel.length - 1}))`; }));
+    let k = 0;
+    const tick = () => { if (k++ < 9 && m.isConnected) { sfx.click(); setTimeout(tick, 60 + k * 22); } };
+    tick();
+  } else el.style.transform = `translateX(calc(var(--pu-item) * -${reel.length - 1}))`;
+  setTimeout(() => showPuResult(m, q), fast ? 50 : 1650);
+}
+function showPuResult(m, q) {
+  if (!m.isConnected) return;
+  const now = Date.now();
+  const canNow = PU.freeSlot(S, now) >= 0 && !PU.isActive(S, q.id, now);
+  sfx.milestone();
+  m.querySelector('.modal').classList.add('pu-done');
+  $('.pu-roll-head h2', m).textContent = t('pu_got', { p: L(q.name) });
+  $('.pu-result', m).innerHTML = `${rarityChip(q.rarity)}<p class="pu-desc"><b>${esc(L(q.desc))}</b><br>${t('pu_lasts', { m: q.mins })}</p>
+    ${canNow ? `<button type="button" class="btn btn-gold big" data-action="pu-install" data-id="${q.id}">${t('pu_install_now')}</button><button type="button" class="btn btn-soft" data-action="close">${t('pu_keep')}</button>`
+    : `<p class="small">${PU.isActive(S, q.id, now) ? t('pu_already_toast') : t('pu_full_kept')}</p><button type="button" class="btn btn-gold big" data-action="close">OK</button>`}`;
+}
+function puSlotFlow(i) {
+  const now = Date.now();
+  const x = S.pu.slots[i];
+  if (x && x.until > now) {
+    const q = PU.PU_BY_ID[x.id];
+    openModal(`<div class="modal-head"><h2 class="h2">${esc(L(q.name))}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+      <div class="pu-big">${puArt(q.id)}</div>${rarityChip(q.rarity)}
+      <p class="pu-desc"><b>${esc(L(q.desc))}</b><br>${t('pu_left', { t: clock(x.until - now) })}</p>
+      <button type="button" class="btn btn-gold big" data-action="close">OK</button>`, 'pu-modal');
+    return;
+  }
+  const inv = Object.entries(S.pu.inv).filter(([, n]) => n > 0);
+  const price = PU.boxPrice(E.baseIncome(S));
+  openModal(`<div class="modal-head"><h2 class="h2">${t('pu_choose')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    ${inv.length ? `<div class="pu-choose">${inv.map(([id, n]) => {
+      const q = PU.PU_BY_ID[id];
+      const on = PU.isActive(S, id, now);
+      return `<button type="button" class="pu-choice r-${q.rarity}" data-action="pu-install" data-id="${id}" data-slot="${i}" ${on ? 'disabled' : ''}><span class="pu-choice-art">${puArt(id)}</span><span class="pu-choice-txt"><b>${esc(L(q.name))}</b><span>${esc(L(q.desc))} · ${q.mins} min</span><span class="pu-n">×${n}${on ? ' · ' + t('pu_already') : ''}</span></span></button>`;
+    }).join('')}</div>` : `<p class="speech">${t('pu_none')}</p>`}
+    <div class="pu-buy">
+      <button type="button" class="btn btn-gold ${S.money >= price ? '' : 'cant'}" data-action="pu-buy" data-kind="money"><span>${ico('crate')} ${t('pu_buy')}</span><small>${money(price)}</small></button>
+      <button type="button" class="btn btn-gem ${(S.gems || 0) >= PU.GEM_BOX ? '' : 'cant'}" data-action="pu-buy" data-kind="gems"><span>${t('pu_super')}</span><small>${ico('gem')} ${PU.GEM_BOX}</small></button>
+    </div>`, 'pu-modal');
+}
+function installPowerup(id, slot) {
+  const now = Date.now();
+  const q = PU.PU_BY_ID[id];
+  if (!q) return false;
+  if (PU.isActive(S, id, now)) { sfx.nope(); toast(t('pu_already_toast')); return false; }
+  const at = Number.isInteger(slot) && slot >= 0 && (!S.pu.slots[slot] || S.pu.slots[slot].until <= now) ? slot : PU.freeSlot(S, now);
+  if (at < 0) { sfx.nope(); toast(t('pu_full')); return false; }
+  if (!PU.install(S, id, now, at)) { sfx.nope(); return false; }
+  persist();
+  sfx.milestone();
+  toast(t('pu_installed', { p: L(q.name) }), 'boost');
+  refreshPu();
+  updateHUD();
+  const el = $(`#stage-extras .pu-on.slot-${at}`);
+  if (el) el.classList.add('pop');
+  return true;
+}
+function showPuOdds() {
+  openModal(`<div class="modal-head"><h2 class="h2">${t('pu_odds_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <table class="odds-table pu-odds"><thead><tr><th></th><th>${t('pu_box')}</th><th>${t('pu_super')}</th></tr></thead><tbody>
+    ${Object.keys(PU.PU_RARITIES).map((r) => `<tr><td>${rarityChip(r)}</td><td>${PU.BOX_ODDS[r]} %</td><td>${PU.GEM_BOX_ODDS[r]} %</td></tr>`).join('')}</tbody></table>
+    <div class="pu-list">${PU.POWERUPS.map((q) => `<div class="pu-li r-${q.rarity}"><span class="pu-li-art">${puArt(q.id)}</span><span><b>${esc(L(q.name))}</b><span>${esc(L(q.desc))} · ${q.mins} min</span></span></div>`).join('')}</div>
+    <p class="small">${t('pu_stack_note')}</p>`, 'pu-modal');
 }
 
 function onTap(e) {
@@ -292,7 +455,7 @@ function itemCardHTML(kind, it) {
   return `<div class="item-card" data-card="${kind}:${it.id}">
     <div class="item-art">${itemArt(it)}<span class="count">${fmt(n)}</span>${isNew ? `<span class="new-tag">${t('new_badge')}</span>` : ''}</div>
     <div class="item-body">
-      <div class="item-name">${esc(L(it.name))}</div>
+      <div class="item-name">${esc(L(it.name))}${kind === 'u' && it.cls ? `<span class="cls-tag">${ico('cls_' + it.cls)}${esc(L(CLASSES[it.cls].name))}</span>` : ''}</div>
       <div class="item-desc">${esc(L(it.desc))}</div>
       <div class="item-stat">${kind === 'b' ? t('each_income', { v: money(each) }) : t('each_power', { v: fmt(each) })}${n ? ` · <b>${kind === 'b' ? t('total_income', { v: money(total) }) : t('total_power', { v: fmt(total) })}</b>` : ''}</div>
       <div class="ms"><div class="ms-fill" style="width:${msW}%"></div><span>${nxt ? t('milestone', { n, m: nxt }) : t('milestone_done')}</span></div>
@@ -557,22 +720,25 @@ function sheetHTML() {
   }
   if (kind === 'future') {
     return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><div class="eyebrow">${ico('lock')} ${t('region_locked', { n: mapEra + 1 })}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
-    <div class="locked-stats"><span class="vs-foe">${ico('skull')}<b>${fmt(E.regionDef(S, r))}</b></span><span class="reward-row">${t('reward')}: ${ico('coin')} +${inc}/s</span></div>`;
+    <div class="locked-stats"><span class="vs-foe">${ico('skull')}<b>${fmt(E.regionDef(S, r))}</b></span><span class="reward-row">${t('reward')}: ${ico('coin')} +${inc}/s</span></div>
+    ${terrainHTML(r)}`;
   }
-  const P = E.armyPower(S), D = E.regionDef(S, r), ch = E.winChance(P, D);
+  const P = E.battlePower(S, r), D = E.battleDef(S, r), ch = E.winChance(P, D);
   return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
     <div class="vs-row"><span class="vs-me">${ico('swords')}<b>${fmt(P)}</b></span><span class="vs-mid">${t('vs')}</span><span class="vs-foe"><b>${fmt(D)}</b>${ico('skull')}${S.damage[id] ? `<em>${t('weakened')}</em>` : ''}</span></div>
     <div class="meter"><div class="meter-fill ${chanceClass(ch)}" style="width:${ch * 100}%"></div><span>${pct(ch)} ${t('win_chance')} · ${chanceLabel(ch)}</span></div>
+    ${terrainHTML(r)}
+    ${tacticHTML(r)}
     <div class="sheet-foot"><div class="reward-row">${t('reward')}: ${ico('coin')} +${inc}/s</div>
     <button class="btn btn-attack" data-action="attack" data-id="${id}" ${ch <= 0 ? 'disabled' : ''}>${ico('swords')} ${t('attack')}</button></div>`;
 }
 // Hjemområdet på et kart er hele det forrige kapittelet – herfra kan man zoome inn til det
 function homeSheetHTML() {
-  if (mapEra === 0) return `<div class="sheet-top"><div class="sheet-art">${A.mascot()}</div><div class="sheet-info"><div class="eyebrow">${t('home')}</div><h3>${esc(S.name)}</h3></div></div>`;
+  if (mapEra === 0) return `<div class="sheet-top"><div class="sheet-art">${miniGeneral()}</div><div class="sheet-info"><div class="eyebrow">${t('home')}</div><h3>${esc(S.name)}</h3></div></div>`;
   const prev = mapEra - 1, pk = levelKind(prev);
   const status = pk === 'past' ? t('home_done', { n: prev + 1 }) : pk === 'now' ? t('home_now', { n: prev + 1 }) : t('home_locked', { n: prev + 1 });
   const title = esc(L(ERAS[prev].title));
-  return `<div class="sheet-top"><div class="sheet-art">${A.mascot()}</div><div class="sheet-info"><div class="eyebrow">${ico(pk === 'past' ? 'check' : pk === 'now' ? 'flag' : 'lock')} ${status}</div><h3>${title}</h3></div></div>
+  return `<div class="sheet-top"><div class="sheet-art">${miniGeneral()}</div><div class="sheet-info"><div class="eyebrow">${ico(pk === 'past' ? 'check' : pk === 'now' ? 'flag' : 'lock')} ${status}</div><h3>${title}</h3></div></div>
     <button type="button" class="btn btn-soft zoom-into" data-action="lvl-in">${ico('plus')} ${t('zoom_into', { c: title })}</button>`;
 }
 
@@ -882,71 +1048,190 @@ function pickMySprites(n) {
   return out;
 }
 
+// Interaktiv kamp: ca. 8 sekunder der du trykker på fiender som dukker opp og bruker evner.
+// Uten innsats blir utfallet som vinnersjansen; innsats gir ekstra skade (se E.prepareBattle).
+const BATTLE_MS = 8000;
+const PRE_MS = 750;
+const TAP_DMG = 0.035;
+const ARTY_DMG = 0.06;
+const ARTY_CD = 2600;
+const AIR_DMG = 0.3;
 function startBattle(id) {
   const r = REGION_BY_ID[id];
   if (!r || S.conquered[id]) return;
   unlockAudio();
+  const prep = E.prepareBattle(S, id);
+  if (!prep) return;
   const mine = pickMySprites(Math.min(5, Math.max(1, E.armySize(S))));
-  const res = E.attack(S, id);
-  if (!res) return;
-  lastBattle = res;
-  persist();
-  showBattle(r, res, mine);
+  showBattle(r, prep, mine);
 }
 
-function showBattle(r, res, mine) {
+function showBattle(r, prep, mine) {
   modalCount++;
+  updateTutorial();
   const ov = document.createElement('div');
-  ov.className = 'battle' + (ERAS[S.era].space ? ' space' : '');
+  ov.className = 'battle live' + (ERAS[S.era].space ? ' space' : '');
   const foeCount = r.enemy === 'boss' || r.enemy === 'penguin' ? 5 : 4;
   const foes = Array.from({ length: foeCount }, (_, i) => enemyArtFor(r, i));
+  const T = TERRAINS[r.terrain];
   ov.innerHTML = `<div class="battle-inner">
-    <div class="battle-head"><div class="eyebrow">${t('attack')}</div><h2>${esc(L(r.name))}</h2></div>
+    <div class="battle-head"><div class="eyebrow">${esc(L(TACTICS[prep.tactic].name))}${T ? ' · ' + esc(L(T.name)) : ''}</div><h2>${esc(L(r.name))}</h2></div>
     <div class="battle-bars">
-      <div class="bbar me"><div class="bbar-label">${t('you')} · ${fmt(res.P)}</div><div class="bbar-track"><div class="bbar-fill"></div></div></div>
+      <div class="bbar me"><div class="bbar-label">${t('you')} · ${fmt(prep.P)}</div><div class="bbar-track"><div class="bbar-fill"></div></div></div>
       <div class="bvs">${t('vs')}</div>
-      <div class="bbar foe"><div class="bbar-label">${fmt(res.D)}</div><div class="bbar-track"><div class="bbar-fill"></div></div></div>
+      <div class="bbar foe"><div class="bbar-label">${fmt(prep.D)}</div><div class="bbar-track"><div class="bbar-fill"></div></div></div>
     </div>
+    <div class="battle-time"><div class="battle-time-fill"></div></div>
     <div class="battlefield">
       <div class="army me" data-n="${Math.min(mine.length, 4)}">${mine.map((id, i) => `<div class="fighter" style="--i:${i}">${A.unitArt(id, 'me')}</div>`).join('')}</div>
       <div class="army foe" data-n="${Math.min(foes.length, 4)}">${foes.map((svg, i) => `<div class="fighter" style="--i:${i}">${svg}</div>`).join('')}</div>
+      <div class="targets"></div>
       <div class="booms"></div>
+      <div class="battle-call">${t('battle_go')}</div>
     </div>
-    <div class="battle-skip">${t('battle_skip')}</div>
+    <p class="battle-hint">${t('battle_hint')}</p>
+    <div class="ability-bar">
+      <button type="button" class="ability arty" data-ab="arty"><span class="ab-ico">${ico('boom')}</span><b>${t('ab_arty')}</b><span class="ab-cd"></span></button>
+      ${prep.airstrike ? `<button type="button" class="ability air" data-ab="air"><span class="ab-ico">${ico('rocket')}</span><b>${t('ab_air')}</b></button>` : ''}
+      <button type="button" class="ability skip" data-ab="skip"><span class="ab-ico">${ico('ffwd')}</span><b>${t('ab_skip')}</b></button>
+    </div>
   </div>`;
   $('#overlay-root').appendChild(ov);
-  const lossFrac = res.P > 0 ? Math.min(1, (res.P - res.powerAfter) / res.P) : 1;
-  const meEnd = res.win ? Math.max(0.15, 1 - lossFrac - 0.1) : 0.08;
-  const foeEnd = res.win ? 0 : Math.max(0.12, 1 - res.dealt / res.D);
-  requestAnimationFrame(() => {
-    ov.classList.add('go');
-    $('.bbar.me .bbar-fill', ov).style.width = meEnd * 100 + '%';
-    $('.bbar.foe .bbar-fill', ov).style.width = foeEnd * 100 + '%';
-  });
-  const words = ['POW!', 'BOOM!', 'BANG!', 'ZAP!', 'KRASJ!', 'PANG!'];
-  const timers = [];
-  for (let i = 0; i < 9; i++) {
-    timers.push(setTimeout(() => {
-      const b = document.createElement('div');
-      b.className = 'boom';
-      b.style.left = 20 + Math.random() * 60 + '%';
-      b.style.top = 10 + Math.random() * 60 + '%';
-      b.innerHTML = `<svg viewBox="0 0 100 100"><path d="M50 4l9 24 25-12-10 25 24 9-24 10 12 25-25-10-11 23-9-23-25 11 11-25-24-11 24-9-12-25 25 12z" fill="${['#ffd23f', '#ff8a3d', '#ff5d8f', '#7ffcff'][i % 4]}" stroke="#2b2350" stroke-width="4" stroke-linejoin="round"/></svg><span>${words[i % words.length]}</span>`;
-      $('.booms', ov)?.appendChild(b);
-      i % 2 ? sfx.boom() : sfx.pew();
-      if (S.settings.vibrate && i % 3 === 0) buzz(25);
-      setTimeout(() => b.remove(), 700);
-    }, 250 + i * 240));
-  }
-  let shown = false;
-  const finish = () => {
-    if (shown) return;
-    shown = true;
-    timers.forEach(clearTimeout);
-    showBattleResult(ov, r, res);
+  const meFill = $('.bbar.me .bbar-fill', ov), foeFill = $('.bbar.foe .bbar-fill', ov), timeFill = $('.battle-time-fill', ov);
+  const field = $('.battlefield', ov), targets = $('.targets', ov), booms = $('.booms', ov);
+  const artyBtn = $('[data-ab="arty"]', ov), artyCd = $('.ab-cd', artyBtn);
+  const st = { t: -PRE_MS, last: 0, score: 0, done: false, hits: 0, arty: 0, artyReady: 500, air: false, nextSpawn: 150 };
+  const words = getLang() === 'en' ? ['POW!', 'BOOM!', 'BANG!', 'ZAP!', 'CRASH!', 'WHAM!'] : ['POW!', 'BOOM!', 'BANG!', 'ZAP!', 'KRASJ!', 'PANG!'];
+  const colors = ['#ffd23f', '#ff8a3d', '#ff5d8f', '#7ffcff'];
+  let raf = 0;
+  requestAnimationFrame(() => ov.classList.add('go'));
+  const boom = (x, y, word, big = false) => {
+    const b = document.createElement('div');
+    b.className = 'boom' + (big ? ' big' : '');
+    b.style.left = x + '%';
+    b.style.top = y + '%';
+    b.innerHTML = `<svg viewBox="0 0 100 100"><path d="M50 4l9 24 25-12-10 25 24 9-24 10 12 25-25-10-11 23-9-23-25 11 11-25-24-11 24-9-12-25 25 12z" fill="${colors[Math.floor(Math.random() * colors.length)]}" stroke="#2b2350" stroke-width="4" stroke-linejoin="round"/></svg><span>${word}</span>`;
+    booms.appendChild(b);
+    setTimeout(() => b.remove(), 700);
   };
-  timers.push(setTimeout(finish, 2700));
-  ov.addEventListener('click', (e) => { if (!shown && !e.target.closest('button')) finish(); });
+  const dmgText = (x, y, v) => {
+    const d = document.createElement('div');
+    d.className = 'dmg-float';
+    d.style.left = x + '%';
+    d.style.top = y + '%';
+    d.textContent = '-' + Math.round((v / prep.need) * 100) + '%';
+    booms.appendChild(d);
+    setTimeout(() => d.remove(), 800);
+  };
+  const spawnTarget = () => {
+    if (targets.children.length >= 3) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'target';
+    b.setAttribute('aria-label', t('target_label'));
+    const x = 54 + Math.random() * 33, y = 6 + Math.random() * 56;
+    b.style.left = x + '%';
+    b.style.top = y + '%';
+    b.innerHTML = `${enemyArtFor(r, Math.floor(Math.random() * 3))}<span class="target-ring"></span>`;
+    const kill = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (b.dataset.hit || st.done || st.t < 0) return;
+      b.dataset.hit = '1';
+      b.classList.add('hit');
+      st.hits++;
+      st.score += TAP_DMG;
+      boom(x + 4, y + 6, words[st.hits % words.length]);
+      dmgText(x + 2, y, TAP_DMG);
+      st.hits % 2 ? sfx.pew() : sfx.boom();
+      if (S.settings.vibrate) buzz(12);
+      setTimeout(() => b.remove(), 260);
+    };
+    b.addEventListener('pointerdown', kill);
+    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') kill(e); });
+    targets.appendChild(b);
+    setTimeout(() => { if (!b.dataset.hit) { b.classList.add('gone'); setTimeout(() => b.remove(), 250); } }, 1500);
+  };
+  const finish = (skip) => {
+    if (st.done) return;
+    st.done = true;
+    cancelAnimationFrame(raf);
+    let score = st.score;
+    let time = Math.max(0, Math.min(1, st.t / BATTLE_MS));
+    if (skip) { // resten av kampen spilles automatisk
+      const rest = Math.max(0, 1 - time);
+      if (score + rest >= prep.need) { time = Math.min(1, time + Math.max(0, prep.need - score)); score = Math.max(score, prep.need); } else { score += rest; time = 1; }
+    }
+    targets.innerHTML = '';
+    ov.classList.add('ending');
+    const res = E.resolveBattle(S, prep, { score, time });
+    if (!res) { ov.remove(); modalCount = Math.max(0, modalCount - 1); renderTab(); return; }
+    res.hits = st.hits;
+    res.arty = st.arty;
+    lastBattle = res;
+    persist();
+    foeFill.style.width = res.win ? '0%' : Math.max(6, (1 - Math.min(1, score / prep.need)) * 100) + '%';
+    meFill.style.width = res.win ? Math.max(15, (1 - time) * 100) + '%' : '6%';
+    if (res.win) for (let i = 0; i < 4; i++) setTimeout(() => boom(58 + Math.random() * 30, 10 + Math.random() * 50, words[i], true), i * 90);
+    setTimeout(() => showBattleResult(ov, r, res), skip ? 150 : 650);
+  };
+  const step = (now) => {
+    if (st.done || !ov.isConnected) return;
+    const dt = st.last ? Math.min(100, now - st.last) : 16;
+    st.last = now;
+    const prev = st.t;
+    st.t += dt;
+    if (prev < 0 && st.t >= 0) ov.classList.add('fighting');
+    if (st.t >= 0) {
+      st.score += (st.t - Math.max(0, prev)) / BATTLE_MS;
+      if (st.t >= st.nextSpawn) { spawnTarget(); st.nextSpawn = st.t + 480 + Math.random() * 260; }
+      if (Math.random() < 0.04) boom(20 + Math.random() * 60, 15 + Math.random() * 55, words[Math.floor(Math.random() * words.length)]);
+    }
+    foeFill.style.width = Math.max(0, 1 - st.score / prep.need) * 100 + '%';
+    meFill.style.width = Math.max(0.05, 1 - Math.max(0, st.t) / BATTLE_MS) * 100 + '%';
+    timeFill.style.width = Math.max(0, 1 - Math.max(0, st.t) / BATTLE_MS) * 100 + '%';
+    const cd = st.artyReady - st.t;
+    artyBtn.disabled = cd > 0 || st.t < 0;
+    artyBtn.classList.toggle('ready', cd <= 0 && st.t >= 0);
+    artyCd.textContent = cd > 0 && st.t >= 0 ? Math.ceil(cd / 1000) : '';
+    if (st.score >= prep.need) { finish(false); return; }
+    if (st.t >= BATTLE_MS) { finish(false); return; }
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  ov.addEventListener('click', (e) => {
+    const ab = e.target.closest('[data-ab]');
+    if (!ab || st.done) return;
+    if (ab.dataset.ab === 'skip') { sfx.click(); finish(true); return; }
+    if (st.t < 0) return;
+    if (ab.dataset.ab === 'arty' && st.t >= st.artyReady) {
+      st.artyReady = st.t + ARTY_CD;
+      st.arty++;
+      const v = ARTY_DMG * (prep.artillery || 1);
+      st.score += v;
+      for (let i = 0; i < 3; i++) setTimeout(() => boom(60 + Math.random() * 28, 12 + Math.random() * 50, 'BOOM!'), i * 110);
+      dmgText(70, 20, v);
+      sfx.boom();
+      if (S.settings.vibrate) buzz(30);
+    } else if (ab.dataset.ab === 'air' && !st.air) {
+      st.air = true;
+      ab.disabled = true;
+      ab.classList.add('used');
+      const rk = document.createElement('div');
+      rk.className = 'air-strike';
+      rk.innerHTML = [0, 1, 2].map((i) => `<span style="--d:${i * 0.12}s;--y:${14 + i * 17}%">${A.missileArt()}</span>`).join('');
+      field.appendChild(rk);
+      setTimeout(() => rk.remove(), 1100);
+      setTimeout(() => {
+        if (st.done) return;
+        st.score += AIR_DMG;
+        for (let i = 0; i < 5; i++) setTimeout(() => boom(56 + Math.random() * 34, 8 + Math.random() * 56, 'KABOOM!', true), i * 80);
+        dmgText(72, 30, AIR_DMG);
+        sfx.boom();
+        if (S.settings.vibrate) buzz(60);
+      }, 420);
+    }
+  });
 }
 
 function showBattleResult(ov, r, res) {
@@ -954,11 +1239,13 @@ function showBattleResult(ov, r, res) {
   ov.classList.add('done');
   const card = document.createElement('div');
   card.className = 'result-card ' + (res.win ? 'win' : 'lose');
-  card.innerHTML = `<div class="result-mascot">${A.mascot(res.win ? 'happy' : 'sad')}</div>
+  card.innerHTML = `<div class="result-mascot">${miniGeneral(res.win ? 'happy' : 'sad')}</div>
     <h2 class="result-title">${res.win ? t('victory') : t('defeat')}</h2>
     <p>${res.win ? t('victory_text', { r: esc(L(r.name)) }) : t('defeat_text', { r: esc(L(r.name)) })}</p>
     ${res.win ? `<p class="result-reward">${ico('coin')} ${t('new_income', { v: money(r.income * pm()) })}</p><p class="result-reward gems">${ico('gem')} ${t('gems_won', { n: res.gems })}</p>` : ''}
     <p class="result-loss">${res.lostTotal ? t('lost_units', { n: fmt(res.lostTotal) }) : t('lost_none')}</p>
+    ${res.healed ? `<p class="result-heal">${t('healed', { n: fmt(res.healed) })}</p>` : ''}
+    ${res.hits != null ? `<p class="result-stats">${t('battle_stats', { h: res.hits, a: res.arty || 0 })}</p>` : ''}
     ${!res.win ? `<p class="tip">${t('defeat_tip')}</p>` : ''}
     ${!res.win && res.lostTotal && M.adsEnabled() ? `<button class="btn btn-ad big" type="button" data-action="ad-revive">${ico(S.adFree ? 'gift' : 'ad')} ${t('revive', { n: fmt(res.lostTotal) })}</button>` : ''}
     <button class="btn btn-gold big" type="button" data-action="battle-done">${t('continue')}</button>`;
@@ -1022,6 +1309,9 @@ function showIntro() {
       <button type="button" class="chip ${getLang() === 'nb' ? 'on' : ''}" data-action="intro-lang" data-lang="nb">Norsk</button>
       <button type="button" class="chip ${getLang() === 'en' ? 'on' : ''}" data-action="intro-lang" data-lang="en">English</button>
     </div>
+    <div class="field-label">${t('pick_general')}</div>
+    <div class="gen-pick" role="radiogroup" aria-label="${t('pick_general')}">${C.GENERALS.map((g) => `<button type="button" class="gen-card ${g.id === introGeneral ? 'on' : ''}" role="radio" aria-checked="${g.id === introGeneral}" data-action="intro-general" data-id="${g.id}">
+      <span class="gen-art">${A.mascot('happy', { gen: g.id })}</span><b>${esc(L(g.name))}</b></button>`).join('')}</div>
     <label class="field-label" for="village-name">${t('intro_q')}</label>
     <input id="village-name" class="text-input" maxlength="22" autocomplete="off" placeholder="${esc(name)}">
     <button type="button" class="btn btn-gold big" data-action="intro-start">${t('intro_start')}</button>
@@ -1033,6 +1323,7 @@ function startGame() {
   const input = $('#village-name');
   const name = (input && input.value.trim()) || t('intro_placeholder');
   S = E.newState(name.slice(0, 22));
+  S.general = introGeneral;
   S.settings.lang = getLang();
   S.seenIntro = 0;
   persist();
@@ -1086,7 +1377,7 @@ function eraNext(btn) {
 
 function prestigeRewardsHTML(level) {
   const r = E.prestigeRewards(level);
-  const skin = r.skin ? C.SKIN_BY_ID[r.skin] : null;
+  const skins = r.skins.map((id) => C.SKIN_BY_ID[id]).filter(Boolean);
   return `<div class="prestige-box">
     <div class="prestige-head">${pBadge(level, 'big')}<b>${t('prestige_level', { n: level })}</b></div>
     <ul class="prestige-list">
@@ -1094,7 +1385,7 @@ function prestigeRewardsHTML(level) {
       <li>${ico('gem')} ${t('pr_gems', { n: r.gems })}</li>
       <li>${ico('crate')} ${t('pr_crate', { c: esc(L(C.CRATE_BY_ID[r.crate].name)) })}</li>
       <li>${ico('star')} ${t('pr_star')}</li>
-      ${skin ? `<li class="pr-skin"><span class="pr-skin-art">${skinPreview(skin)}</span><span>${t('pr_skin', { s: esc(L(skin.name)) })}</span></li>` : ''}
+      ${skins.map((skin) => `<li class="pr-skin"><span class="pr-skin-art">${skinPreview(skin)}</span><span>${t('pr_skin', { s: esc(L(skin.name)) })}</span></li>`).join('')}
     </ul>
   </div>`;
 }
@@ -1139,11 +1430,11 @@ function doPrestige(btn) {
   M.happytime();
   social()?.submit(true).catch?.(() => {});
   const r = E.prestigeRewards(S.prestige);
-  const skin = r.skin ? C.SKIN_BY_ID[r.skin] : null;
+  const skins = r.skins.map((id) => C.SKIN_BY_ID[id]).filter(Boolean);
   const m = openModal(`<div class="prestige-star-big">★${S.prestige > 1 ? `<small>${S.prestige}</small>` : ''}</div>
     <h2 class="big-title">${t('prestige_done', { n: S.prestige })}</h2>
     <p class="speech">${t('prestige_done_text', { p: Math.round(E.PRESTIGE_BONUS * S.prestige * 100) })}</p>
-    ${skin ? `<div class="loot-card r-prestige small-card"><span class="loot-new">${t('new_skin')}</span><div class="loot-art">${skinPreview(skin)}</div>${rarityChip('prestige')}<h3>${esc(L(skin.name))}</h3></div>` : ''}
+    ${skins.length ? `<div class="prestige-skins">${skins.map((skin) => `<div class="loot-card r-prestige small-card"><span class="loot-new">${t('new_skin')}</span><div class="loot-art">${skinPreview(skin)}</div>${rarityChip('prestige')}<h3>${esc(L(skin.name))}</h3></div>`).join('')}</div>` : ''}
     <p class="result-reward gems center-row">${ico('gem')} +${r.gems} · ${ico('crate')} 1 × ${esc(L(C.CRATE_BY_ID[r.crate].name))}</p>
     <button type="button" class="btn btn-gold big" data-action="close">${t('lets_go')}</button>`, 'celebrate', () => showEraIntro(0));
   confetti(m, 80);
@@ -1273,6 +1564,9 @@ function mineHTML() {
       <button type="button" class="link-btn" data-action="odds" data-id="${c.id}">${ico('info')} ${t('see_odds')}</button></div>
     <button type="button" class="buy-btn" data-action="open-crate" data-id="${c.id}"><span class="lbl">${t('open')}</span><span class="price">×${C.crateCount(S, c.id)}</span></button>
   </div>`).join('')}</div>` : `<div class="empty-card">${A.crateArt('wood')}<p>${t('no_crates')}</p><button type="button" class="btn btn-gold" data-action="shopview" data-view="store">${t('to_store')}</button></div>`}
+  <div class="section-title">${t('your_general')}</div>
+  <div class="gen-pick mine" role="radiogroup" aria-label="${t('your_general')}">${C.GENERALS.map((g) => `<button type="button" class="gen-card ${g.id === S.general ? 'on' : ''}" role="radio" aria-checked="${g.id === S.general}" data-action="pick-general" data-id="${g.id}">
+    <span class="gen-art">${A.mascotOf(g.id)}</span><b>${esc(L(g.name))}</b><span class="gen-desc">${esc(L(g.desc))}</span>${g.id === S.general ? `<span class="gen-on">${ico('check')} ${t('chosen')}</span>` : ''}</button>`).join('')}</div>
   <div class="section-title">${t('my_skins')}</div>
   <div class="progress"><div class="progress-fill" style="width:${(own / total) * 100}%"></div><span>${t('collection', { a: own, b: total })}</span></div>
   <div class="chip-row" role="group">${C.CATEGORIES.map((c) => `<button type="button" class="chip ${c.id === skinCat ? 'on' : ''}" data-action="skincat" data-cat="${c.id}">${esc(L(c.name))} <small>${C.SKINS.filter((k) => k.cat === c.id && S.skins.owned[k.id]).length}</small></button>`).join('')}</div>
@@ -1622,7 +1916,7 @@ function renderTop() {
         <button type="button" class="${topView === 'global' ? 'on' : ''}" data-action="topview" data-view="global">${t('top_global')}</button>
       </div></div>
     <div class="card profile-card">
-      <div class="profile-row"><div class="avatar">${A.mascot()}</div>
+      <div class="profile-row"><div class="avatar">${miniGeneral()}</div>
         <div class="profile-info"><b>${A.flagSvg('row-flag')}${esc(S.name)}${pBadge(S.prestige)}</b><span>${st.signedIn ? t('signed_in_with', { p: providerName(st.provider) }) : t('playing_as_guest')}</span></div>
         ${providerBadge(st.provider)}</div>
       ${st.signedIn ? '' : `<div class="login-buttons">${LOGIN_PROVIDERS.map((p) => `<button type="button" class="btn-login ${p === 'facebook' ? 'fb' : 'apple'}" data-action="login" data-p="${p}">${p === 'facebook' ? fbLogo : appleLogo}<span>${p === 'facebook' ? t('login_facebook') : t('login_apple')}</span></button>`).join('')}
@@ -1659,7 +1953,7 @@ async function loadBoard() {
       <span class="score">${ico('flag')}${fmt(r.score)}</span>
       ${kind === 'friends' && !r.me ? `<button type="button" class="icon-btn small-x" data-action="remove-friend" data-id="${esc(r.id)}" aria-label="${t('remove_friend')}">${ico('close')}</button>` : ''}
     </div>`).join('')}
-    ${kind === 'friends' && onlyMe ? `<div class="empty-card">${A.mascot()}<p>${t('no_friends')}</p></div>` : ''}
+    ${kind === 'friends' && onlyMe ? `<div class="empty-card">${miniGeneral()}<p>${t('no_friends')}</p></div>` : ''}
     <p class="small muted center">${t('score_explain')}</p>`;
 }
 async function doLogin(p) {
@@ -1777,7 +2071,7 @@ function toast(text, kind = '') {
 // ---------------- forsyningskasser ----------------
 function maybeCrate(now) {
   if (now < nextCrate) return;
-  nextCrate = now + 45000 + Math.random() * 50000;
+  nextCrate = now + (45000 + Math.random() * 50000) / PU.puEffect(S, 'crates');
   if (modalCount > 0 || document.hidden || !S || S.tut < 4) return;
   const el = document.createElement('button');
   el.type = 'button';
@@ -1860,6 +2154,7 @@ function updateLive() {
     if (sig !== lastSig.target) { lastSig.target = sig; const c = $('#target-card'); if (c) c.innerHTML = targetCardHTML(); }
     const tb = $('[data-action="buytap"]');
     if (tb && S.tapLevel < E.TAP_MAX) tb.classList.toggle('cant', S.money < E.tapCost(S.tapLevel));
+    updatePuLive();
     const bw = $('#boost-wrap');
     if (bw) { const bs = E.adBoostActive(S) ? Math.ceil((S.adBoostUntil - Date.now()) / 1000) : -1; if (bs !== lastSig.boost) { lastSig.boost = bs; bw.innerHTML = boostCardHTML(); } }
   } else if (tab === 'build' || tab === 'army') {
@@ -1876,7 +2171,13 @@ function frame(now) {
     E.tick(S, dt);
     liveAcc += dt; saveAcc += dt; badgeAcc += dt;
     if (liveAcc >= 0.12) { liveAcc = 0; updateLive(); }
-    if (badgeAcc >= 1) { badgeAcc = 0; updateBadges(); if (S.tut === 2) updateTutorial(); }
+    if (badgeAcc >= 1) {
+      badgeAcc = 0;
+      updateBadges();
+      if (S.tut === 2) updateTutorial();
+      const gone = PU.expirePowerups(S);
+      if (gone.length) { gone.forEach((id) => toast(t('pu_expired', { p: L(PU.PU_BY_ID[id].name) }))); refreshPu(); persist(); }
+    }
     if (saveAcc >= 5) { saveAcc = 0; persist(); social()?.submit().catch?.(() => {}); }
     maybeCrate(Date.now());
   }
@@ -1955,6 +2256,38 @@ function onAction(e) {
       break;
     }
     case 'intro-start': startGame(); break;
+    case 'tactic': {
+      if (!TACTICS[btn.dataset.t]) break;
+      S.settings.tactic = btn.dataset.t;
+      persist();
+      sfx.click();
+      if (tab === 'map') { const sc = $('#scr-map').scrollTop; renderMap(); $('#scr-map').scrollTop = sc; }
+      else { const c = $('#target-card'); if (c) c.innerHTML = targetCardHTML(); lastSig.target = null; }
+      break;
+    }
+    case 'pu-buy': buyPowerupFlow(btn.dataset.kind === 'gems' ? 'gems' : 'money'); break;
+    case 'pu-slot': puSlotFlow(Number(btn.dataset.i)); break;
+    case 'pu-odds': showPuOdds(); break;
+    case 'pu-install': {
+      const ok = installPowerup(btn.dataset.id, btn.dataset.slot != null ? Number(btn.dataset.slot) : undefined);
+      if (ok && btn.closest('.modal')) closeModal(btn);
+      break;
+    }
+    case 'intro-general': {
+      introGeneral = btn.dataset.id;
+      $$('.gen-pick .gen-card').forEach((b) => { const on = b.dataset.id === introGeneral; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+      sfx.click();
+      break;
+    }
+    case 'pick-general': {
+      if (!C.GENERAL_BY_ID[btn.dataset.id]) break;
+      S.general = btn.dataset.id;
+      skinCat = C.GENERAL_BY_ID[S.general].cat;
+      applySkins(); persist(); sfx.buy();
+      toast(t('general_picked', { g: L(C.GENERAL_BY_ID[S.general].name) }));
+      const sc = $('#scr-shop').scrollTop; renderShop(); $('#scr-shop').scrollTop = sc;
+      break;
+    }
     case 'rename': {
       const v = ($('#rename')?.value || '').trim();
       if (v) { S.name = v.slice(0, 22); persist(); toast('✓ ' + S.name); renderTab(); }
@@ -2085,7 +2418,7 @@ function boot(hotData) {
       persist();
       setTimeout(() => toast(t('starter_fix'), 'gold'), 1200);
     }
-    for (const [lvl, id] of Object.entries(C.PRESTIGE_SKINS)) if ((S.prestige || 0) >= Number(lvl) && !S.skins.owned[id]) S.skins.owned[id] = Date.now();
+    for (const [lvl, ids] of Object.entries(C.PRESTIGE_SKINS)) for (const id of ids) if ((S.prestige || 0) >= Number(lvl) && !S.skins.owned[id]) S.skins.owned[id] = Date.now();
     applySkins();
     setSound(S.settings.sound);
     setTab('base');

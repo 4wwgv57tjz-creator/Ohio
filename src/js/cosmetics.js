@@ -15,8 +15,19 @@ export const CATEGORIES = [
   { id: 'army', name: { nb: 'Hær', en: 'Army' } },
   { id: 'flag', name: { nb: 'Flagg', en: 'Flag' } },
   { id: 'hq', name: { nb: 'Hovedkvarter', en: 'HQ' } },
-  { id: 'hat', name: { nb: 'General', en: 'General' } },
+  { id: 'hat', name: { nb: 'Buckeye', en: 'Buckeye' }, gen: 'buckeye' },
+  { id: 'drip', name: { nb: 'Drip', en: 'Drip' }, gen: 'drip' },
+  { id: 'zorgon', name: { nb: 'Zorgon', en: 'Zorgon' }, gen: 'zorgon' },
 ];
+
+// Generalene man kan velge mellom. Hver general har sine egne skins (kategorien cat).
+export const GENERALS = [
+  { id: 'drip', cat: 'drip', name: { nb: 'General Drip', en: 'General Drip' }, desc: { nb: 'Dunjakke, USA-genser og gullklokke. Samler på antrekk.', en: 'Puffer jacket, USA shirt and a gold watch. Collects outfits.' } },
+  { id: 'buckeye', cat: 'hat', name: { nb: 'General Buckeye', en: 'General Buckeye' }, desc: { nb: 'Ohio-nøtta med generalhatt. Samler på hatter.', en: 'The Ohio nut in a general’s cap. Collects hats.' } },
+  { id: 'zorgon', cat: 'zorgon', name: { nb: 'Keiser Zorgon', en: 'Emperor Zorgon' }, desc: { nb: 'Romkeiseren som byttet side. Samler på kapper og kroner.', en: 'The space emperor who switched sides. Collects capes and crowns.' } },
+];
+export const GENERAL_BY_ID = Object.fromEntries(GENERALS.map((g) => [g.id, g]));
+export const DEFAULT_GENERAL = 'drip';
 
 const K = (id, cat, rarity, nb, en, extra = {}) => ({ id, cat, rarity, name: { nb, en }, ...extra });
 const team = (main, dark, light, acc) => ({ main, dark, light, acc });
@@ -111,6 +122,30 @@ export const SKINS = [
   K('hq_ghost', 'hq', 'epic', 'Spøkelseshus', 'Haunted', { fx: 'ghost' }),
   K('hq_rainbow', 'hq', 'legendary', 'Regnbuepalass', 'Rainbow Palace', { fx: 'rainbow' }),
   K('hq_hologram', 'hq', 'mythic', 'Hologramborg', 'Hologram Keep', { fx: 'hologram' }),
+  K('hq_ocean', 'hq', 'common', 'Undervannsbase', 'Ocean Base', { fx: 'ocean' }),
+  K('hq_toxic', 'hq', 'rare', 'Giftfabrikk', 'Toxic Plant', { fx: 'toxic' }),
+  K('hq_choco', 'hq', 'rare', 'Sjokoladeslott', 'Chocolate Castle', { fx: 'choco' }),
+  K('hq_cyber', 'hq', 'epic', 'Cyberby', 'Cyber City', { fx: 'cyber' }),
+  // flere hærfarger – også med generalene som tema
+  K('army_reef', 'army', 'common', 'Korallrev', 'Coral Reef', { team: team('#1fb5b0', '#137a77', '#9df0ec', '#ffd23f') }),
+  K('army_cherry', 'army', 'common', 'Kirsebær', 'Cherry', { team: team('#e8436f', '#a82a4c', '#ffa6bd', '#ffffff') }),
+  K('army_moss', 'army', 'common', 'Mosegrønn', 'Moss Green', { team: team('#2f7d3a', '#1d5226', '#86c98f', '#b5823d') }),
+  K('army_arctic', 'army', 'rare', 'Arktis', 'Arctic', { team: team('#dff3ff', '#7fb7e0', '#ffffff', '#3559d6') }),
+  K('army_sunset', 'army', 'rare', 'Skumring', 'Dusk', { team: team('#ff8a3d', '#c4527a', '#ffc28a', '#7a5cff') }),
+  K('army_bubblegum', 'army', 'rare', 'Tyggegummi', 'Bubblegum', { team: team('#ff9fd0', '#55d6b6', '#ffe0f0', '#fff35c') }),
+  K('army_midnight', 'army', 'rare', 'Midnatt', 'Midnight', { team: team('#24308a', '#141c55', '#7f8fe8', '#cdd6e3') }),
+  K('army_buckeye', 'army', 'epic', 'Nøttehæren', 'Nut Army', { team: team('#7b4a2a', '#4e2c15', '#e2bd8f', '#4fae3c') }),
+  K('army_drip', 'army', 'epic', 'Drip-hæren', 'Drip Army', { team: team('#1f1d2b', '#000000', '#6a6688', '#ffd23f'), fx: 'shine' }),
+  K('army_zorgon', 'army', 'epic', 'Zorgons garde', 'Zorgon’s Guard', { team: team('#b38cff', '#7a2fb0', '#e0d0ff', '#ffd23f') }),
+  K('army_radioactive', 'army', 'legendary', 'Radioaktiv', 'Radioactive', { team: team('#9dff3d', '#1d2b12', '#d8ffb0', '#ff3dc8'), fx: 'neon' }),
+  K('army_frost', 'army', 'legendary', 'Frostkrigere', 'Frost Warriors', { team: team('#9fe7ff', '#3d8bff', '#ffffff', '#bfefff'), fx: 'shine' }),
+  // flere flagg
+  K('flag_stripes', 'flag', 'common', 'Striper', 'Stripes', { design: 'stripes', own: '#ff8a8a' }),
+  K('flag_wave', 'flag', 'common', 'Bølge', 'Wave', { design: 'wave', own: '#8fd3ff' }),
+  K('flag_sun', 'flag', 'common', 'Sol', 'Sun', { design: 'sun', own: '#ffc861' }),
+  K('flag_pizza', 'flag', 'rare', 'Pizza', 'Pizza', { design: 'pizza', own: '#ffd98a' }),
+  K('flag_drip', 'flag', 'epic', 'Drip-flagg', 'Drip Flag', { design: 'drip', own: '#c9c4dc' }),
+  K('flag_zorgon', 'flag', 'epic', 'Zorgon-flagg', 'Zorgon Flag', { design: 'zorgon', own: '#c9a6ff' }),
   // ---- flere hatter ----
   K('hat_chef', 'hat', 'common', 'Kokkelue', 'Chef’s Hat', { hat: 'chef' }),
   K('hat_beanie', 'hat', 'common', 'Strikkelue', 'Beanie', { hat: 'beanie' }),
@@ -124,14 +159,54 @@ export const SKINS = [
   K('hat_bunny', 'hat', 'epic', 'Kaninører', 'Bunny Ears', { hat: 'bunny' }),
   K('hat_fire', 'hat', 'epic', 'Brannhjelm', 'Firefighter Helmet', { hat: 'fire' }),
   K('hat_halo', 'hat', 'legendary', 'Glorie', 'Halo', { hat: 'halo' }),
+  K('hat_sombrero', 'hat', 'common', 'Sombrero', 'Sombrero', { hat: 'sombrero' }),
+  K('hat_detective', 'hat', 'rare', 'Detektivlue', 'Detective Cap', { hat: 'detective' }),
+  K('hat_knight', 'hat', 'epic', 'Ridderhjelm', 'Knight Helmet', { hat: 'knight' }),
+  K('hat_dino', 'hat', 'legendary', 'Dinohette', 'Dino Hood', { hat: 'dino' }),
+  // General Drip – antrekk
+  K('drip_usa', 'drip', 'common', 'USA-drip', 'USA Drip', { def: true, look: {} }),
+  K('drip_red', 'drip', 'common', 'Rød dunjakke', 'Red Puffer', { look: { jacket: '#e5484d', jacketLine: '#a8323a', jacketHi: '#ffb3b5', shirt: '#f4f4f4', text: '', pants: '#2b2d42', pantsLine: '#14151f', hatC: '#e5484d', hatCuff: '#c43c41', hatAcc: '#fff' } }),
+  K('drip_winter', 'drip', 'common', 'Snø-drip', 'Snow Drip', { look: { jacket: '#f4f7fb', jacketLine: '#c8d2e0', jacketHi: '#ffffff', shirt: '#3d8bff', hatC: '#f4f7fb', hatCuff: '#dfe6f0', hatAcc: '#3d8bff', crest: '#3d8bff' } }),
+  K('drip_camo', 'drip', 'common', 'Kamo-drip', 'Camo Drip', { look: { jacketPattern: 'camo', jacket: '#5d6b3a', camoA: '#3f4a26', camoB: '#8a9a5a', shirt: '#2b2d42', text: '', pants: '#4a5230', pantsLine: '#2f3420', hat: 'cap', hatC: '#5d6b3a', hatCuff: '#3f4a26', hatAcc: '#ffd23f' } }),
+  K('drip_italy', 'drip', 'rare', 'Italia-drip', 'Italy Drip', { look: { jacket: '', shirt: '#2f9e44', band: '#ffffff', text: 'ITALY', textC: '#1d1b29', pantsPattern: 'camo', pants: '#a99a6a', camoA: '#7d7a4a', camoB: '#d8cba0', shades: '#ffffff', hat: 'none', chain: '' } }),
+  K('drip_ohio', 'drip', 'rare', 'Ohio-drip', 'Ohio Drip', { look: { jacket: '#bb0000', jacketLine: '#7a0000', jacketHi: '#ff9a9a', shirt: '#9aa3ad', text: 'OHIO', textC: '#bb0000', pants: '#3a3d4a', pantsLine: '#24262f', hatC: '#9aa3ad', hatCuff: '#7d8590', hatAcc: '#bb0000', crest: '#bb0000' } }),
+  K('drip_norge', 'drip', 'rare', 'Norge-drip', 'Norway Drip', { look: { jacket: '#ba0c2f', jacketLine: '#7d0820', jacketHi: '#ff9aab', shirt: '#00205b', text: 'NORGE', textC: '#ffffff', hatC: '#ba0c2f', hatCuff: '#00205b', hatAcc: '#ffffff', crest: '#ffffff' } }),
+  K('drip_track', 'drip', 'rare', 'Treningsdress', 'Tracksuit', { look: { jacket: '#7a5cff', jacketLine: '#5b3fb0', jacketHi: '#c9b8ff', shirt: '#ffffff', text: '', pantsPattern: 'stripe', pants: '#7a5cff', pantsLine: '#ffffff', hat: 'cap', hatC: '#7a5cff', hatCuff: '#5b3fb0', hatAcc: '#ffffff', shoeAcc: '#7a5cff' } }),
+  K('drip_pink', 'drip', 'rare', 'Rosa drip', 'Pink Drip', { look: { jacket: '#ff8fc8', jacketLine: '#e0609e', jacketHi: '#ffe0f0', shirt: '#ffffff', text: 'LOVE', textC: '#ff5d8f', hatC: '#ff8fc8', hatCuff: '#e0609e', hatAcc: '#ffffff', crest: '#ffffff' } }),
+  K('drip_santa', 'drip', 'rare', 'Jule-drip', 'Holiday Drip', { look: { jacket: '#e5484d', jacketLine: '#a8323a', jacketHi: '#ffd0d0', hat: 'santa', shirt: '#2f9e44', text: 'HO HO', textC: '#ffffff', pants: '#2b2d42', pantsLine: '#14151f' } }),
+  K('drip_space', 'drip', 'epic', 'Rom-drip', 'Space Drip', { look: { jacket: '#cdd6e3', jacketLine: '#8a96ab', jacketHi: '#ffffff', shirt: '#2b2d42', text: 'SPACE', textC: '#7ffcff', shades: '#7ffcff', lens: '#1d1b29', hat: 'none', pants: '#5b6476', pantsLine: '#3a4150' } }),
+  K('drip_king', 'drip', 'epic', 'Kongen', 'The King', { look: { jacket: '#5b2a8a', jacketLine: '#3a1a5a', jacketHi: '#c9a6ff', hat: 'crown', shirt: '#ffd23f', text: 'KING', textC: '#5b2a8a', pants: '#1d1b29', pantsLine: '#000000' } }),
+  K('drip_neon', 'drip', 'epic', 'Neon-drip', 'Neon Drip', { fx: 'neon', look: { jacket: '#39ff88', jacketLine: '#1fbf60', jacketHi: '#d8ffe8', shirt: '#1d1b29', text: 'DRIP', textC: '#39ff88', shades: '#39ff88', lens: '#1d1b29', hatC: '#1d1b29', hatCuff: '#2b2838', hatAcc: '#39ff88', crest: '#39ff88' } }),
+  K('drip_gold', 'drip', 'legendary', 'Gull-drip', 'Gold Drip', { fx: 'gold', look: { jacket: '#ffc62e', jacketLine: '#cf930c', jacketHi: '#fff6c2', shirt: '#1d1b29', text: 'GOLD', textC: '#ffd23f', shades: '#ffd23f', lens: '#2b2350', hatC: '#ffc62e', hatCuff: '#e6a816', crest: '#ffffff' } }),
+  K('drip_fire', 'drip', 'legendary', 'Ild-drip', 'Fire Drip', { look: { jacketPattern: 'flames', jacket: '#e5484d', shirt: '#1d1b29', text: 'HOT', textC: '#ff8a3d', hatC: '#e5484d', hatCuff: '#1d1b29', hatAcc: '#ffd23f' } }),
+  K('drip_ice', 'drip', 'mythic', 'Is-drip', 'Ice Drip', { fx: 'sparkle', look: { jacket: '#9fe7ff', jacketLine: '#5ab8e0', jacketHi: '#ffffff', shirt: '#e6fbff', text: 'ICE', textC: '#3d8bff', chain: '#bfefff', watch: '#bfefff', shades: '#bfefff', lens: '#3d8bff', hatC: '#9fe7ff', hatCuff: '#5ab8e0', hatAcc: '#ffffff', crest: '#ffffff' } }),
+  // Keiser Zorgon – kapper og kroner
+  K('zorg_royal', 'zorgon', 'common', 'Keiserkappe', 'Imperial Cape', { def: true, look: {} }),
+  K('zorg_green', 'zorgon', 'common', 'Grønn klassiker', 'Green Classic', { look: { skin: '#7be07b', skinDark: '#4fb04f', cape: '#2f6b3a', capeIn: '#ffd23f', robe: '#244f2c', monocle: false } }),
+  K('zorg_party', 'zorgon', 'common', 'Festkeiser', 'Party Emperor', { look: { crown: 'party', cape: '#56e0ff', capeIn: '#ff5d8f', robe: '#ffb000', monocle: false } }),
+  K('zorg_pirate', 'zorgon', 'rare', 'Rompirat', 'Space Pirate', { look: { crown: 'pirate', cape: '#2b2d42', capeIn: '#ef4f5a', robe: '#3d3756', monocle: false } }),
+  K('zorg_ohio', 'zorgon', 'rare', 'Ohio-keiser', 'Ohio Emperor', { look: { cape: '#bb0000', capeIn: '#9aa3ad', robe: '#7a0000', trim: '#e3e9f2', orb: '#ff4d4d' } }),
+  K('zorg_santa', 'zorgon', 'rare', 'Julekeiser', 'Holiday Emperor', { look: { crown: 'santa', cape: '#e5484d', capeIn: '#ffffff', robe: '#2f9e44', trim: '#ffffff' } }),
+  K('zorg_ice', 'zorgon', 'epic', 'Iskeiser', 'Ice Emperor', { look: { skin: '#bfefff', skinDark: '#8fd3f0', cape: '#f4fbff', capeIn: '#7fd3ff', robe: '#5ab8e0', trim: '#ffffff', orb: '#7ffcff', crown: 'ice' } }),
+  K('zorg_fire', 'zorgon', 'epic', 'Ildkeiser', 'Fire Emperor', { look: { skin: '#ff8a65', skinDark: '#e0603d', cape: '#c43c41', capeIn: '#ffd23f', robe: '#7a1f24', orb: '#ffb000', crown: 'horns', pattern: 'flames' } }),
+  K('zorg_robot', 'zorgon', 'epic', 'Robotkeiser', 'Robot Emperor', { look: { skin: '#cdd6e3', skinDark: '#8a96ab', crown: 'helmet', cape: '#3a4150', capeIn: '#7ffcff', robe: '#5b6476', trim: '#7ffcff', orb: '#7ffcff', eye: '#ef4f5a' } }),
+  K('zorg_shadow', 'zorgon', 'epic', 'Skyggekeiser', 'Shadow Emperor', { look: { skin: '#4a3d6b', skinDark: '#2b2350', cape: '#14101f', capeIn: '#7a2fb0', robe: '#1f1830', eye: '#ff3d77', orb: '#ff3d77' } }),
+  K('zorg_gold', 'zorgon', 'legendary', 'Gullkeiser', 'Golden Emperor', { fx: 'gold', look: { cape: '#ffc62e', capeIn: '#fff0a6', robe: '#e6a816', trim: '#fff6c2', orb: '#ffffff' } }),
+  K('zorg_angel', 'zorgon', 'legendary', 'Englekeiser', 'Angel Emperor', { look: { crown: 'halo', skin: '#fff1b8', skinDark: '#e8d08a', cape: '#ffffff', capeIn: '#ffe680', robe: '#f4f0ff', trim: '#ffd23f', orb: '#ffe680', monocle: false } }),
+  K('zorg_galaxy', 'zorgon', 'mythic', 'Galaksekeiser', 'Galaxy Emperor', { fx: 'galaxy', look: { cape: '#1b0f4f', capeIn: '#7ffcff', robe: '#2b1b6f', pattern: 'stars', eye: '#7ffcff', orb: '#7ffcff' } }),
+  K('zorg_rainbow', 'zorgon', 'mythic', 'Regnbuekeiser', 'Rainbow Emperor', { look: { pattern: 'rainbow', cape: '#ff4d8d', capeIn: '#7a5cff' } }),
   // ---- eksklusive prestisje-skins (låses opp med prestisjestjerner, finnes ikke i kasser) ----
   K('flag_stars', 'flag', 'prestige', 'Prestisjeflagg', 'Prestige Flag', { design: 'stars', own: '#ffd23f', prestige: 1 }),
   K('hat_prestige', 'hat', 'prestige', 'Prestisjekrone', 'Prestige Crown', { hat: 'prestige', prestige: 2 }),
+  K('drip_prestige', 'drip', 'prestige', 'Prestisje-drip', 'Prestige Drip', { prestige: 2, fx: 'stars', look: { jacket: '#7a5cff', jacketLine: '#5b3fb0', jacketHi: '#e0d4ff', shirt: '#1d1b29', text: '★', textC: '#ffd23f', hat: 'crown', shades: '#ffd23f', lens: '#2b2350', pants: '#24308a', pantsLine: '#141c55' } }),
+  K('zorg_prestige', 'zorgon', 'prestige', 'Prestisjekeiser', 'Prestige Emperor', { prestige: 2, fx: 'stars', look: { cape: '#7a5cff', capeIn: '#ffd23f', robe: '#24308a', pattern: 'stars' } }),
   K('hq_star', 'hq', 'prestige', 'Stjernepalasset', 'Star Palace', { fx: 'star', prestige: 3 }),
   K('army_stars', 'army', 'prestige', 'Stjernehæren', 'Star Army', { team: team('#24308a', '#141c55', '#6a7cf0', '#ffd23f'), fx: 'stars', prestige: 5 }),
 ];
 export const SKIN_BY_ID = Object.fromEntries(SKINS.map((k) => [k.id, k]));
-export const PRESTIGE_SKINS = Object.fromEntries(SKINS.filter((k) => k.prestige).map((k) => [k.prestige, k.id]));
+// prestisjenivå → skins som låses opp (★2 gir én til hver general)
+export const PRESTIGE_SKINS = {};
+for (const k of SKINS) if (k.prestige) (PRESTIGE_SKINS[k.prestige] = PRESTIGE_SKINS[k.prestige] || []).push(k.id);
 export const DEFAULT_SKINS = Object.fromEntries(CATEGORIES.map((c) => [c.id, SKINS.find((k) => k.cat === c.id && k.def).id]));
 
 // ---------- lootkasser ----------
