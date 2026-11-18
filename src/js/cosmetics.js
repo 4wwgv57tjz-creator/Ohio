@@ -23,7 +23,7 @@ export const CATEGORIES = [
 
 // Generalene man kan velge mellom. Hver general har sine egne skins (kategorien cat).
 export const GENERALS = [
-  { id: 'drip', cat: 'drip', name: { nb: 'General Drip', en: 'General Drip' }, desc: { nb: 'Dunjakke, USA-genser og gullklokke. Samler på antrekk.', en: 'Puffer jacket, USA shirt and a gold watch. Collects outfits.' },
+  { id: 'drip', cat: 'drip', name: { nb: 'General Drip', en: 'General Drip' }, desc: { nb: 'Dunjakke, USA-genser og gullklokke. Snakker slang og samler på antrekk.', en: 'Puffer jacket, USA shirt and a gold watch. Talks slang and collects outfits.' },
     perk: { income: 1.15, spoils: 1.5, ability: 'bribe' },
     style: { nb: 'Økonomi: +15 % inntekt og +50 % krigsbytte', en: 'Economy: +15% income and +50% spoils' } },
   { id: 'buckeye', cat: 'hat', name: { nb: 'General Buckeye', en: 'General Buckeye' }, desc: { nb: 'Ohio-nøtta med generalhatt. Samler på hatter.', en: 'The Ohio nut in a general’s cap. Collects hats.' },

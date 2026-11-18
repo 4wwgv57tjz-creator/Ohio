@@ -4,6 +4,7 @@ import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, UNIT_BY_ID, regionsOfEra
 import * as PU from './powerups.js';
 import * as EV from './events.js';
 import * as D from './daily.js';
+import { voice } from './voice.js';
 import * as C from './cosmetics.js';
 import * as M from './monetize.js';
 import { initSocial, social, onSocialChange, LOGIN_PROVIDERS } from './social.js';
@@ -49,6 +50,9 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const ico = (n, c) => A.icon(n, c);
 const pm = () => E.prestigeMult(S);
+const fill = (str, vars) => { let out = str; if (vars) for (const k in vars) out = out.split('{' + k + '}').join(vars[k]); return out; };
+// Replikk fra generalen hvis den har en egen (General Drip snakker slang), ellers standardteksten
+const say = (key, fallbackKey, vars) => { const v = S && voice(S.general, key); return v ? fill(L(v), vars) : t(fallbackKey, vars); };
 
 // ---------------- lagring ----------------
 function loadSave() {
@@ -230,12 +234,6 @@ const QUIPS = {
     { nb: 'Jeg teller soldatene hver morgen. I dag var det én for mye.', en: 'I count the soldiers every morning. Today there was one too many.' },
     { nb: 'Noen har spist kartet over Indiana. Igjen.', en: 'Someone has eaten the map of Indiana. Again.' },
   ],
-  drip: [
-    { nb: 'Dette antrekket er dyrere enn hele Lima.', en: 'This outfit costs more than all of Lima.' },
-    { nb: 'Klokka mi går så fort at det allerede er i morgen.', en: 'My watch is so fast it is already tomorrow.' },
-    { nb: 'Drip er en livsstil. Og en militær strategi.', en: 'Drip is a lifestyle. And a military strategy.' },
-    { nb: 'Jeg erobrer ikke land. Jeg tar dem på stil.', en: 'I do not conquer lands. I win them on style.' },
-  ],
   buckeye: [
     { nb: 'Jeg er en hard nøtt å knekke. Bokstavelig talt.', en: 'I am a tough nut to crack. Literally.' },
     { nb: 'Ingen ekorn kommer forbi denne generalen.', en: 'No squirrel gets past this general.' },
@@ -291,7 +289,9 @@ function genReact(kind) {
 function maybeQuip(now) {
   if (!S || S.tut < 5 || tab !== 'base' || modalCount > 0 || document.hidden || now < nextQuip) return;
   nextQuip = now + 22000 + Math.random() * 22000;
-  if (EV.currentEvent(S)) { genSay(t('ev_spawn_say')); return; }
+  if (EV.currentEvent(S)) { genSay(say('evSpawn', 'ev_spawn_say')); return; }
+  const own = voice(S.general, 'quip'); // Drip snakker slang hele tiden
+  if (own) { genSay(L(own)); return; }
   const pool = [...QUIPS.all, ...(QUIPS[S.general] || [])];
   genSay(L(pool[Math.floor(Math.random() * pool.length)]));
 }
@@ -623,6 +623,7 @@ function onTap(e) {
     tapBurst(x, y, r.crit === 2 ? 14 : 8, skin.burst);
     shakeStage(r.crit === 2);
     genReact(r.crit === 2 ? 'spin' : 'jump');
+    if (r.crit === 2) { const v = voice(S.general, 'mega'); if (v) genSay(L(v), 1500); }
   } else {
     sfx.tap(r.tier);
     if (S.settings.vibrate) buzz(8);
@@ -635,7 +636,7 @@ function onTap(e) {
     const b = hq.getBoundingClientRect();
     floatText(b.left + b.width / 2, b.top + 10, t('combo_up', { m: multTxt(r.mult / (r.crit === 2 ? E.CRIT.megaMult : r.crit ? E.CRIT.mult : 1)) }), 'ft-combo');
     sfx.comboUp(r.tier);
-    if (r.tier >= 3) genSay(t('combo_say_' + Math.min(4, r.tier)), 1600);
+    if (r.tier >= 3) genSay(say('combo' + Math.min(4, r.tier), 'combo_say_' + Math.min(4, r.tier)), 1600);
   }
   updateCombo();
   updateHUD();
@@ -1473,7 +1474,7 @@ function showBattle(r, prep) {
       <div class="targets"></div>
       <div class="booms"></div>
       <div class="warn" hidden><span class="warn-txt"></span><span class="warn-bar"><span></span></span></div>
-      <div class="battle-call">${t('battle_go')}</div>
+      ${(() => { const call = say('call', 'battle_go'); return `<div class="battle-call${call.length > 8 ? ' long' : ''}">${esc(call)}</div>`; })()}
     </div>
     <p class="battle-hint">${prep.specials.length ? t('battle_hint2') : t('battle_hint')}</p>
     <div class="ability-bar">
@@ -1767,7 +1768,9 @@ function showBattleResult(ov, r, res) {
   const card = document.createElement('div');
   card.className = 'result-card ' + (res.win ? 'win s' + res.stars : 'lose');
   const weak = !res.win && res.dealt > 0 ? Math.max(1, Math.round((res.dealt / r.def) * 100)) : 0;
+  const line = voice(S.general, res.win ? 'win' : 'lose');
   card.innerHTML = `<div class="result-mascot">${miniGeneral(res.win ? 'happy' : 'sad')}</div>
+    ${line ? `<div class="result-say">${esc(L(line))}</div>` : ''}
     <h2 class="result-title">${res.win ? t('victory') : res.retreat ? t('retreated') : t('defeat')}</h2>
     ${res.win ? `<div class="result-stars">${[1, 2, 3].map((i) => `<span class="rs ${i <= res.stars ? 'on' : ''}" style="--i:${i}">${ico('star')}</span>`).join('')}</div>` : ''}
     <p>${res.win ? t('victory_text', { r: esc(L(r.name)) }) : res.retreat ? t('retreat_text', { r: esc(L(r.name)) }) : t('defeat_text', { r: esc(L(r.name)) })}</p>
@@ -1983,8 +1986,8 @@ function checkOffline() {
   S.lastSeen = Date.now();
   if (secs < 60 || earned < 1) return;
   openModal(`<div class="modal-mascot">${A.mascot()}</div>
-    <h2 class="big-title">${t('welcome_back')}</h2>
-    <p class="speech">${t('away_text', { t: duration(secs) })}</p>
+    <h2 class="big-title">${esc(say('welcome', 'welcome_back'))}</h2>
+    <p class="speech">${esc(say('away', 'away_text', { t: duration(secs) }))}</p>
     <div class="big-money">${ico('coin')} ${money(earned)}</div>
     <button type="button" class="btn btn-gold big" data-action="collect" data-amount="${earned}">${t('collect')}</button>
     ${M.adsEnabled() && S.tut >= 5 ? `<button type="button" class="btn btn-ad big" data-action="ad-double" data-amount="${earned}">${ico('ad')} ${t('double_reward')} · ${money(earned * 2)}</button>` : ''}`, 'welcome');
@@ -2591,7 +2594,7 @@ function socialSettingsHTML() {
 // ---------------- hendelser i basen ----------------
 function onEventSpawn() {
   sfx.event();
-  if (tab === 'base') { refreshEventSpot(); genSay(t('ev_spawn_say')); }
+  if (tab === 'base') { refreshEventSpot(); genSay(say('evSpawn', 'ev_spawn_say')); }
   updateBadges();
 }
 function openEvent() {
@@ -2628,7 +2631,7 @@ function answerEvent(btn) {
   persist();
   if (res.good) { sfx.milestone(); if (S.settings.vibrate) buzz(20); } else { sfx.nope(); if (S.settings.vibrate) buzz(40); }
   modal.classList.add('ev-done', res.good ? 'good' : 'bad');
-  modal.innerHTML = `<div class="ev-head"><div class="ev-art">${A.citizenArt(x.who)}</div><div class="ev-ttl"><div class="eyebrow">${esc(L(x.title))}</div><h2 class="h2">${res.good ? t('ev_good') : t('ev_bad')}</h2></div></div>
+  modal.innerHTML = `<div class="ev-head"><div class="ev-art">${A.citizenArt(x.who)}</div><div class="ev-ttl"><div class="eyebrow">${esc(L(x.title))}</div><h2 class="h2">${esc(res.good ? say('evGood', 'ev_good') : say('evBad', 'ev_bad'))}</h2></div></div>
     <p class="ev-chosen">«${esc(L(a.t))}»</p>
     <p class="ev-r">${esc(L(a.r))}</p>
     <div class="ev-fx ${res.good ? 'good' : 'bad'}">${fxLabel(res)}</div>
@@ -2788,12 +2791,12 @@ function updateTutorial() {
   const coach = $('#coach');
   if (modalCount > 0 || S.tut >= 5) { coach.hidden = true; $('#app').classList.remove('coach-on'); return; }
   let text = '', target = null;
-  if (S.tut === 0) { text = t('tut0'); target = tab === 'base' ? $('#hq') : $('#tab-base'); }
-  else if (S.tut === 1) { text = t('tut1'); target = tab === 'build' ? $('[data-action="buy"][data-id="corn"]') : $('#tab-build'); }
-  else if (S.tut === 2) { text = t('tut2'); target = tab === 'army' ? $('[data-action="buy"][data-id="militia"]') : $('#tab-army'); }
-  else if (S.tut === 3) { text = t('tut3'); target = tab === 'map' ? $('#region-sheet [data-action="attack"]') : $('#tab-map'); }
+  if (S.tut === 0) { text = say('tut0', 'tut0'); target = tab === 'base' ? $('#hq') : $('#tab-base'); }
+  else if (S.tut === 1) { text = say('tut1', 'tut1'); target = tab === 'build' ? $('[data-action="buy"][data-id="corn"]') : $('#tab-build'); }
+  else if (S.tut === 2) { text = say('tut2', 'tut2'); target = tab === 'army' ? $('[data-action="buy"][data-id="militia"]') : $('#tab-army'); }
+  else if (S.tut === 3) { text = say('tut3', 'tut3'); target = tab === 'map' ? $('#region-sheet [data-action="attack"]') : $('#tab-map'); }
   else if (S.tut === 4) {
-    text = t('tut4');
+    text = say('tut4', 'tut4');
     if (!coachTimer) coachTimer = setTimeout(() => { S.tut = 5; coachTimer = 0; persist(); updateTutorial(); }, 7000);
   }
   if (target) target.classList.add('hint');
@@ -3139,6 +3142,7 @@ function boot(hotData) {
       daily: (last = '', streak = 0) => { S.daily = { last, streak, total: S.daily.total || 0 }; refreshDailyBtn(); updateBadges(); },
       combo: (n) => { combo = n; lastTapAt = performance.now(); updateCombo(); },
       gen: (g) => { S.general = g; applySkins(); renderTab(); },
+      quip: () => { nextQuip = 0; maybeQuip(performance.now()); return $('#gen-say')?.textContent; },
     };
   }
   try {

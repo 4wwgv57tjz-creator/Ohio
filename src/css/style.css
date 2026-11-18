@@ -1697,3 +1697,8 @@ main { flex: 1; position: relative; min-height: 0; }
   .hq-gen-in, .walker, .w-in, .ev-citizen, .ev-bang, .daily-btn.ready, .tap-combo, .dl-tile.today, .float-text.ft-mega, .float-text.ft-rainbow { animation: none !important; }
   .walker .emote { animation: none !important; opacity: 0; }
 }
+
+/* generalen sier noe på resultatkortet, og lengre kamprop (Drip: «SCHPA KRIG!») */
+.result-say { position: relative; display: table; max-width: 92%; margin: 8px auto 2px; padding: 5px 12px; background: #fff; border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 0 3px 0 var(--ink); font-weight: 800; font-size: 14px; line-height: 1.25; }
+.result-say::before { content: ''; position: absolute; left: 50%; top: -8px; width: 10px; height: 10px; margin-left: -5px; background: #fff; border-left: 2.5px solid var(--ink); border-top: 2.5px solid var(--ink); transform: rotate(45deg); }
+.battle-call.long { font-size: min(40px, 10vw); white-space: nowrap; }

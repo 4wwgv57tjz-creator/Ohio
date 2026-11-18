@@ -49,7 +49,9 @@ Tips:
   til kapitlene du allerede har erobret. Prikkene mellom knappene viser alle kapitlene – trykk på en for å hoppe dit.
 - **Tre generaler med hver sin strategi**, valgt ved start eller i Butikk → Mine ting (bytte hvert tiende minutt):
   - **General Drip** (dunjakke, USA-genser og gullklokke): økonomi – +15 % inntekt og +50 % krigsbytte. Evne:
-    *Bestikkelse* – betal 5 % av pengene, fienden mister styrke og hopper over neste angrep.
+    *Bestikkelse* – betal 5 % av pengene, fienden mister styrke og hopper over neste angrep. Drip snakker slang –
+    «Wallah bror», «Schpa krig!», «Wallah dette ekke no for meg», «Wallah vi kæsa di da» – og på engelsk
+    «Wallahi bro», «Let’s run it!», «No cap» og «Nah bro, this ain’t it». Replikkene står i `src/js/voice.js`.
   - **General Buckeye** (Ohio-nøtta med generalhatt): folkehæren – +25 % infanteri og +50 % per trykk. Evne:
     *Nøtteregn* – treffer alle fiendene på skjermen.
   - **Keiser Zorgon** (romkeiseren som byttet side): teknologi – +25 % fly, raskere artilleri og tidligere varsel.
@@ -269,6 +271,7 @@ src/
   js/powerups.js  powerups i hovedkvarteret (sjanser, plasser og effekter)
   js/events.js    hendelser i basen: 47 rare spørsmål med svar og utfall (norsk og engelsk)
   js/daily.js     daglig innloggingsbonus (sju dager, rekke)
+  js/voice.js     replikker generalene sier (Drip snakker slang på norsk og engelsk)
   js/monetize.js  reklame (demo, AdSense, CrazyGames, Poki) og kjøp
   js/social*.js   leaderboard, venner og innlogging (demo og Firebase)
   js/i18n.js      tekster og tallformatering
