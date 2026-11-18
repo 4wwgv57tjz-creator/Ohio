@@ -61,6 +61,7 @@ export const sfx = {
   nope() { tone(180, 0.16, { type: 'sawtooth', vol: 0.12, slide: -60 }); },
   coin() { tone(988, 0.06, { type: 'square', vol: 0.12 }); tone(1319, 0.18, { type: 'square', vol: 0.12, delay: 0.06 }); },
   click() { tone(880, 0.04, { type: 'triangle', vol: 0.15 }); },
+  warn() { tone(740, 0.1, { type: 'square', vol: 0.13 }); tone(554, 0.14, { type: 'square', vol: 0.13, delay: 0.13 }); },
   boom() { noise(0.45, { vol: 0.5, freq: 1400 }); tone(90, 0.3, { type: 'sine', vol: 0.4, slide: -50 }); },
   pew() { tone(1400, 0.12, { type: 'square', vol: 0.08, slide: -1100 }); },
   march() { noise(0.06, { vol: 0.25, freq: 500 }); },

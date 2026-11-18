@@ -15,12 +15,17 @@ tegneseriestil, og lydene lages direkte i nettleseren – det er ingen bilde- el
    (opptil 8 timer).
 3. **Hær**: rekrutter enheter. Hver enhetstype gir hærstyrke og hører til en klasse: infanteri, kjøretøy, fly eller
    skip.
-4. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent. Med 1,5 ganger så stor
-   hær som forsvaret er seieren sikker, og du mister færre soldater. Taper du, blir fienden svekket til neste gang.
-5. **Kampen** varer i omtrent 8 sekunder. Trykk på fiendene som dukker opp med røde sikter, og bruk artilleriet når
-   det er klart. Uten å gjøre noe blir sjansen som vist; med god innsats kan du vinne kamper du ellers ville tapt, og du
-   mister færre soldater. **Hopp over** avgjør kampen med en gang.
-6. Hvert område du erobrer gir mer inntekt. Ta alle områdene i et kapittel for å låse opp neste kapittel med
+4. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent og gjelder hvis du ikke
+   gjør noe i kampen. Først med 1,8 ganger så stor hær som forsvaret er seieren sikker. Taper du, blir fienden svekket –
+   men svekkelsen bygges opp igjen over tid, og ingen fiende kan svekkes under 40 %.
+5. **Kampen**: hæren din har liv som tappes av fiendens ild. Trykk på fiendene med røde sikter (treff på rad gir
+   **kombo**), bruk **artilleriet**, og stopp fiendens varslede spesialangrep: **kanonsalve** stoppes med **Skjold**
+   (trykk i tide), og **stormangrep** stoppes ved å trykke tre ganger på kapteinen. Hver general har også en egen
+   **evne** én gang per kamp. **Trekk tilbake** avbryter kampen med færre tap, og **Hopp over** avgjør den med en gang.
+   Uten innsats blir utfallet som vinnersjansen; god innsats gir seier oftere, færre tap og flere stjerner.
+6. **Stjerner**: en seier gir 1–3 stjerner etter hvor mye liv hæren har igjen (over halvparten gir tre). Stjernene gir
+   **krigsbytte** (penger), **medaljer** til Krigsskolen, ekstra edelstener og sjanse for en gratis powerup.
+7. Hvert område du erobrer gir mer inntekt. Ta alle områdene i et kapittel for å låse opp neste kapittel med
    nye bygninger og enheter.
 
 Tips:
@@ -31,13 +36,23 @@ Tips:
 - **Zoom mellom kapitlene** på kartet: trykk **−** (eller knip fingrene sammen) for å zoome ut og se kapitlene som
   venter, med områdene du ikke har erobret ennå. Trykk **+** (eller knip helt inn på hjemområdet ditt) for å zoome inn
   til kapitlene du allerede har erobret. Prikkene mellom knappene viser alle kapitlene – trykk på en for å hoppe dit.
-- **Tre generaler** å velge mellom, ved start eller i Butikk → Mine ting: **General Drip** (dunjakke, USA-genser og
-  gullklokke), **General Buckeye** (Ohio-nøtta med generalhatt) og **Keiser Zorgon** (romkeiseren som byttet side).
+- **Tre generaler med hver sin strategi**, valgt ved start eller i Butikk → Mine ting (bytte hvert tiende minutt):
+  - **General Drip** (dunjakke, USA-genser og gullklokke): økonomi – +15 % inntekt og +50 % krigsbytte. Evne:
+    *Bestikkelse* – betal 5 % av pengene, fienden mister styrke og hopper over neste angrep.
+  - **General Buckeye** (Ohio-nøtta med generalhatt): folkehæren – +25 % infanteri og +50 % per trykk. Evne:
+    *Nøtteregn* – treffer alle fiendene på skjermen.
+  - **Keiser Zorgon** (romkeiseren som byttet side): teknologi – +25 % fly, raskere artilleri og tidligere varsel.
+    Evne: *Laserstråle* – stor skade og lammer fienden i to sekunder.
   Generalen står ved hovedkvarteret, viser deg hva du skal gjøre i starten og har sine egne skins.
+- **Krigsskolen** (Hær → Krigsskole): bruk medaljer på ni retninger med fem nivåer hver – infanteri, panser, fly og
+  marine (+10 % per nivå), artilleri, logistikk (færre tap), etterretning (svakere fiender og tidligere varsel),
+  økonomi og plyndring (mer krigsbytte og flere powerups). Medaljene rekker ikke til alt, så du må velge en strategi.
+  **Omskolering** gir alle medaljene tilbake for 30 edelstener.
 - **Strategi**: hvert område har et terreng (by, slette, fjell, kyst, øyer, ørken, jungel, is …) som gir bonus til
   noen enhetsklasser – for eksempel får fly +50 % i fjellet og skip +50 % på øyer. Bygg hæren etter målene dine.
-  **Taktikk** velges før angrep: Lynangrep (+25 % styrke, flere tap), Angrep, eller Beleiring (−15 % styrke, færre tap,
-  og fienden svekkes mer hvis du taper).
+  **Taktikk** velges før angrep: Angrep, Lynangrep (+25 % styrke, mange flere tap), Beleiring (−15 % styrke, færre tap,
+  mye raskere artilleri, og fienden svekkes mer hvis du taper) eller Snikangrep (dobbel skade fra trykk og artilleri de
+  første 3,5 sekundene, og fienden angriper senere).
 - **Powerups i hovedkvarteret** (på Base): kjøp en tilfeldig powerup for penger (koster tre minutter med inntekt) eller
   en superboks for 40 edelstener (minst Sjelden). Sett den inn i en av tre plasser i hovedkvarteret, så står den der
   og virker i 10 minutter (UFO-en i 15): pengetrykkeri, turboknapp, kassemagnet, kanontårn, radar, skjoldgenerator,
@@ -142,7 +157,8 @@ Når universet er erobret kan du ta **prestisje**: du starter på nytt som en li
   starter på nytt
 - eksklusive prestisje-skins som ikke finnes i kasser: Prestisjeflagg (★1), et prestisje-skin til hver general (★2),
   Stjernepalasset (★3) og Stjernehæren (★5)
-- powerups på lager og i hovedkvarteret, og generalen du har valgt, blir med videre
+- powerups på lager og i hovedkvarteret, og generalen du har valgt, blir med videre; Krigsskolen og medaljene starter
+  på nytt, så du kan prøve en ny strategi
 
 Stjernen vises ved bygd-skiltet, på profilen og på leaderboardet.
 

@@ -22,10 +22,23 @@ export const CATEGORIES = [
 
 // Generalene man kan velge mellom. Hver general har sine egne skins (kategorien cat).
 export const GENERALS = [
-  { id: 'drip', cat: 'drip', name: { nb: 'General Drip', en: 'General Drip' }, desc: { nb: 'Dunjakke, USA-genser og gullklokke. Samler på antrekk.', en: 'Puffer jacket, USA shirt and a gold watch. Collects outfits.' } },
-  { id: 'buckeye', cat: 'hat', name: { nb: 'General Buckeye', en: 'General Buckeye' }, desc: { nb: 'Ohio-nøtta med generalhatt. Samler på hatter.', en: 'The Ohio nut in a general’s cap. Collects hats.' } },
-  { id: 'zorgon', cat: 'zorgon', name: { nb: 'Keiser Zorgon', en: 'Emperor Zorgon' }, desc: { nb: 'Romkeiseren som byttet side. Samler på kapper og kroner.', en: 'The space emperor who switched sides. Collects capes and crowns.' } },
+  { id: 'drip', cat: 'drip', name: { nb: 'General Drip', en: 'General Drip' }, desc: { nb: 'Dunjakke, USA-genser og gullklokke. Samler på antrekk.', en: 'Puffer jacket, USA shirt and a gold watch. Collects outfits.' },
+    perk: { income: 1.15, spoils: 1.5, ability: 'bribe' },
+    style: { nb: 'Økonomi: +15 % inntekt og +50 % krigsbytte', en: 'Economy: +15% income and +50% spoils' } },
+  { id: 'buckeye', cat: 'hat', name: { nb: 'General Buckeye', en: 'General Buckeye' }, desc: { nb: 'Ohio-nøtta med generalhatt. Samler på hatter.', en: 'The Ohio nut in a general’s cap. Collects hats.' },
+    perk: { tap: 1.5, cls: { inf: 0.25 }, ability: 'nuts' },
+    style: { nb: 'Folkehæren: +25 % infanteri og +50 % per trykk', en: 'People’s army: +25% infantry and +50% per tap' } },
+  { id: 'zorgon', cat: 'zorgon', name: { nb: 'Keiser Zorgon', en: 'Emperor Zorgon' }, desc: { nb: 'Romkeiseren som byttet side. Samler på kapper og kroner.', en: 'The space emperor who switched sides. Collects capes and crowns.' },
+    perk: { cls: { air: 0.25 }, artyCd: 0.75, warn: 1.4, ability: 'laser' },
+    style: { nb: 'Teknologi: +25 % fly, raskere artilleri og tidligere varsel om angrep', en: 'Technology: +25% air, faster artillery and earlier attack warnings' } },
 ];
+// Generalens kampevne (én gang per kamp)
+export const ABILITIES = {
+  bribe: { name: { nb: 'Bestikkelse', en: 'Bribe' }, desc: { nb: 'Betal 5 % av pengene dine: fienden mister styrke og hopper over neste angrep.', en: 'Pay 5% of your money: the enemy loses strength and skips its next attack.' } },
+  nuts: { name: { nb: 'Nøtteregn', en: 'Nut Storm' }, desc: { nb: 'Treffer alle fiendene på skjermen på en gang.', en: 'Hits every enemy on screen at once.' } },
+  laser: { name: { nb: 'Laserstråle', en: 'Laser Beam' }, desc: { nb: 'Stor skade, og fienden lammes i to sekunder.', en: 'Heavy damage, and the enemy is stunned for two seconds.' } },
+};
+export const GENERAL_SWITCH_MS = 10 * 60 * 1000; // generalen kan byttes hvert tiende minutt
 export const GENERAL_BY_ID = Object.fromEntries(GENERALS.map((g) => [g.id, g]));
 export const DEFAULT_GENERAL = 'drip';
 

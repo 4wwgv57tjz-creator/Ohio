@@ -1,6 +1,6 @@
 // Take over the world Ohio – brukergrensesnitt, spill-løkke og lagring.
 import * as E from './engine.js';
-import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, regionsOfEra, SPACE_HOMES, TERRAINS, CLASSES, TACTICS, TACTIC_IDS } from './data.js';
+import { ERAS, BUILDINGS, UNITS, REGIONS, REGION_BY_ID, regionsOfEra, SPACE_HOMES, TERRAINS, CLASSES, TACTICS, TACTIC_IDS, DOCTRINES, DOC_MAX, docCost } from './data.js';
 import * as PU from './powerups.js';
 import * as C from './cosmetics.js';
 import * as M from './monetize.js';
@@ -27,6 +27,7 @@ let skinCat = 'army';
 let mapView = 'map';
 let lastBattle = null;
 let topView = 'friends';
+let armyView = 'units';
 let showAllSkins = false;
 let boardCache = { kind: '', rows: null, at: 0 };
 let introGeneral = C.DEFAULT_GENERAL;
@@ -162,7 +163,7 @@ function renderTab() {
   lastSig = {};
   if (tab === 'base') renderBase();
   else if (tab === 'build') renderList('b');
-  else if (tab === 'army') renderList('u');
+  else if (tab === 'army') { if (armyView === 'school') renderSchool(); else renderList('u'); }
   else if (tab === 'shop') renderShop();
   else if (tab === 'top') renderTop();
   else renderMap();
@@ -184,7 +185,8 @@ function updateBadges() {
   const canWin = !S.finished && regionsOfEra(S.era).some((r) => !S.conquered[r.id] && E.chanceFor(S, r) >= 1);
   $('#tab-map .badge').hidden = !canWin;
   $('#tab-build .badge').hidden = !(S.era > 0 && (S.seenBuild ?? 0) < S.era);
-  $('#tab-army .badge').hidden = !(S.era > 0 && (S.seenArmy ?? 0) < S.era);
+  const canSpend = DOCTRINES.some((d) => E.docLevel(S, d.id) < DOC_MAX && (S.medals || 0) >= docCost(E.docLevel(S, d.id)));
+  $('#tab-army .badge').hidden = !((S.era > 0 && (S.seenArmy ?? 0) < S.era) || canSpend);
   const freeCrate = Date.now() >= (S.ads.freeCrateAt || 0) && M.adsEnabled();
   $('#tab-shop .badge').hidden = !(S.tut >= 5 && (freeCrate || C.cratesOwned(S) > 0 || (S.gems || 0) >= C.CRATES[0].price));
 }
@@ -470,7 +472,7 @@ function renderList(kind) {
   const teaser = items.find((it) => it.era === S.era + 1);
   const head = kind === 'b'
     ? `<div class="screen-head"><div><div class="eyebrow">${t('build_title')}</div><div class="big-num">${ico('coin')}+${money(E.incomePerSec(S))}/s</div></div>${modeSwitch()}</div>`
-    : `<div class="screen-head"><div><div class="eyebrow">${t('army_title')} · ${t('units_count', { n: fmt(E.armySize(S)) })}</div><div class="big-num">${ico('swords')}${fmt(E.armyPower(S))}</div></div>${modeSwitch()}</div>`;
+    : `${armyToggle()}<div class="screen-head"><div><div class="eyebrow">${t('army_title')} · ${t('units_count', { n: fmt(E.armySize(S)) })}</div><div class="big-num">${ico('swords')}${fmt(E.armyPower(S))}</div></div>${modeSwitch()}</div>`;
   const el = $(kind === 'b' ? '#scr-build' : '#scr-army');
   el.innerHTML = `<div class="pad stack">${head}
     ${kind === 'u' && E.armySize(S) ? `<div class="mini-parade">${paradeHTML()}</div>` : ''}
@@ -479,6 +481,37 @@ function renderList(kind) {
     ${kind === 'b' ? tapCardHTML() : ''}
   </div>`;
   updateBuyButtons();
+}
+
+function armyToggle() {
+  const canSpend = DOCTRINES.some((d) => E.docLevel(S, d.id) < DOC_MAX && (S.medals || 0) >= docCost(E.docLevel(S, d.id)));
+  return `<div class="mode-switch wide army-toggle" role="group">
+    <button type="button" class="${armyView === 'units' ? 'on' : ''}" data-action="armyview" data-view="units">${ico('army')} ${t('army_units')}</button>
+    <button type="button" class="${armyView === 'school' ? 'on' : ''}" data-action="armyview" data-view="school">${ico('medal')} ${t('army_school')}${canSpend ? ' <span class="count-dot">!</span>' : ''}</button>
+  </div>`;
+}
+// ---------------- KRIGSSKOLEN ----------------
+function renderSchool() {
+  const g = C.GENERAL_BY_ID[S.general];
+  const ab = g.perk && g.perk.ability ? C.ABILITIES[g.perk.ability] : null;
+  $('#scr-army').innerHTML = `<div class="pad stack">${armyToggle()}
+    <div class="screen-head"><div><div class="eyebrow">${t('school_title')}</div><div class="big-num">${ico('medal')}${fmt(S.medals || 0)}</div></div></div>
+    <p class="school-intro">${t('school_intro')}</p>
+    <div class="card gen-perk-card"><div class="gp-art">${miniGeneral()}</div><div class="gp-txt"><b>${esc(L(g.name))}</b><span>${esc(L(g.style))}</span>${ab ? `<span class="gp-ab">${t('ability')}: <b>${esc(L(ab.name))}</b> – ${esc(L(ab.desc))}</span>` : ''}</div></div>
+    <div class="doc-grid">${DOCTRINES.map((d) => docCardHTML(d)).join('')}</div>
+    <div class="school-foot"><span>${t('medals_earned', { n: fmt(S.medalsEarned || 0) })}</span>
+      <button type="button" class="btn btn-soft" data-action="doc-respec" ${E.docSpent(S) ? '' : 'disabled'}>${t('respec')} · ${ico('gem')} ${E.RESPEC_GEMS}</button></div>
+  </div>`;
+}
+function docCardHTML(d) {
+  const lvl = E.docLevel(S, d.id);
+  const max = lvl >= DOC_MAX;
+  const cost = docCost(lvl);
+  return `<div class="doc-card ${max ? 'max' : ''}"><div class="doc-ico">${ico(d.icon)}</div>
+    <div class="doc-body"><b>${esc(L(d.name))}</b><span>${esc(L(d.desc))}</span>
+      <div class="doc-pips" aria-label="${lvl}/${DOC_MAX}">${Array.from({ length: DOC_MAX }, (_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div></div>
+    <button type="button" class="buy-btn doc-btn ${!max && (S.medals || 0) >= cost ? '' : 'cant'}" data-action="doc-up" data-id="${d.id}" ${max ? 'disabled' : ''}><span class="lbl">${max ? t('max') : t('upgrade')}</span>${max ? '' : `<span class="price">${ico('medal')}${cost}</span>`}</button>
+  </div>`;
 }
 
 function modeSwitch() {
@@ -715,7 +748,7 @@ function sheetHTML() {
   const r = REGION_BY_ID[id];
   const inc = money(r.income * pm());
   if (kind === 'past' || S.conquered[id]) {
-    return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><div class="eyebrow">${ico('check')} ${t('conquered')}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
+    return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><div class="eyebrow">${ico('check')} ${t('conquered')}${S.stars[r.id] ? ' ' + starRow(S.stars[r.id], 'sheet-stars') : ''}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
     <div class="reward-row">${ico('coin')} +${inc}/s</div>`;
   }
   if (kind === 'future') {
@@ -749,7 +782,7 @@ function regionListHTML() {
     const done = kind === 'past' || !!S.conquered[r.id];
     const locked = !done && kind === 'future';
     const ch = done || locked ? 0 : E.chanceFor(S, r);
-    const tail = done ? `<span class="rinc">+${money(r.income * pm())}/s</span>${ico('check')}`
+    const tail = done ? `${S.stars[r.id] ? starRow(S.stars[r.id], 'rstars') : ''}<span class="rinc">+${money(r.income * pm())}/s</span>${ico('check')}`
       : `<span class="rdef">${ico('skull')}${fmt(E.regionDef(S, r))}</span>${locked ? `<span class="rlock">${ico('lock')}</span>` : `<span class="rchance ${chanceClass(ch)}">${pct(ch)}</span>`}`;
     return `<button type="button" class="region-row${done ? ' done' : ''}${locked ? ' locked' : ''}${selected === r.id ? ' sel' : ''}" data-action="select" data-id="${r.id}">
       <span class="swatch" style="background:${done ? 'var(--own)' : r.color}"></span>
@@ -1048,14 +1081,19 @@ function pickMySprites(n) {
   return out;
 }
 
-// Interaktiv kamp: ca. 8 sekunder der du trykker på fiender som dukker opp og bruker evner.
-// Uten innsats blir utfallet som vinnersjansen; innsats gir ekstra skade (se E.prepareBattle).
-const BATTLE_MS = 8000;
+// Interaktiv kamp: hæren din har liv som tappes av fiendens ild. Fienden varsler spesialangrep –
+// kanonsalve (stopp den med Skjold) og stormangrep (trykk på kapteinen tre ganger). Treff på rad gir kombo.
+// Uten innsats blir utfallet som vinnersjansen; god innsats gir seier oftere, færre tap og flere stjerner.
 const PRE_MS = 750;
-const TAP_DMG = 0.035;
-const ARTY_DMG = 0.06;
-const ARTY_CD = 2600;
-const AIR_DMG = 0.3;
+const TAP_DMG = 0.022;
+const ARTY_DMG = 0.05;
+const AIR_DMG = 0.25;
+const SHIELD_MS = 1300;
+const SHIELD_CD = 4200;
+const COUNTER_DMG = 0.04;
+const COMBO_MAX = 1.75;
+const ABILITY_DMG = { bribe: 0.2, nuts: 0.1, laser: 0.22 };
+const starRow = (n, cls = '') => `<span class="stars-row ${cls}">${[1, 2, 3].map((i) => `<span class="st ${i <= n ? 'on' : ''}">${ico('star')}</span>`).join('')}</span>`;
 function startBattle(id) {
   const r = REGION_BY_ID[id];
   if (!r || S.conquered[id]) return;
@@ -1074,6 +1112,7 @@ function showBattle(r, prep, mine) {
   const foeCount = r.enemy === 'boss' || r.enemy === 'penguin' ? 5 : 4;
   const foes = Array.from({ length: foeCount }, (_, i) => enemyArtFor(r, i));
   const T = TERRAINS[r.terrain];
+  const ab = prep.ability ? C.ABILITIES[prep.ability] : null;
   ov.innerHTML = `<div class="battle-inner">
     <div class="battle-head"><div class="eyebrow">${esc(L(TACTICS[prep.tactic].name))}${T ? ' · ' + esc(L(T.name)) : ''}</div><h2>${esc(L(r.name))}</h2></div>
     <div class="battle-bars">
@@ -1081,28 +1120,40 @@ function showBattle(r, prep, mine) {
       <div class="bvs">${t('vs')}</div>
       <div class="bbar foe"><div class="bbar-label">${fmt(prep.D)}</div><div class="bbar-track"><div class="bbar-fill"></div></div></div>
     </div>
-    <div class="battle-time"><div class="battle-time-fill"></div></div>
+    <div class="battle-status"><span class="combo" hidden></span>${starRow(3, 'live-stars')}</div>
     <div class="battlefield">
       <div class="army me" data-n="${Math.min(mine.length, 4)}">${mine.map((id, i) => `<div class="fighter" style="--i:${i}">${A.unitArt(id, 'me')}</div>`).join('')}</div>
       <div class="army foe" data-n="${Math.min(foes.length, 4)}">${foes.map((svg, i) => `<div class="fighter" style="--i:${i}">${svg}</div>`).join('')}</div>
+      <div class="shield-wall"></div>
       <div class="targets"></div>
       <div class="booms"></div>
+      <div class="warn" hidden><span class="warn-txt"></span><span class="warn-bar"><span></span></span></div>
       <div class="battle-call">${t('battle_go')}</div>
     </div>
-    <p class="battle-hint">${t('battle_hint')}</p>
+    <p class="battle-hint">${prep.specials.length ? t('battle_hint2') : t('battle_hint')}</p>
     <div class="ability-bar">
       <button type="button" class="ability arty" data-ab="arty"><span class="ab-ico">${ico('boom')}</span><b>${t('ab_arty')}</b><span class="ab-cd"></span></button>
+      <button type="button" class="ability shield" data-ab="shield"><span class="ab-ico">${ico('shield')}</span><b>${t('ab_shield')}</b><span class="ab-cd"></span></button>
+      ${ab ? `<button type="button" class="ability gen" data-ab="gen"><span class="ab-ico gen-face">${miniGeneral()}</span><b>${esc(L(ab.name))}</b></button>` : ''}
       ${prep.airstrike ? `<button type="button" class="ability air" data-ab="air"><span class="ab-ico">${ico('rocket')}</span><b>${t('ab_air')}</b></button>` : ''}
-      <button type="button" class="ability skip" data-ab="skip"><span class="ab-ico">${ico('ffwd')}</span><b>${t('ab_skip')}</b></button>
     </div>
+    <div class="battle-sub"><button type="button" class="link-btn" data-ab="retreat">${ico('flag')} ${t('ab_retreat')}</button><button type="button" class="link-btn" data-ab="skip">${ico('ffwd')} ${t('ab_skip')}</button></div>
   </div>`;
   $('#overlay-root').appendChild(ov);
-  const meFill = $('.bbar.me .bbar-fill', ov), foeFill = $('.bbar.foe .bbar-fill', ov), timeFill = $('.battle-time-fill', ov);
+  const meFill = $('.bbar.me .bbar-fill', ov), foeFill = $('.bbar.foe .bbar-fill', ov);
   const field = $('.battlefield', ov), targets = $('.targets', ov), booms = $('.booms', ov);
+  const warnEl = $('.warn', ov), warnTxt = $('.warn-txt', ov), warnBar = $('.warn-bar span', ov);
+  const comboEl = $('.combo', ov), liveStars = $$('.live-stars .st', ov);
   const artyBtn = $('[data-ab="arty"]', ov), artyCd = $('.ab-cd', artyBtn);
-  const st = { t: -PRE_MS, last: 0, score: 0, done: false, hits: 0, arty: 0, artyReady: 500, air: false, nextSpawn: 150 };
+  const shieldBtn = $('[data-ab="shield"]', ov), shieldCd = $('.ab-cd', shieldBtn);
+  const st = {
+    t: -PRE_MS, last: 0, score: 0, hp: 1, done: false, combo: 1, bestCombo: 1, lastHit: -1e9, hits: 0, arty: 0,
+    artyReady: 400, shieldUntil: -1, shieldReady: 0, nextSp: 0, warn: null, blocked: 0, missed: 0,
+    genUsed: false, air: false, stunUntil: -1, cancelled: {}, nextSpawn: 150,
+  };
   const words = getLang() === 'en' ? ['POW!', 'BOOM!', 'BANG!', 'ZAP!', 'CRASH!', 'WHAM!'] : ['POW!', 'BOOM!', 'BANG!', 'ZAP!', 'KRASJ!', 'PANG!'];
   const colors = ['#ffd23f', '#ff8a3d', '#ff5d8f', '#7ffcff'];
+  const early = () => (prep.early && st.t < prep.early ? 2 : 1);
   let raf = 0;
   requestAnimationFrame(() => ov.classList.add('go'));
   const boom = (x, y, word, big = false) => {
@@ -1114,66 +1165,141 @@ function showBattle(r, prep, mine) {
     booms.appendChild(b);
     setTimeout(() => b.remove(), 700);
   };
-  const dmgText = (x, y, v) => {
+  const floatTxt = (x, y, txt, cls = '') => {
     const d = document.createElement('div');
-    d.className = 'dmg-float';
+    d.className = 'dmg-float ' + cls;
     d.style.left = x + '%';
     d.style.top = y + '%';
-    d.textContent = '-' + Math.round((v / prep.need) * 100) + '%';
+    d.textContent = txt;
     booms.appendChild(d);
-    setTimeout(() => d.remove(), 800);
+    setTimeout(() => d.remove(), 900);
+  };
+  const dmg = (v, x, y) => { st.score += v; floatTxt(x, y, '-' + Math.max(1, Math.round((v / prep.need) * 100)) + '%'); };
+  const showCombo = () => {
+    comboEl.hidden = st.combo < 1.1;
+    comboEl.textContent = t('combo', { n: fmt(Math.round(st.combo * 100) / 100) });
+    comboEl.classList.remove('bump'); void comboEl.offsetWidth; comboEl.classList.add('bump');
+  };
+  const bump = (inc) => { st.combo = Math.min(COMBO_MAX, st.combo + inc); st.bestCombo = Math.max(st.bestCombo, st.combo); showCombo(); };
+  const breakCombo = () => { if (st.combo > 1) { st.combo = 1; showCombo(); } };
+  const hitTarget = (b, x, y) => {
+    if (b.dataset.hit || st.done || st.t < 0) return false;
+    b.dataset.hit = '1';
+    b.classList.add('hit');
+    st.hits++;
+    if (st.t - st.lastHit <= 1400) bump(0.15); else { st.combo = 1; bump(0); }
+    st.lastHit = st.t;
+    dmg(TAP_DMG * st.combo * early(), x + 2, y);
+    boom(x + 4, y + 6, words[st.hits % words.length]);
+    st.hits % 2 ? sfx.pew() : sfx.boom();
+    if (S.settings.vibrate) buzz(12);
+    setTimeout(() => b.remove(), 260);
+    return true;
   };
   const spawnTarget = () => {
-    if (targets.children.length >= 3) return;
+    if (targets.querySelectorAll('.target:not(.captain)').length >= 3) return;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'target';
     b.setAttribute('aria-label', t('target_label'));
-    const x = 54 + Math.random() * 33, y = 6 + Math.random() * 56;
+    const x = 54 + Math.random() * 33, y = 8 + Math.random() * 54;
     b.style.left = x + '%';
     b.style.top = y + '%';
     b.innerHTML = `${enemyArtFor(r, Math.floor(Math.random() * 3))}<span class="target-ring"></span>`;
-    const kill = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (b.dataset.hit || st.done || st.t < 0) return;
-      b.dataset.hit = '1';
-      b.classList.add('hit');
-      st.hits++;
-      st.score += TAP_DMG;
-      boom(x + 4, y + 6, words[st.hits % words.length]);
-      dmgText(x + 2, y, TAP_DMG);
-      st.hits % 2 ? sfx.pew() : sfx.boom();
-      if (S.settings.vibrate) buzz(12);
-      setTimeout(() => b.remove(), 260);
-    };
+    b._xy = [x, y];
+    const kill = (e) => { e.preventDefault(); e.stopPropagation(); hitTarget(b, x, y); };
     b.addEventListener('pointerdown', kill);
     b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') kill(e); });
     targets.appendChild(b);
-    setTimeout(() => { if (!b.dataset.hit) { b.classList.add('gone'); setTimeout(() => b.remove(), 250); } }, 1500);
+    setTimeout(() => { if (!b.dataset.hit && b.isConnected) { b.classList.add('gone'); breakCombo(); setTimeout(() => b.remove(), 250); } }, 1400);
   };
-  const finish = (skip) => {
+  // stormangrep: kapteinen må treffes tre ganger før angrepet slår inn
+  const spawnCaptain = (w) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'target captain';
+    b.setAttribute('aria-label', t('captain_label'));
+    b.style.left = '60%';
+    b.style.top = '26%';
+    b.innerHTML = `${enemyArtFor(r, 0)}<span class="target-ring"></span><span class="cap-n">3</span>`;
+    let left = 3;
+    const hit = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!st.warn || st.warn !== w || st.done) return;
+      left--;
+      b.querySelector('.cap-n').textContent = Math.max(0, left);
+      b.classList.remove('hurt'); void b.offsetWidth; b.classList.add('hurt');
+      sfx.pew();
+      if (S.settings.vibrate) buzz(15);
+      if (left <= 0) { w.capDown = true; b.classList.add('hit'); setTimeout(() => b.remove(), 260); resolveWarn(); }
+    };
+    b.addEventListener('pointerdown', hit);
+    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') hit(e); });
+    targets.appendChild(b);
+    w.cap = b;
+  };
+  const startWarn = (k) => {
+    const sp = prep.specials[k];
+    const w = { k, type: sp.type, impact: sp.at, from: st.t };
+    st.warn = w;
+    warnEl.hidden = false;
+    warnEl.className = 'warn ' + sp.type;
+    warnTxt.textContent = sp.type === 'barrage' ? t('warn_barrage') : t('warn_charge');
+    if (sp.type === 'charge') spawnCaptain(w);
+    shieldBtn.classList.toggle('alert', sp.type === 'barrage');
+    sfx.warn();
+    if (S.settings.vibrate) buzz(20);
+  };
+  const resolveWarn = () => {
+    const w = st.warn;
+    if (!w) return;
+    st.warn = null;
+    st.nextSp = w.k + 1;
+    warnEl.hidden = true;
+    shieldBtn.classList.remove('alert');
+    if (w.cap && w.cap.isConnected && !w.capDown) { w.cap.classList.add('gone'); setTimeout(() => w.cap && w.cap.remove(), 250); }
+    if (st.cancelled[w.k]) return;
+    const ok = w.type === 'barrage' ? st.t <= st.shieldUntil : !!w.capDown;
+    if (ok) {
+      st.blocked++;
+      st.score += COUNTER_DMG;
+      bump(0.3);
+      floatTxt(44, 30, t('blocked'), 'good');
+      sfx.milestone();
+    } else {
+      st.missed++;
+      st.hp -= E.SP_HP;
+      st.combo = 1;
+      showCombo();
+      floatTxt(18, 34, '-' + Math.round(E.SP_HP * 100) + ' %', 'bad');
+      ov.classList.remove('hurt'); void ov.offsetWidth; ov.classList.add('hurt');
+      for (let i = 0; i < 3; i++) setTimeout(() => boom(10 + Math.random() * 34, 20 + Math.random() * 45, 'BOOM!', i === 1), i * 90);
+      sfx.boom();
+      if (S.settings.vibrate) buzz(90);
+    }
+  };
+  const finish = (kind) => {
     if (st.done) return;
     st.done = true;
     cancelAnimationFrame(raf);
-    let score = st.score;
-    let time = Math.max(0, Math.min(1, st.t / BATTLE_MS));
-    if (skip) { // resten av kampen spilles automatisk
-      const rest = Math.max(0, 1 - time);
-      if (score + rest >= prep.need) { time = Math.min(1, time + Math.max(0, prep.need - score)); score = Math.max(score, prep.need); } else { score += rest; time = 1; }
-    }
+    let perf;
+    if (kind === 'skip') {
+      const a = E.finishAuto(prep, { t: Math.max(0, st.t), score: st.score, hp: st.hp, nextSp: st.warn ? st.warn.k : st.nextSp, cancelled: st.cancelled });
+      perf = { score: a.score, hp: a.hp };
+    } else perf = { score: st.score, hp: st.hp, retreat: kind === 'retreat' };
     targets.innerHTML = '';
+    warnEl.hidden = true;
     ov.classList.add('ending');
-    const res = E.resolveBattle(S, prep, { score, time });
+    const res = E.resolveBattle(S, prep, perf);
     if (!res) { ov.remove(); modalCount = Math.max(0, modalCount - 1); renderTab(); return; }
-    res.hits = st.hits;
-    res.arty = st.arty;
+    Object.assign(res, { hits: st.hits, arty: st.arty, bestCombo: st.bestCombo, blocked: st.blocked, specials: prep.specials.length });
+    S.stats.blocked = (S.stats.blocked || 0) + st.blocked;
     lastBattle = res;
     persist();
-    foeFill.style.width = res.win ? '0%' : Math.max(6, (1 - Math.min(1, score / prep.need)) * 100) + '%';
-    meFill.style.width = res.win ? Math.max(15, (1 - time) * 100) + '%' : '6%';
+    foeFill.style.width = res.win ? '0%' : Math.max(6, (1 - Math.min(1, res.score / prep.need)) * 100) + '%';
+    meFill.style.width = Math.max(4, res.hp * 100) + '%';
     if (res.win) for (let i = 0; i < 4; i++) setTimeout(() => boom(58 + Math.random() * 30, 10 + Math.random() * 50, words[i], true), i * 90);
-    setTimeout(() => showBattleResult(ov, r, res), skip ? 150 : 650);
+    setTimeout(() => showBattleResult(ov, r, res), kind === 'skip' || kind === 'retreat' ? 150 : 650);
   };
   const step = (now) => {
     if (st.done || !ov.isConnected) return;
@@ -1183,40 +1309,59 @@ function showBattle(r, prep, mine) {
     st.t += dt;
     if (prev < 0 && st.t >= 0) ov.classList.add('fighting');
     if (st.t >= 0) {
-      st.score += (st.t - Math.max(0, prev)) / BATTLE_MS;
-      if (st.t >= st.nextSpawn) { spawnTarget(); st.nextSpawn = st.t + 480 + Math.random() * 260; }
-      if (Math.random() < 0.04) boom(20 + Math.random() * 60, 15 + Math.random() * 55, words[Math.floor(Math.random() * words.length)]);
+      const d = st.t - Math.max(0, prev);
+      st.score += prep.autoRate * d;
+      if (st.t > st.stunUntil) st.hp -= prep.drain * d;
+      if (st.t >= st.nextSpawn) { spawnTarget(); st.nextSpawn = st.t + 520 + Math.random() * 260; }
+      if (Math.random() < 0.035) boom(20 + Math.random() * 60, 15 + Math.random() * 55, words[Math.floor(Math.random() * words.length)]);
+      // fiendens spesialangrep
+      while (!st.warn && st.nextSp < prep.specials.length && st.cancelled[st.nextSp]) st.nextSp++;
+      if (!st.warn && st.nextSp < prep.specials.length && st.t >= prep.specials[st.nextSp].at - prep.warnMs) startWarn(st.nextSp);
+      if (st.warn) {
+        const w = st.warn;
+        warnBar.style.width = Math.max(0, Math.min(1, (w.impact - st.t) / Math.max(1, w.impact - w.from))) * 100 + '%';
+        if (st.t >= w.impact) resolveWarn();
+      }
     }
+    ov.classList.toggle('shielded', st.t <= st.shieldUntil && st.t >= 0);
     foeFill.style.width = Math.max(0, 1 - st.score / prep.need) * 100 + '%';
-    meFill.style.width = Math.max(0.05, 1 - Math.max(0, st.t) / BATTLE_MS) * 100 + '%';
-    timeFill.style.width = Math.max(0, 1 - Math.max(0, st.t) / BATTLE_MS) * 100 + '%';
+    meFill.style.width = Math.max(0, st.hp) * 100 + '%';
+    const stars = E.starsFor(st.hp);
+    liveStars.forEach((x, i) => x.classList.toggle('on', i < stars));
     const cd = st.artyReady - st.t;
     artyBtn.disabled = cd > 0 || st.t < 0;
     artyBtn.classList.toggle('ready', cd <= 0 && st.t >= 0);
     artyCd.textContent = cd > 0 && st.t >= 0 ? Math.ceil(cd / 1000) : '';
-    if (st.score >= prep.need) { finish(false); return; }
-    if (st.t >= BATTLE_MS) { finish(false); return; }
+    const sc = st.shieldReady - st.t;
+    shieldBtn.disabled = sc > 0 || st.t < 0;
+    shieldCd.textContent = sc > 0 && st.t >= 0 ? Math.ceil(sc / 1000) : '';
+    if (st.score >= prep.need) { finish('win'); return; }
+    if (st.hp <= 0) { finish('lose'); return; }
     raf = requestAnimationFrame(step);
   };
   raf = requestAnimationFrame(step);
   ov.addEventListener('click', (e) => {
-    const ab = e.target.closest('[data-ab]');
-    if (!ab || st.done) return;
-    if (ab.dataset.ab === 'skip') { sfx.click(); finish(true); return; }
+    const b = e.target.closest('[data-ab]');
+    if (!b || st.done) return;
+    const id = b.dataset.ab;
+    if (id === 'skip') { sfx.click(); finish('skip'); return; }
+    if (id === 'retreat') { sfx.click(); finish('retreat'); return; }
     if (st.t < 0) return;
-    if (ab.dataset.ab === 'arty' && st.t >= st.artyReady) {
-      st.artyReady = st.t + ARTY_CD;
+    if (id === 'arty' && st.t >= st.artyReady) {
+      st.artyReady = st.t + prep.artyCd;
       st.arty++;
-      const v = ARTY_DMG * (prep.artillery || 1);
-      st.score += v;
       for (let i = 0; i < 3; i++) setTimeout(() => boom(60 + Math.random() * 28, 12 + Math.random() * 50, 'BOOM!'), i * 110);
-      dmgText(70, 20, v);
+      dmg(ARTY_DMG * prep.artyMult * early(), 70, 20);
       sfx.boom();
       if (S.settings.vibrate) buzz(30);
-    } else if (ab.dataset.ab === 'air' && !st.air) {
+    } else if (id === 'shield' && st.t >= st.shieldReady) {
+      st.shieldUntil = st.t + SHIELD_MS;
+      st.shieldReady = st.t + SHIELD_CD;
+      sfx.buy();
+    } else if (id === 'air' && !st.air) {
       st.air = true;
-      ab.disabled = true;
-      ab.classList.add('used');
+      b.disabled = true;
+      b.classList.add('used');
       const rk = document.createElement('div');
       rk.className = 'air-strike';
       rk.innerHTML = [0, 1, 2].map((i) => `<span style="--d:${i * 0.12}s;--y:${14 + i * 17}%">${A.missileArt()}</span>`).join('');
@@ -1224,35 +1369,76 @@ function showBattle(r, prep, mine) {
       setTimeout(() => rk.remove(), 1100);
       setTimeout(() => {
         if (st.done) return;
-        st.score += AIR_DMG;
         for (let i = 0; i < 5; i++) setTimeout(() => boom(56 + Math.random() * 34, 8 + Math.random() * 56, 'KABOOM!', true), i * 80);
-        dmgText(72, 30, AIR_DMG);
+        dmg(AIR_DMG, 72, 30);
         sfx.boom();
         if (S.settings.vibrate) buzz(60);
       }, 420);
+    } else if (id === 'gen' && !st.genUsed) {
+      st.genUsed = true;
+      b.disabled = true;
+      b.classList.add('used');
+      const kind = prep.ability;
+      if (kind === 'bribe') {
+        const cost = Math.floor(S.money * 0.05);
+        S.money -= cost;
+        updateHUD();
+        // fienden hopper over neste spesialangrep
+        if (st.warn) { st.cancelled[st.warn.k] = true; resolveWarn(); } else if (st.nextSp < prep.specials.length) st.cancelled[st.nextSp] = true;
+        floatTxt(40, 18, '-' + money(cost), 'gold');
+        floatTxt(62, 40, t('bribed'), 'good');
+        dmg(ABILITY_DMG.bribe, 70, 26);
+        sfx.coin();
+      } else if (kind === 'nuts') {
+        $$('.target:not(.captain)', targets).forEach((x) => hitTarget(x, x._xy[0], x._xy[1]));
+        for (let i = 0; i < 6; i++) setTimeout(() => boom(52 + Math.random() * 38, 6 + Math.random() * 60, getLang() === 'en' ? 'NUTS!' : 'NØTT!', false), i * 70);
+        dmg(ABILITY_DMG.nuts, 70, 24);
+        sfx.recruit();
+      } else if (kind === 'laser') {
+        ov.classList.add('lasering');
+        sfx.pew();
+        setTimeout(() => {
+          ov.classList.remove('lasering');
+          if (st.done) return;
+          st.stunUntil = st.t + 2000;
+          for (let i = 0; i < 4; i++) setTimeout(() => boom(60 + Math.random() * 28, 14 + Math.random() * 48, 'ZAAP!', true), i * 80);
+          dmg(ABILITY_DMG.laser, 70, 28);
+          floatTxt(62, 52, t('stunned'), 'good');
+          sfx.boom();
+        }, 800);
+      }
     }
   });
 }
 
 function showBattleResult(ov, r, res) {
-  res.win ? sfx.victory() : sfx.defeat();
+  if (res.win && res.stars === 3) sfx.fanfare(); else res.win ? sfx.victory() : sfx.defeat();
   ov.classList.add('done');
   const card = document.createElement('div');
-  card.className = 'result-card ' + (res.win ? 'win' : 'lose');
+  card.className = 'result-card ' + (res.win ? 'win s' + res.stars : 'lose');
+  const weak = !res.win && res.dealt > 0 ? Math.max(1, Math.round((res.dealt / r.def) * 100)) : 0;
   card.innerHTML = `<div class="result-mascot">${miniGeneral(res.win ? 'happy' : 'sad')}</div>
-    <h2 class="result-title">${res.win ? t('victory') : t('defeat')}</h2>
-    <p>${res.win ? t('victory_text', { r: esc(L(r.name)) }) : t('defeat_text', { r: esc(L(r.name)) })}</p>
-    ${res.win ? `<p class="result-reward">${ico('coin')} ${t('new_income', { v: money(r.income * pm()) })}</p><p class="result-reward gems">${ico('gem')} ${t('gems_won', { n: res.gems })}</p>` : ''}
+    <h2 class="result-title">${res.win ? t('victory') : res.retreat ? t('retreated') : t('defeat')}</h2>
+    ${res.win ? `<div class="result-stars">${[1, 2, 3].map((i) => `<span class="rs ${i <= res.stars ? 'on' : ''}" style="--i:${i}">${ico('star')}</span>`).join('')}</div>` : ''}
+    <p>${res.win ? t('victory_text', { r: esc(L(r.name)) }) : res.retreat ? t('retreat_text', { r: esc(L(r.name)) }) : t('defeat_text', { r: esc(L(r.name)) })}</p>
+    ${res.win ? `<div class="loot-list">
+      <div class="loot-row">${ico('coin')}<span>${t('new_income', { v: money(r.income * pm()) })}</span></div>
+      ${res.spoils > 0 ? `<div class="loot-row">${ico('crate')}<span>${t('spoils', { v: money(res.spoils) })}</span></div>` : ''}
+      <div class="loot-row">${ico('medal')}<span>${t('medals_won', { n: res.medals })}</span></div>
+      <div class="loot-row">${ico('gem')}<span>${t('gems_won', { n: res.gems })}</span></div>
+      ${res.drop ? `<div class="loot-row drop"><span class="loot-pu">${puArt(res.drop.id)}</span><span>${t('drop_won', { p: esc(L(res.drop.name)) })}</span></div>` : ''}
+    </div>` : weak ? `<p class="result-weak">${t('enemy_weakened', { p: weak })}</p>` : ''}
     <p class="result-loss">${res.lostTotal ? t('lost_units', { n: fmt(res.lostTotal) }) : t('lost_none')}</p>
     ${res.healed ? `<p class="result-heal">${t('healed', { n: fmt(res.healed) })}</p>` : ''}
-    ${res.hits != null ? `<p class="result-stats">${t('battle_stats', { h: res.hits, a: res.arty || 0 })}</p>` : ''}
+    ${res.hits != null ? `<p class="result-stats">${t('battle_stats2', { h: res.hits, c: fmt(Math.round((res.bestCombo || 1) * 100) / 100), b: res.blocked || 0, n: res.specials || 0 })}</p>` : ''}
+    ${res.win && res.stars < 3 ? `<p class="tip">${t('star_tip')}</p>` : ''}
     ${!res.win ? `<p class="tip">${t('defeat_tip')}</p>` : ''}
     ${!res.win && res.lostTotal && M.adsEnabled() ? `<button class="btn btn-ad big" type="button" data-action="ad-revive">${ico(S.adFree ? 'gift' : 'ad')} ${t('revive', { n: fmt(res.lostTotal) })}</button>` : ''}
     <button class="btn btn-gold big" type="button" data-action="battle-done">${t('continue')}</button>`;
   $('.battle-inner', ov).appendChild(card);
-  if (res.win) confetti(ov, 40);
+  if (res.win) confetti(ov, res.stars === 3 ? 90 : 40);
   ov.dataset.era = res.eraDone ? '1' : '';
-  setTimeout(() => $('button', card)?.focus({ preventScroll: true }), 50);
+  setTimeout(() => $('button.btn-gold', card)?.focus({ preventScroll: true }), 50);
 }
 
 function battleDone(btn) {
@@ -1311,7 +1497,7 @@ function showIntro() {
     </div>
     <div class="field-label">${t('pick_general')}</div>
     <div class="gen-pick" role="radiogroup" aria-label="${t('pick_general')}">${C.GENERALS.map((g) => `<button type="button" class="gen-card ${g.id === introGeneral ? 'on' : ''}" role="radio" aria-checked="${g.id === introGeneral}" data-action="intro-general" data-id="${g.id}">
-      <span class="gen-art">${A.mascot('happy', { gen: g.id })}</span><b>${esc(L(g.name))}</b></button>`).join('')}</div>
+      <span class="gen-art">${A.mascot('happy', { gen: g.id })}</span><b>${esc(L(g.name))}</b><span class="gen-style">${esc(L(g.style))}</span></button>`).join('')}</div>
     <label class="field-label" for="village-name">${t('intro_q')}</label>
     <input id="village-name" class="text-input" maxlength="22" autocomplete="off" placeholder="${esc(name)}">
     <button type="button" class="btn btn-gold big" data-action="intro-start">${t('intro_start')}</button>
@@ -1356,7 +1542,7 @@ function showEraComplete() {
   const unlocks = [...BUILDINGS, ...UNITS].filter((it) => it.era === S.era + 1);
   const m = openModal(`<div class="modal-mascot">${A.mascot()}</div>
     <h2 class="big-title">${esc(L(cur.won))}</h2>
-    <p class="result-reward gems center-row">${ico('gem')} ${t('gems_won', { n: E.gemsForEra(S.era) })} · ${ico('crate')} 1 × ${esc(L(C.CRATE_BY_ID.gold.name))}</p>
+    <p class="result-reward gems center-row">${ico('gem')} ${t('gems_won', { n: E.gemsForEra(S.era) })} · ${ico('medal')} ${t('medals_won', { n: 5 })} · ${ico('crate')} 1 × ${esc(L(C.CRATE_BY_ID.gold.name))}</p>
     <p class="speech">${esc(L(next.intro))}</p>
     <div class="unlock-title">${t('era_unlocked')}</div>
     <div class="unlock-grid">${unlocks.map((it) => `<div class="unlock"><div class="unlock-art">${itemArt(it)}</div><span>${esc(L(it.name))}</span></div>`).join('')}</div>
@@ -1566,7 +1752,8 @@ function mineHTML() {
   </div>`).join('')}</div>` : `<div class="empty-card">${A.crateArt('wood')}<p>${t('no_crates')}</p><button type="button" class="btn btn-gold" data-action="shopview" data-view="store">${t('to_store')}</button></div>`}
   <div class="section-title">${t('your_general')}</div>
   <div class="gen-pick mine" role="radiogroup" aria-label="${t('your_general')}">${C.GENERALS.map((g) => `<button type="button" class="gen-card ${g.id === S.general ? 'on' : ''}" role="radio" aria-checked="${g.id === S.general}" data-action="pick-general" data-id="${g.id}">
-    <span class="gen-art">${A.mascotOf(g.id)}</span><b>${esc(L(g.name))}</b><span class="gen-desc">${esc(L(g.desc))}</span>${g.id === S.general ? `<span class="gen-on">${ico('check')} ${t('chosen')}</span>` : ''}</button>`).join('')}</div>
+    <span class="gen-art">${A.mascotOf(g.id)}</span><b>${esc(L(g.name))}</b><span class="gen-style">${esc(L(g.style))}</span>${g.perk.ability ? `<span class="gen-desc">${t('ability')}: ${esc(L(C.ABILITIES[g.perk.ability].name))}</span>` : ''}${g.id === S.general ? `<span class="gen-on">${ico('check')} ${t('chosen')}</span>` : ''}</button>`).join('')}</div>
+  <p class="gen-note">${E.genSwitchLeft(S) > 0 ? t('general_wait', { t: clock(E.genSwitchLeft(S)) }) : t('general_switch_note')}</p>
   <div class="section-title">${t('my_skins')}</div>
   <div class="progress"><div class="progress-fill" style="width:${(own / total) * 100}%"></div><span>${t('collection', { a: own, b: total })}</span></div>
   <div class="chip-row" role="group">${C.CATEGORIES.map((c) => `<button type="button" class="chip ${c.id === skinCat ? 'on' : ''}" data-action="skincat" data-cat="${c.id}">${esc(L(c.name))} <small>${C.SKINS.filter((k) => k.cat === c.id && S.skins.owned[k.id]).length}</small></button>`).join('')}</div>
@@ -2256,6 +2443,21 @@ function onAction(e) {
       break;
     }
     case 'intro-start': startGame(); break;
+    case 'armyview': armyView = btn.dataset.view === 'school' ? 'school' : 'units'; sfx.click(); renderTab(); $('#scr-army').scrollTop = 0; break;
+    case 'doc-up': {
+      const d = DOCTRINES.find((x) => x.id === btn.dataset.id);
+      if (d && E.upgradeDoc(S, d.id)) {
+        persist(); sfx.buy(); updateHUD(); updateBadges();
+        toast(t('doc_up', { d: L(d.name), n: E.docLevel(S, d.id) }), 'boost');
+        const sc = $('#scr-army').scrollTop; renderSchool(); $('#scr-army').scrollTop = sc;
+      } else { sfx.nope(); toast(t('need_medals')); }
+      break;
+    }
+    case 'doc-respec': {
+      if (E.respecDoc(S)) { persist(); sfx.coin(); updateHUD(); updateBadges(); toast(t('respec_done'), 'boost'); renderSchool(); }
+      else { sfx.nope(); toast((S.gems || 0) < E.RESPEC_GEMS ? t('not_enough_gems') : t('need_medals')); }
+      break;
+    }
     case 'tactic': {
       if (!TACTICS[btn.dataset.t]) break;
       S.settings.tactic = btn.dataset.t;
@@ -2280,8 +2482,8 @@ function onAction(e) {
       break;
     }
     case 'pick-general': {
-      if (!C.GENERAL_BY_ID[btn.dataset.id]) break;
-      S.general = btn.dataset.id;
+      if (!C.GENERAL_BY_ID[btn.dataset.id] || btn.dataset.id === S.general) break;
+      if (!E.switchGeneral(S, btn.dataset.id)) { sfx.nope(); toast(t('general_wait', { t: clock(E.genSwitchLeft(S)) })); break; }
       skinCat = C.GENERAL_BY_ID[S.general].cat;
       applySkins(); persist(); sfx.buy();
       toast(t('general_picked', { g: L(C.GENERAL_BY_ID[S.general].name) }));

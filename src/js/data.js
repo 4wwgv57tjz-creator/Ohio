@@ -116,12 +116,30 @@ export const TERRAINS = {
 };
 const REGION_TERRAIN = {'lima': 'plains', 'dayton': 'city', 'toledo': 'plains', 'athens': 'forest', 'cincinnati': 'city', 'akron': 'plains', 'cleveland': 'city', 'columbus': 'city', 'midwest': 'plains', 'south': 'forest', 'florida': 'swamp', 'northeast': 'city', 'plains': 'plains', 'texas': 'desert', 'desert': 'desert', 'westcoast': 'mountain', 'alaska': 'ice', 'capital': 'city', 'caribbean': 'islands', 'central': 'jungle', 'mexico': 'desert', 'canada_e': 'coast', 'canada_w': 'mountain', 'canada_n': 'ice', 'greenland': 'ice', 'colombia': 'jungle', 'venezuela': 'coast', 'peru': 'mountain', 'bolivia': 'plains', 'chile': 'coast', 'argentina': 'plains', 'amazonas': 'jungle', 'brasil': 'coast', 'norden': 'mountain', 'westeu': 'city', 'easteu': 'plains', 'nafrica': 'desert', 'savanna': 'plains', 'mideast': 'desert', 'steppes': 'plains', 'russia': 'ice', 'southasia': 'jungle', 'eastasia': 'city', 'oceania': 'islands', 'antarctica': 'ice', 'moon': 'crater', 'mars': 'desert', 'venus': 'gas', 'mercury': 'crater', 'jupiter': 'gas', 'saturn': 'space', 'neptune': 'ice', 'pluto': 'space', 'zorg': 'city', 'krystallia': 'crater', 'godteri': 'plains', 'magmus': 'crater', 'blobbus': 'swamp', 'robotron': 'city', 'mothership': 'space'};
 // Taktikk velges før angrep: mer styrke koster flere soldater, og omvendt
+// Taktikk velges før angrep. power endrer vinnersjansen; resten virker i selve kampen.
 export const TACTICS = {
-  blitz: { power: 1.25, loss: 1.6, weaken: 1, name: { nb: 'Lynangrep', en: 'Blitz' }, desc: { nb: '+25 % styrke, men flere tap', en: '+25% power, but more losses' } },
-  normal: { power: 1, loss: 1, weaken: 1, name: { nb: 'Angrep', en: 'Attack' }, desc: { nb: 'Vanlig angrep', en: 'A regular attack' } },
-  siege: { power: 0.85, loss: 0.45, weaken: 1.6, name: { nb: 'Beleiring', en: 'Siege' }, desc: { nb: '−15 % styrke, færre tap, og svekker fienden mer hvis du taper', en: '−15% power, fewer losses, and weakens the enemy more if you lose' } },
+  normal: { power: 1, loss: 1, weaken: 1, name: { nb: 'Angrep', en: 'Attack' }, desc: { nb: 'Et vanlig angrep uten fordeler eller ulemper.', en: 'A regular attack with no pros or cons.' } },
+  blitz: { power: 1.25, loss: 1.6, weaken: 1, name: { nb: 'Lynangrep', en: 'Blitz' }, desc: { nb: '+25 % styrke, men mange flere tap.', en: '+25% power, but many more losses.' } },
+  siege: { power: 0.85, loss: 0.45, weaken: 1.6, artyCd: 0.6, name: { nb: 'Beleiring', en: 'Siege' }, desc: { nb: '−15 % styrke, færre tap, artilleriet lader mye raskere, og fienden svekkes mer hvis du taper.', en: '−15% power, fewer losses, much faster artillery, and the enemy is weakened more if you lose.' } },
+  ambush: { power: 1, loss: 0.8, weaken: 1, early: 3500, delay: 1200, name: { nb: 'Snikangrep', en: 'Ambush' }, desc: { nb: 'Dobbel skade fra trykk og artilleri de første 3,5 sekundene, og fienden angriper senere.', en: 'Double damage from taps and artillery in the first 3.5 seconds, and the enemy strikes later.' } },
 };
 export const TACTIC_IDS = Object.keys(TACTICS);
+
+// Krigsskolen: medaljer fra seire kjøper nivåer. Det er ikke nok medaljer til alt – velg en strategi.
+export const DOC_MAX = 5;
+export const docCost = (level) => 2 * (level + 1); // nivå 1 koster 2, nivå 5 koster 10
+export const DOCTRINES = [
+  { id: 'inf', cls: 'inf', icon: 'cls_inf', name: { nb: 'Infanteriskolen', en: 'Infantry School' }, desc: { nb: '+10 % styrke for infanteri per nivå', en: '+10% infantry power per level' } },
+  { id: 'veh', cls: 'veh', icon: 'cls_veh', name: { nb: 'Panserskolen', en: 'Armour School' }, desc: { nb: '+10 % styrke for kjøretøy per nivå', en: '+10% vehicle power per level' } },
+  { id: 'air', cls: 'air', icon: 'cls_air', name: { nb: 'Flyskolen', en: 'Air Academy' }, desc: { nb: '+10 % styrke for fly per nivå', en: '+10% air power per level' } },
+  { id: 'sea', cls: 'sea', icon: 'cls_sea', name: { nb: 'Sjøkrigsskolen', en: 'Naval Academy' }, desc: { nb: '+10 % styrke for skip per nivå', en: '+10% navy power per level' } },
+  { id: 'arty', icon: 'boom', name: { nb: 'Artilleri', en: 'Artillery' }, desc: { nb: 'Artilleriet gjør 15 % mer skade og lader 6 % raskere per nivå', en: 'Artillery deals 15% more damage and reloads 6% faster per level' } },
+  { id: 'log', icon: 'crate', name: { nb: 'Logistikk', en: 'Logistics' }, desc: { nb: '8 % færre tap per nivå', en: '8% fewer losses per level' } },
+  { id: 'intel', icon: 'target', name: { nb: 'Etterretning', en: 'Intelligence' }, desc: { nb: 'Fiendene er 3 % svakere, og du ser angrepene deres 15 % tidligere per nivå', en: 'Enemies are 3% weaker, and you see their attacks 15% earlier per level' } },
+  { id: 'econ', icon: 'coin', name: { nb: 'Økonomi', en: 'Economy' }, desc: { nb: '+5 % inntekt per nivå', en: '+5% income per level' } },
+  { id: 'loot', icon: 'gift', name: { nb: 'Plyndring', en: 'Plunder' }, desc: { nb: '+25 % krigsbytte og +4 % sjanse for powerups fra seire per nivå', en: '+25% spoils and +4% power-up chance from victories per level' } },
+];
+export const DOCTRINE_BY_ID = Object.fromEntries(DOCTRINES.map((x) => [x.id, x]));
 
 // ---------- REGIONER ----------
 // enemy: 'army' = fiendtlige versjoner av epokens enheter, ellers spesialfiender.

@@ -1,7 +1,7 @@
 // Spillmotor – ren logikk uten DOM, slik at den kan testes og simuleres i Node.
-import { BUILDINGS, UNITS, REGIONS, ERAS, REGION_BY_ID, BUILDING_BY_ID, UNIT_BY_ID, regionsOfEra, TERRAINS, TACTICS } from './data.js';
-import { newPowerups, restorePowerups, puEffect } from './powerups.js';
-import { newCosmetics, restoreCosmetics, EMPTY_INV, addCrate, PRESTIGE_SKINS, equippedSkin, GENERAL_BY_ID, DEFAULT_GENERAL } from './cosmetics.js';
+import { BUILDINGS, UNITS, REGIONS, ERAS, REGION_BY_ID, BUILDING_BY_ID, UNIT_BY_ID, regionsOfEra, TERRAINS, TACTICS, DOCTRINES, DOCTRINE_BY_ID, DOC_MAX, docCost } from './data.js';
+import { newPowerups, restorePowerups, puEffect, grantRandom } from './powerups.js';
+import { newCosmetics, restoreCosmetics, EMPTY_INV, addCrate, PRESTIGE_SKINS, equippedSkin, GENERAL_BY_ID, DEFAULT_GENERAL, GENERAL_SWITCH_MS } from './cosmetics.js';
 
 export const SAVE_VERSION = 1;
 export const B_GROWTH = 1.15; // prisøkning per bygning
@@ -12,7 +12,9 @@ export const TAP_MAX = 25;
 export const TAP_PCT = 0.012; // andel av inntekt per trykk per nivå
 export const BOOST_MULT = 3;
 export const BOOST_SECS = 30;
-export const SAFE_RATIO = 1.5; // hærstyrke/forsvar for 100 % vinnersjanse
+export const SAFE_RATIO = 1.8; // hærstyrke/forsvar for 100 % vinnersjanse (uten innsats i kampen)
+export const DEF_FLOOR = 0.4; // et område kan ikke svekkes under 40 % av forsvaret
+export const DAMAGE_HEAL = 0.02; // svekkelse bygges opp igjen med 2 % av forsvaret per minutt
 export const AD_BOOST_MULT = 2; // inntektsboost fra belønningsreklame
 export const AD_BOOST_SECS = 600;
 export const START_GEMS = 50;
@@ -31,11 +33,16 @@ export function newState(name = '') {
     units: {},
     conquered: {},
     damage: {},
+    stars: {},
+    doc: {},
+    medals: 0,
+    medalsEarned: 0,
+    genSwitchAt: 0,
     tapLevel: 0,
     boostUntil: 0,
     lastSeen: now,
     created: now,
-    stats: { taps: 0, won: 0, lost: 0, unitsLost: 0, crates: 0, playTime: 0, wins: 0 },
+    stats: { taps: 0, won: 0, lost: 0, unitsLost: 0, crates: 0, playTime: 0, wins: 0, stars3: 0, blocked: 0, retreats: 0 },
     prestige: 0,
     general: DEFAULT_GENERAL,
     settings: { sound: true, vibrate: true, lang: 'nb', buyMode: 1, tactic: 'normal' },
@@ -62,7 +69,10 @@ export function restore(data) {
   const s = { ...base, ...data };
   s.stats = { ...base.stats, ...(data.stats || {}) };
   s.settings = { ...base.settings, ...(data.settings || {}) };
-  for (const k of ['buildings', 'units', 'conquered', 'damage']) s[k] = { ...(data[k] || {}) };
+  for (const k of ['buildings', 'units', 'conquered', 'damage', 'stars']) s[k] = { ...(data[k] || {}) };
+  s.doc = {};
+  for (const x of DOCTRINES) { const v = data.doc && data.doc[x.id]; if (Number.isFinite(v) && v > 0) s.doc[x.id] = Math.min(DOC_MAX, Math.floor(v)); }
+  for (const k of ['medals', 'medalsEarned', 'genSwitchAt']) if (!Number.isFinite(s[k]) || s[k] < 0) s[k] = 0;
   s.skins = restoreCosmetics(data.skins);
   s.crates = { ...base.crates, ...(data.crates || {}) };
   s.crates.inv = { ...EMPTY_INV, ...((data.crates && data.crates.inv) || {}) };
@@ -89,6 +99,39 @@ export const boostActive = (s, now = Date.now()) => now < (s.boostUntil || 0);
 export const adBoostActive = (s, now = Date.now()) => now < (s.adBoostUntil || 0);
 export const boostMult = (s, now = Date.now()) => (boostActive(s, now) ? BOOST_MULT : 1) * (adBoostActive(s, now) ? AD_BOOST_MULT : 1);
 
+// ---------- generalens fordeler og Krigsskolen ----------
+export const genPerk = (s) => (GENERAL_BY_ID[s.general] && GENERAL_BY_ID[s.general].perk) || {};
+export const docLevel = (s, id) => (s.doc && s.doc[id]) || 0;
+// Styrkemultiplikator for en enhetsklasse: general + Krigsskolen
+export const classMult = (s, cls) => 1 + ((genPerk(s).cls && genPerk(s).cls[cls]) || 0) + 0.1 * docLevel(s, cls);
+export const incomeMult = (s) => (genPerk(s).income || 1) * (1 + 0.05 * docLevel(s, 'econ'));
+export function upgradeDoc(s, id) {
+  const lvl = docLevel(s, id);
+  if (!DOCTRINE_BY_ID[id] || lvl >= DOC_MAX) return false;
+  const c = docCost(lvl);
+  if ((s.medals || 0) < c) return false;
+  s.medals -= c;
+  s.doc[id] = lvl + 1;
+  return true;
+}
+export const docSpent = (s) => DOCTRINES.reduce((a, x) => { let n = 0; for (let l = 0; l < docLevel(s, x.id); l++) n += docCost(l); return a + n; }, 0);
+export const RESPEC_GEMS = 30;
+export function respecDoc(s) {
+  const spent = docSpent(s);
+  if (!spent || (s.gems || 0) < RESPEC_GEMS) return false;
+  s.gems -= RESPEC_GEMS;
+  s.medals = (s.medals || 0) + spent;
+  s.doc = {};
+  return true;
+}
+export const genSwitchLeft = (s, now = Date.now()) => Math.max(0, (s.genSwitchAt || 0) + GENERAL_SWITCH_MS - now);
+export function switchGeneral(s, id, now = Date.now()) {
+  if (!GENERAL_BY_ID[id] || id === s.general || genSwitchLeft(s, now) > 0) return false;
+  s.general = id;
+  s.genSwitchAt = now;
+  return true;
+}
+
 export const isAvailable = (s, item) => item.era <= s.era;
 export const owned = (s, kind, id) => (kind === 'b' ? s.buildings[id] : s.units[id]) || 0;
 
@@ -105,11 +148,11 @@ export function baseIncome(s) {
   for (const b of BUILDINGS) { const n = s.buildings[b.id]; if (n) sum += buildingIncome(s, b, n); }
   return sum;
 }
-export const incomePerSec = (s, now = Date.now()) => baseIncome(s) * boostMult(s, now) * puEffect(s, 'income', now);
+export const incomePerSec = (s, now = Date.now()) => baseIncome(s) * incomeMult(s) * boostMult(s, now) * puEffect(s, 'income', now);
 
 export function armyPower(s) {
   let sum = 0;
-  for (const u of UNITS) { const n = s.units[u.id]; if (n) sum += unitPower(s, u, n); }
+  for (const u of UNITS) { const n = s.units[u.id]; if (n) sum += unitPower(s, u, n) * classMult(s, u.cls); }
   return sum;
 }
 export function armySize(s) { let n = 0; for (const k in s.units) n += s.units[k] || 0; return n; }
@@ -148,7 +191,7 @@ export function buy(s, kind, id, mode = 1) {
 
 // ---------- trykk ----------
 export function tapValue(s, now = Date.now(), level = s.tapLevel) {
-  return ((1 + 2 * level) * prestigeMult(s) + incomePerSec(s, now) * TAP_PCT * level) * puEffect(s, 'tap', now);
+  return ((1 + 2 * level) * prestigeMult(s) + incomePerSec(s, now) * TAP_PCT * level) * puEffect(s, 'tap', now) * (genPerk(s).tap || 1);
 }
 export const tapCost = (level) => 25 * Math.pow(5.2, level);
 export function doTap(s, now = Date.now()) {
@@ -168,6 +211,13 @@ export function buyTap(s) {
 export function tick(s, dt, now = Date.now()) {
   const inc = incomePerSec(s, now) * dt;
   s.money += inc; s.totalEarned += inc; s.stats.playTime += dt;
+  // svekkede områder bygger seg opp igjen
+  for (const id in s.damage) {
+    const r = REGION_BY_ID[id];
+    if (!r) { delete s.damage[id]; continue; }
+    s.damage[id] -= r.def * DAMAGE_HEAL * (dt / 60);
+    if (s.damage[id] <= 0) delete s.damage[id];
+  }
   return inc;
 }
 export function offlineGain(s, now = Date.now()) {
@@ -179,25 +229,25 @@ export function offlineGain(s, now = Date.now()) {
 // ---------- kamp ----------
 export function regionDef(s, r) {
   if (typeof r === 'string') r = REGION_BY_ID[r];
-  return Math.max(r.def * 0.25, r.def - (s.damage[r.id] || 0));
+  return Math.max(r.def * DEF_FLOOR, r.def - (s.damage[r.id] || 0));
 }
 export const winChance = (P, D) => (P <= 0 ? 0 : Math.max(0, Math.min(1, (P / D - 0.5) / (SAFE_RATIO - 0.5))));
 // Terreng: enheter av riktig klasse får bonus i området
 export const terrainBonus = (r, cls) => (TERRAINS[r.terrain] && TERRAINS[r.terrain].bonus[cls]) || 0;
 export function armyPowerVs(s, r) {
   let sum = 0;
-  for (const u of UNITS) { const n = s.units[u.id]; if (n) sum += unitPower(s, u, n) * (1 + terrainBonus(r, u.cls)); }
+  for (const u of UNITS) { const n = s.units[u.id]; if (n) sum += unitPower(s, u, n) * (classMult(s, u.cls) + terrainBonus(r, u.cls)); }
   return sum;
 }
 export const tacticId = (s, t) => (TACTICS[t] ? t : TACTICS[s.settings && s.settings.tactic] ? s.settings.tactic : 'normal');
-// Styrken du angriper med: hær med terrengbonus × taktikk × powerups
+// Styrken du angriper med: hær med klasse- og terrengbonus × taktikk × powerups
 export function battlePower(s, r, tactic, now = Date.now()) {
   if (typeof r === 'string') r = REGION_BY_ID[r];
   return armyPowerVs(s, r) * TACTICS[tacticId(s, tactic)].power * puEffect(s, 'power', now);
 }
 export function battleDef(s, r, now = Date.now()) {
   if (typeof r === 'string') r = REGION_BY_ID[r];
-  return regionDef(s, r) * puEffect(s, 'enemy', now);
+  return regionDef(s, r) * puEffect(s, 'enemy', now) * (1 - 0.03 * docLevel(s, 'intel'));
 }
 export function chanceFor(s, r, tactic, now = Date.now()) {
   if (typeof r === 'string') r = REGION_BY_ID[r];
@@ -217,30 +267,72 @@ function applyCasualties(s, frac, rnd) {
   return { lost, total };
 }
 
-// Interaktive kamper: autospill gir 1,0 i skade i løpet av kampen. need er hvor mye som trengs for å vinne.
-// Uten innsats vinner du med samme sannsynlighet som vinnersjansen; trykk og evner gir ekstra skade.
-export const BATTLE_K = 2.2;
+// ---------- kamp i sanntid ----------
+// Hæren din har liv (hp) som tappes jevnt av fiendens ild og med SP_HP for hvert spesialangrep du ikke stopper.
+// Fienden har «need» i liv. Uten innsats gjør hæren 1,0 i skade før livet er tomt, og vinner med samme
+// sannsynlighet som vinnersjansen. Trykk, kombo, artilleri, evner og blokkerte angrep gir ekstra skade og liv.
+export const AUTO_MS = 8000;
+export const SP_HP = 0.12;
+export const BATTLE_K = 3;
+export const WARN_MS = 1700;
 export function prepareBattle(s, regionId, tactic, rnd = Math.random, now = Date.now()) {
   const r = REGION_BY_ID[regionId];
   if (!r || r.era !== s.era || s.conquered[r.id]) return null;
   const tid = tacticId(s, tactic);
+  const tc = TACTICS[tid];
+  const perk = genPerk(s);
   const P = battlePower(s, r, tid, now), D = battleDef(s, r, now);
   const chance = winChance(P, D);
   const u = rnd();
   const need = chance >= 1 ? 0.55 + 0.4 * u : u < chance ? 0.55 + 0.45 * (u / chance) : 1 + (u - chance) * BATTLE_K;
-  return { r, tactic: tid, P, D, chance, need, airstrike: puEffect(s, 'airstrike', now) > 0, artillery: puEffect(s, 'artillery', now) };
+  // fiendens spesialangrep: flere i senere kapitler, ingen i aller første kamp
+  const n = s.stats.won === 0 && s.era === 0 ? 0 : r.era === 0 ? 1 : r.era <= 2 ? 2 : 3;
+  const specials = [];
+  for (let i = 0; i < n; i++) {
+    const at = AUTO_MS * ((i + 0.6) / (n + 0.4)) + (rnd() - 0.5) * 600 + (tc.delay || 0) * (1 - i / Math.max(1, n));
+    specials.push({ at: Math.min(AUTO_MS - 300, at), type: rnd() < 0.5 ? 'barrage' : 'charge' });
+  }
+  const artyMult = puEffect(s, 'artillery', now) * (1 + 0.15 * docLevel(s, 'arty'));
+  const artyCd = 2600 * (tc.artyCd || 1) * (perk.artyCd || 1) * (1 - 0.06 * docLevel(s, 'arty'));
+  const warnMs = WARN_MS * (perk.warn || 1) * (1 + 0.15 * docLevel(s, 'intel'));
+  return {
+    r, tactic: tid, P, D, chance, need, specials,
+    drain: (1 - SP_HP * n) / AUTO_MS, autoRate: 1 / AUTO_MS,
+    airstrike: puEffect(s, 'airstrike', now) > 0, artyMult, artyCd, warnMs,
+    early: tc.early || 0, ability: perk.ability || null,
+  };
 }
-// perf = { score: skade levert (1,0 = autospill hele kampen), time: andel av kamptiden som ble brukt }
+// Spiller resten av kampen automatisk fra en gitt stilling (brukes av «hopp over» og autokamp)
+export function finishAuto(prep, st = {}) {
+  let t = st.t || 0, score = st.score || 0, hp = st.hp ?? 1, k = st.nextSp || 0;
+  const skip = st.cancelled || {};
+  const dt = 25;
+  while (score < prep.need - 1e-9 && hp > 1e-9) {
+    t += dt;
+    score += prep.autoRate * dt;
+    hp -= prep.drain * dt;
+    while (k < prep.specials.length && prep.specials[k].at <= t) { if (!skip[k]) hp -= SP_HP; k++; }
+  }
+  const win = score >= prep.need - 1e-9;
+  return { win, score: win ? Math.max(score, prep.need) : score, hp: Math.max(0, hp), t };
+}
+export const starsFor = (hp) => (hp >= 0.5 ? 3 : hp >= 0.25 ? 2 : 1);
+const SPOILS_SECS = [0, 45, 70, 100];
+const DROP = [0, 0.05, 0.15, 0.35];
+// perf = { score, hp, retreat } – hvordan kampen gikk
 export function resolveBattle(s, prep, perf = {}, rnd = Math.random, now = Date.now()) {
   const r = prep && prep.r;
   if (!r || r.era !== s.era || s.conquered[r.id]) return null;
   const tc = TACTICS[prep.tactic] || TACTICS.normal;
-  const score = Number.isFinite(perf.score) ? perf.score : 1;
-  const win = prep.chance >= 1 || score >= prep.need - 1e-9;
-  const time = Math.max(0, Math.min(1, Number.isFinite(perf.time) ? perf.time : win ? Math.min(1, prep.need) : 1));
+  const auto = !Number.isFinite(perf.score) ? finishAuto(prep) : null;
+  const score = auto ? auto.score : perf.score;
+  const hp = Math.max(0, Math.min(1, auto ? auto.hp : Number.isFinite(perf.hp) ? perf.hp : 0));
+  const retreat = !!perf.retreat;
+  const win = !retreat && (prep.chance >= 1 || score >= prep.need - 1e-9);
   const P = prep.P, D = prep.D;
-  let frac = win ? Math.min(0.4, 0.2 * Math.pow(D / Math.max(P, 1e-9), 2)) * (0.45 + 0.55 * time) : 0.3;
-  frac = Math.min(0.85, frac * tc.loss * puEffect(s, 'losses', now));
+  const logi = 1 - 0.08 * docLevel(s, 'log');
+  let frac = win ? Math.min(0.4, 0.2 * Math.pow(D / Math.max(P, 1e-9), 2)) * (0.35 + 0.65 * (1 - hp)) : 0.35 * (retreat ? 0.35 : 1);
+  frac = Math.min(0.85, frac * tc.loss * puEffect(s, 'losses', now) * logi);
   const { lost, total } = applyCasualties(s, frac, rnd);
   // feltsykehus: noen av de falne kommer tilbake
   const heal = puEffect(s, 'heal', now);
@@ -252,31 +344,41 @@ export function resolveBattle(s, prep, perf = {}, rnd = Math.random, now = Date.
     }
   }
   const lostTotal = total - healed;
-  let dealt = 0;
-  let gems = 0;
+  let dealt = 0, gems = 0, stars = 0, medals = 0, spoils = 0, drop = null;
   if (win) {
+    stars = starsFor(hp);
     s.conquered[r.id] = true;
     delete s.damage[r.id];
+    s.stars[r.id] = Math.max(s.stars[r.id] || 0, stars);
     s.stats.won++;
-    gems = Math.round(gemsForRegion(r) * puEffect(s, 'gems', now));
+    if (stars === 3) s.stats.stars3 = (s.stats.stars3 || 0) + 1;
+    gems = Math.round(gemsForRegion(r) * puEffect(s, 'gems', now) * (stars === 3 ? 1.5 : 1));
+    medals = stars;
+    // krigsbytte: penger etter hvor godt det gikk
+    spoils = baseIncome(s) * incomeMult(s) * SPOILS_SECS[stars] * (genPerk(s).spoils || 1) * (1 + 0.25 * docLevel(s, 'loot'));
+    s.money += spoils; s.totalEarned += spoils;
+    if (rnd() < DROP[stars] + 0.04 * docLevel(s, 'loot')) drop = grantRandom(s, rnd);
   } else {
     const rd = regionDef(s, r);
     const part = Math.max(0.2, Math.min(1, score / prep.need)); // jo nærmere seier, jo mer svekkes fienden
-    dealt = Math.max(0, Math.min(rd - r.def * 0.25, (P / (TACTICS[prep.tactic] || TACTICS.normal).power) * 0.5 * part * tc.weaken));
+    dealt = Math.max(0, Math.min(rd - r.def * DEF_FLOOR, (P / tc.power) * 0.5 * part * tc.weaken));
     s.damage[r.id] = (s.damage[r.id] || 0) + dealt;
     s.stats.lost++;
+    if (retreat) s.stats.retreats = (s.stats.retreats || 0) + 1;
   }
   s.stats.unitsLost += lostTotal;
   const eraDone = win && eraComplete(s);
-  if (eraDone) gems += gemsForEra(s.era);
+  if (eraDone) { gems += gemsForEra(s.era); medals += 5; }
   s.gems = (s.gems || 0) + gems;
-  return { win, chance: prep.chance, P, D, lost, lostTotal, healed, dealt, eraDone, region: r, powerAfter: armyPower(s), gems, tactic: prep.tactic, score, need: prep.need };
+  s.medals = (s.medals || 0) + medals;
+  s.medalsEarned = (s.medalsEarned || 0) + medals;
+  return { win, retreat, chance: prep.chance, P, D, lost, lostTotal, healed, dealt, eraDone, region: r, powerAfter: armyPower(s), gems, tactic: prep.tactic, score, need: prep.need, hp, stars, medals, spoils, drop };
 }
-// Automatisk kamp (simulatoren og «hopp over»): samme sjanse som før
+// Automatisk kamp (simulatoren og tester): samme sjanse som vinnersjansen
 export function attack(s, regionId, rnd = Math.random, tactic) {
   const prep = prepareBattle(s, regionId, tactic, rnd);
   if (!prep) return null;
-  return resolveBattle(s, prep, { score: 1, time: Math.min(1, prep.need) }, rnd);
+  return resolveBattle(s, prep, {}, rnd);
 }
 
 export const eraComplete = (s) => regionsOfEra(s.era).every((r) => s.conquered[r.id]);
@@ -313,7 +415,7 @@ export function prestigeReset(s) {
   n.settings = { ...s.settings };
   n.tut = 99;
   n.gems = s.gems; n.skins = s.skins; n.crates = s.crates; n.adFree = s.adFree; n.ads = s.ads; n.purchases = s.purchases;
-  n.social = s.social; n.flags = s.flags; n.general = s.general; n.pu = s.pu;
+  n.social = s.social; n.flags = s.flags; n.general = s.general; n.pu = s.pu; n.genSwitchAt = s.genSwitchAt || 0;
   n.settings.tactic = s.settings.tactic || 'normal';
   n.stats.lifetimeBase = (s.stats.lifetimeBase || 0) + (s.totalEarned || 0);
   const r = prestigeRewards(n.prestige);

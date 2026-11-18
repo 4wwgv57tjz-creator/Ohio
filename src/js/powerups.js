@@ -93,6 +93,13 @@ export function buyBox(s, kind, price, rnd = Math.random) {
   st.bought = (st.bought || 0) + 1;
   return p;
 }
+// Gratis tilfeldig powerup (belønning for gode seire)
+export function grantRandom(s, rnd = Math.random) {
+  const p = roll(BOX_ODDS, rnd);
+  const st = pu(s);
+  st.inv[p.id] = Math.min(99, (st.inv[p.id] || 0) + 1);
+  return p;
+}
 export const freeSlot = (s, now = Date.now()) => pu(s).slots.findIndex((x) => !x || x.until <= now);
 export const invCount = (s) => Object.values(pu(s).inv).reduce((a, n) => a + n, 0);
 // Setter en powerup fra lageret inn i hovedkvarteret
