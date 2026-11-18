@@ -1720,6 +1720,7 @@ function eraNext(btn) {
   persist();
   setTab('map');
   updateHUD();
+  if (interstitialAllowed(M.CONFIG.ads.interstitialMinGap)) showInterstitial('new_chapter');
 }
 
 function prestigeRewardsHTML(level) {
@@ -1796,7 +1797,7 @@ function checkOffline() {
     <p class="speech">${t('away_text', { t: duration(secs) })}</p>
     <div class="big-money">${ico('coin')} ${money(earned)}</div>
     <button type="button" class="btn btn-gold big" data-action="collect" data-amount="${earned}">${t('collect')}</button>
-    ${M.adsEnabled() && S.tut >= 5 ? `<button type="button" class="btn btn-ad big" data-action="ad-double" data-amount="${earned}">${ico(S.adFree ? 'gift' : 'ad')} ${t('double_reward')} · ${money(earned * 2)}</button>` : ''}`, 'welcome');
+    ${M.adsEnabled() && S.tut >= 5 ? `<button type="button" class="btn btn-ad big" data-action="ad-double" data-amount="${earned}">${ico('ad')} ${t('double_reward')} · ${money(earned * 2)}</button>` : ''}`, 'welcome');
 }
 
 function showSettings() {
@@ -1815,6 +1816,8 @@ function showSettings() {
     <div class="stats-box"><b>${ico('shop')} ${t('store_section')}</b>
       <p class="small">${S.adFree ? '✓ ' + t('adfree_active') : M.isDemoAds() ? t('ads_demo_mode') : t('ads_live_mode', { p: M.CONFIG.ads.provider })}</p>
       ${M.paymentsEnabled() ? `<button type="button" class="link-btn" data-action="restore">${t('restore_purchases')}</button>` : ''}
+      ${M.privacyOptionsAvailable() ? `<button type="button" class="link-btn" data-action="ad-choices">${t('ad_choices')}</button>` : ''}
+      ${M.CONFIG.privacyUrl ? `<button type="button" class="link-btn" data-action="privacy">${t('privacy_policy')}</button>` : ''}
     </div>
     <div class="stats-box"><b>${t('stats')}</b>
       <div class="stat-list">
@@ -2087,18 +2090,33 @@ async function watchAd(placement, reward, { always = false } = {}) {
   toast(res === 'skipped' ? t('ad_skipped') : t('ad_none'));
   return false;
 }
+// Mellomreklame – bare for dem som ikke har kjøpt reklamefri. Den kommer i naturlige pauser: etter kamper,
+// når et kapittel er ferdig, og ved fanebytte når det har gått en stund siden forrige reklame.
+// Aldri i opplæringen, de første minuttene eller mens et vindu er åpent.
+function interstitialAllowed(minGapSec) {
+  if (!S || S.adFree || !M.adsEnabled()) return false;
+  if (S.tut < 5 || S.stats.playTime < 240 || modalCount > 0) return false;
+  return Date.now() - (S.ads.lastInterstitial || 0) >= minGapSec * 1000;
+}
+async function showInterstitial(placement) {
+  S.ads.lastInterstitial = Date.now();
+  S.ads.battlesSince = 0;
+  S.ads.interstitials = (S.ads.interstitials || 0) + 1;
+  persist();
+  await M.interstitialAd(placement);
+}
 async function maybeInterstitial() {
   if (!S || S.adFree || !M.adsEnabled()) return;
-  const a = S.ads;
-  const now = Date.now();
-  a.battlesSince = (a.battlesSince || 0) + 1;
-  if (S.tut < 5 || S.stats.playTime < 240 || modalCount > 0) return;
-  if (a.battlesSince < M.CONFIG.ads.interstitialEvery) return;
-  if (now - (a.lastInterstitial || 0) < M.CONFIG.ads.interstitialMinGap * 1000) return;
-  a.battlesSince = 0;
-  a.lastInterstitial = now;
-  persist();
-  await M.interstitialAd('after_battle');
+  S.ads.battlesSince = (S.ads.battlesSince || 0) + 1;
+  if (S.ads.battlesSince < M.CONFIG.ads.interstitialEvery) return;
+  if (!interstitialAllowed(M.CONFIG.ads.interstitialMinGap)) return;
+  await showInterstitial('after_battle');
+}
+// Tidsstyrt: ved fanebytte etter interstitialTimer sekunder uten reklame (0 slår det av)
+function maybeTimedInterstitial(placement) {
+  const sec = Number(M.CONFIG.ads.interstitialTimer) || 0;
+  if (sec <= 0 || !interstitialAllowed(Math.max(sec, M.CONFIG.ads.interstitialMinGap))) return;
+  showInterstitial(placement);
 }
 const FAKE_ADS = [
   { art: () => A.buildingArt('burger'), title: 'Ohio Burger', text: { nb: 'Nå med ekstra mais! Prøv Columbus-menyen i dag.', en: 'Now with extra corn! Try the Columbus meal today.' }, color: '#ff8a3d' },
@@ -2141,8 +2159,8 @@ function boostCardHTML() {
       <div class="item-body"><div class="item-name">${t('boost_active')}</div><div class="item-desc">${t('boost_left2', { t: duration(left) })}</div></div></div>`;
   }
   return `<div class="item-card boost-card"><div class="item-art boost-art">${ico('boost')}</div>
-    <div class="item-body"><div class="item-name">${t('boost_title')}</div><div class="item-desc">${S.adFree ? t('boost_desc_adfree') : t('boost_desc')}</div></div>
-    ${adBtn('ad-boost', false)}</div>`;
+    <div class="item-body"><div class="item-name">${t('boost_title')}</div><div class="item-desc">${t('boost_desc')}</div></div>
+    ${adBtn('ad-boost', false, true)}</div>`;
 }
 
 // ---------------- REISEN (hele spillet som et tre) ----------------
@@ -2539,7 +2557,7 @@ function onAction(e) {
   const a = btn.dataset.action;
   if (a !== 'buy' && a !== 'buytap') unlockAudio();
   switch (a) {
-    case 'tab': sfx.click(); setTab(btn.dataset.tab); break;
+    case 'tab': { const from = tab; sfx.click(); setTab(btn.dataset.tab); if (from !== tab) maybeTimedInterstitial('tab_change'); break; }
     case 'buy': doBuy(btn.dataset.kind, btn.dataset.id, btn); break;
     case 'buytap': doBuyTap(); break;
     case 'mode': {
@@ -2700,6 +2718,11 @@ function onAction(e) {
     case 'skip': buyTimeSkip(btn.dataset.id); break;
     case 'iap': buyProduct(btn.dataset.id); break;
     case 'restore': toast(t('restore_done')); break;
+    case 'ad-choices': M.showPrivacyOptions(); break;
+    case 'privacy':
+      openModal(`<div class="modal-head"><h2 class="h2">${t('privacy_policy')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+        <iframe class="privacy-frame" src="${esc(M.CONFIG.privacyUrl)}" title="${t('privacy_policy')}"></iframe>`, 'privacy-modal');
+      break;
     case 'ad-crate':
       if (Date.now() < (S.ads.freeCrateAt || 0)) break;
       watchAd('free_crate', () => { S.ads.freeCrateAt = Date.now() + FREE_CRATE_COOLDOWN; C.addCrate(S, 'wood'); persist(); updateBadges(); if (tab === 'shop') renderShop(); gotCrateModal('wood'); }, { always: true });
@@ -2709,7 +2732,7 @@ function onAction(e) {
       watchAd('gems', () => { gemAdsLeft(); S.ads.gemCount++; S.gems += AD_GEMS; toast(t('gems_toast', { n: AD_GEMS }), 'boost'); sfx.coin(); updateHUD(); renderShop(); }, { always: true });
       break;
     case 'ad-boost':
-      watchAd('boost', () => { S.adBoostUntil = Date.now() + E.AD_BOOST_SECS * 1000; toast(t('boost_toast'), 'boost'); sfx.milestone(); lastSig.boost = null; updateHUD(); });
+      watchAd('boost', () => { S.adBoostUntil = Date.now() + E.AD_BOOST_SECS * 1000; toast(t('boost_toast'), 'boost'); sfx.milestone(); lastSig.boost = null; updateHUD(); }, { always: true });
       break;
     case 'ad-double': {
       const amt = Number(btn.dataset.amount) || 0;
@@ -2717,7 +2740,7 @@ function onAction(e) {
         S.money += amt * 2; S.totalEarned += amt * 2;
         sfx.coin();
         closeModal(btn); updateHUD(); persist();
-      });
+      }, { always: true });
       break;
     }
     case 'ad-revive': {

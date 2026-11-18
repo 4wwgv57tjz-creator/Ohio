@@ -5,14 +5,17 @@
 //   adsense     – Google AdSense H5 Games Ads (egen nettside/domene, krever godkjent AdSense-konto)
 //   crazygames  – CrazyGames SDK v3 (last opp spillet på crazygames.com, del av reklameinntekten)
 //   poki        – Poki SDK v2 (krever avtale med Poki)
+//   admob       – Google AdMob i app-versjonen (App Store / Google Play via Capacitor, se PUBLISERING.md).
+//                 I en vanlig nettleser vises demo-reklame i stedet.
 //   none        – ingen reklame
 // Kjøp:
 //   demo        – viser kjøpsflyten uten ekte betaling
 //   none        – skjuler alt som koster ekte penger (påkrevd på spillportaler)
-/* global __MONETIZE__ */
+/* global __MONETIZE__, __ADS_PROVIDER__ */
 
 const DEFAULTS = {
-  ads: { provider: 'demo', adsenseClient: '', testMode: true, interstitialEvery: 2, interstitialMinGap: 180 },
+  ads: { provider: 'demo', adsenseClient: '', testMode: true, interstitialEvery: 2, interstitialMinGap: 180, interstitialTimer: 240 },
+  privacyUrl: 'personvern.html',
   payments: { provider: 'demo' },
 };
 function merge(a, b) {
@@ -61,6 +64,57 @@ function guarded(start, startTimeoutMs = 6000) {
 }
 const hook = (name) => { try { ui && ui[name] && ui[name](); } catch { /* */ } };
 
+// ----- AdMob (app-versjonen) -----
+// Pakken @capacitor-community/admob tas bare med i app-bygget (__ADS_PROVIDER__ === 'admob').
+// Rekkefølge ved oppstart: samtykke (GDPR, Googles UMP-skjema) → sporingsspørsmål på iOS (ATT) → start SDK.
+const nativeApp = () => !!(typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const appPlatform = () => (window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'web');
+let admob = null; // { AdMob, R, I, loaded }
+const admobUnit = (kind) => ((CONFIG.ads.admob || {})[(appPlatform() === 'ios' ? 'ios' : 'android') + kind] || '');
+async function admobPreload(kind) {
+  if (!admob || admob.loaded[kind] === 'loading' || admob.loaded[kind] === 'ready') return;
+  const adId = admobUnit(kind);
+  if (!adId) return;
+  admob.loaded[kind] = 'loading';
+  try {
+    const opts = { adId, isTesting: !!CONFIG.ads.testMode };
+    if (kind === 'Rewarded') await admob.AdMob.prepareRewardVideoAd(opts); else await admob.AdMob.prepareInterstitial(opts);
+    admob.loaded[kind] = 'ready';
+  } catch { admob.loaded[kind] = ''; }
+}
+async function admobShow(kind) {
+  if (!admob) return 'none';
+  if (admob.loaded[kind] !== 'ready') {
+    if (admob.loaded[kind] !== 'loading') admobPreload(kind);
+    for (let i = 0; i < 40 && admob.loaded[kind] === 'loading'; i++) await new Promise((r) => setTimeout(r, 250));
+    if (admob.loaded[kind] !== 'ready') return 'none';
+  }
+  const { AdMob, R, I } = admob;
+  const ev = kind === 'Rewarded' ? R : I;
+  const handles = [];
+  let rewarded = false;
+  let closed;
+  const done = new Promise((resolve) => { closed = resolve; });
+  hook('onAdStart');
+  try {
+    handles.push(await AdMob.addListener(ev.Dismissed, () => closed()));
+    handles.push(await AdMob.addListener(ev.FailedToShow, () => closed()));
+    if (kind === 'Rewarded') handles.push(await AdMob.addListener(R.Rewarded, () => { rewarded = true; }));
+    admob.loaded[kind] = '';
+    if (kind === 'Rewarded') AdMob.showRewardVideoAd().then(() => { rewarded = true; }).catch(() => closed());
+    else await AdMob.showInterstitial();
+    await Promise.race([done, new Promise((r) => setTimeout(r, 180000))]);
+    if (kind === 'Rewarded' && !rewarded) await new Promise((r) => setTimeout(r, 300)); // belønningen kan komme rett etter lukking
+    return kind === 'Rewarded' ? (rewarded ? 'ok' : 'skipped') : 'done';
+  } catch {
+    return 'none';
+  } finally {
+    handles.forEach((h) => { try { h && h.remove && h.remove(); } catch { /* */ } });
+    hook('onAdEnd');
+    admobPreload(kind); // gjør neste reklame klar i bakgrunnen
+  }
+}
+
 const PROVIDERS = {
   none: {
     init: async () => true,
@@ -71,6 +125,29 @@ const PROVIDERS = {
     init: async () => true,
     rewarded: async () => (ui ? ui.demoAd('rewarded') : 'none'),
     interstitial: async () => { if (ui) await ui.demoAd('interstitial'); },
+  },
+  // Google AdMob i app-versjonen (Capacitor)
+  admob: {
+    async init() {
+      if (typeof __ADS_PROVIDER__ === 'undefined' || __ADS_PROVIDER__ !== 'admob') return false;
+      const mod = await import('@capacitor-community/admob');
+      const { AdMob, AdmobConsentStatus } = mod;
+      try {
+        const info = await AdMob.requestConsentInfo();
+        if (info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) await AdMob.showConsentForm();
+      } catch (e) { console.warn('AdMob-samtykke:', e && e.message); }
+      try {
+        const tr = await AdMob.trackingAuthorizationStatus();
+        if (tr && tr.status === 'notDetermined') await AdMob.requestTrackingAuthorization();
+      } catch { /* bare iOS */ }
+      await AdMob.initialize({ initializeForTesting: !!CONFIG.ads.testMode });
+      admob = { AdMob, R: mod.RewardAdPluginEvents, I: mod.InterstitialAdPluginEvents, loaded: {} };
+      admobPreload('Rewarded');
+      admobPreload('Interstitial');
+      return true;
+    },
+    rewarded: () => admobShow('Rewarded'),
+    interstitial: () => admobShow('Interstitial'),
   },
   // Google AdSense H5 Games Ads (Ad Placement API): adBreak()/adConfig()
   adsense: {
@@ -159,7 +236,8 @@ const PROVIDERS = {
 
 export async function initMonetization(uiHooks, { forceDemo = false } = {}) {
   ui = uiHooks;
-  const name = forceDemo ? 'demo' : CONFIG.ads.provider;
+  let name = forceDemo ? 'demo' : CONFIG.ads.provider;
+  if (name === 'admob' && !nativeApp()) name = 'demo'; // app-bygget åpnet i en vanlig nettleser
   provider = PROVIDERS[name] || PROVIDERS.demo;
   try { ready = await provider.init(); } catch (e) {
     console.warn('Reklame utilgjengelig:', e.message);
@@ -172,6 +250,12 @@ export async function initMonetization(uiHooks, { forceDemo = false } = {}) {
 export const adsEnabled = () => CONFIG.ads.provider !== 'none';
 export const paymentsEnabled = () => CONFIG.payments.provider === 'demo';
 export const isDemoAds = () => provider === PROVIDERS.demo;
+// Reklamevalg: Googles skjema der spilleren kan endre samtykket (påkrevd i EØS når AdMob ber om det)
+export const privacyOptionsAvailable = () => !!admob;
+export async function showPrivacyOptions() {
+  if (!admob) return false;
+  try { await admob.AdMob.showPrivacyOptionsForm(); return true; } catch { return false; }
+}
 
 export async function rewardedAd(placement) {
   if (!provider || !ready) return 'none';

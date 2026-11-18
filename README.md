@@ -88,13 +88,19 @@ Tips:
   kjøpes i butikken. De brukes på lootkasser og «tidshopp» (få 1 eller 4 timer med inntekt med en gang).
 - **Belønningsreklame** (frivillig): gratis trekasse hvert 30. minutt, +30 edelstener (8 per dag), 2× inntekt i
   10 minutter, dobbel inntekt mens du var borte, og få tilbake soldatene etter et tap.
-- **Reklame mellom kampene**: høyst etter annenhver kamp og med minst 3 minutter mellom. Aldri i opplæringen eller de
-  første 4 minuttene.
-- **Reklamefri**: fjerner reklamen mellom kampene, og boost, dobbel offline-inntekt og gjenoppliving gis uten
-  reklame. Gratis kasser og edelstener krever fortsatt at man ser en reklame. Finnes også i en startpakke sammen med
-  500 edelstener og en kosmisk kasse.
+- **Mellomreklame** (bare for dem som ikke har kjøpt reklamefri) i naturlige pauser: etter annenhver kamp (minst
+  3 minutter mellom), ved fanebytte når det har gått 4 minutter siden forrige reklame, og når et kapittel er ferdig.
+  Aldri i opplæringen eller de første 4 minuttene.
+- **Reklamefri**: fjerner all mellomreklame, og soldatene kommer tilbake etter et tap uten reklame. Gratis kasser,
+  edelstener og dobbel inntekt (2× i 10 minutter og dobbel inntekt for tiden man var borte) krever fortsatt at man
+  ser en reklame. Finnes også i en startpakke sammen med 500 edelstener og en kosmisk kasse.
+- **Personvern**: innstillingene har lenke til personvernerklæringen (`docs/personvern.html`, et utkast som må fylles
+  ut) og, i app-versjonen, «Reklamevalg» der spilleren kan endre samtykket til reklame.
 
 ## Tjen penger på spillet
+
+**Se [PUBLISERING.md](PUBLISERING.md)** for en full guide: hva det koster, hvor mye reklame kan gi, steg for steg til
+App Store og Google Play, AdMob, personvern og skatt i Norge.
 
 Slik det er bygget nå, kjører butikken og reklamen i **demo-modus**: reklamene er spillets egne fiktive merker, og
 kjøp koster ingenting. Det er for å teste. For å tjene ekte penger velger du en av veiene under. Alle krever en
@@ -121,10 +127,11 @@ H5-spillreklame. Sett dette i `monetize.config.json` og kjør `npm run build`:
 Bruk `"testMode": true` mens du tester. I Norge og resten av EØS må reklamen ha et samtykkebanner (GDPR) – det setter
 du opp under «Personvern og meldinger» i AdSense.
 
-**3. App i App Store / Google Play.** Ekte kjøp av edelstener og reklamefri krever en app i en appbutikk, med Apple/Google
-sitt betalingssystem. Det gjøres best ved å lage spillet i Unity (Unity LevelPlay for reklame og Unity IAP for kjøp)
-eller pakke denne web-appen inn med Capacitor (AdMob og et betalingstillegg). Utviklerkonto koster 25 dollar én gang hos
-Google og 99 dollar i året hos Apple, og iPhone-versjonen må bygges på en Mac.
+**3. App i App Store / Google Play.** Prosjektet er klargjort med Capacitor og Google AdMob: `npm run build` lager
+app-versjonen i `app/www/`, og `npm run app:ios` / `npm run app:android` åpner den i Xcode eller Android Studio (etter
+`npx cap add ios` / `npx cap add android`). Utviklerkonto koster 25 dollar én gang hos Google og 99 dollar i året hos
+Apple, og iPhone-versjonen må bygges på en Mac eller i en skytjeneste. Kjøp med ekte penger er foreløpig av i appene
+(det krever Apples og Googles kjøpssystemer). Alle stegene står i [PUBLISERING.md](PUBLISERING.md).
 
 **Om lootkasser som koster penger:** App Store og Google Play krever at sjansene vises (det gjør spillet). Lootkasser
 som kjøpes for ekte penger er forbudt i Belgia, og flere land, også Norge, vurderer strengere regler. Hvis du selger
@@ -134,12 +141,15 @@ edelstener for ekte penger, sjekk reglene der spillet skal selges.
 
 | Felt | Verdier | Betydning |
 |------|---------|-----------|
-| `ads.provider` | `demo`, `adsense`, `crazygames`, `poki`, `none` | Hvilken reklame `docs/`-versjonen bruker |
+| `ads.provider` | `demo`, `adsense`, `crazygames`, `poki`, `none` | Hvilken reklame `docs/`-versjonen bruker (appene bruker alltid AdMob) |
 | `ads.adsenseClient` | `ca-pub-…` | AdSense-utgivernummeret ditt |
-| `ads.testMode` | `true` / `false` | AdSense testreklame (ingen inntekt) |
-| `ads.interstitialEvery` | tall | Reklame mellom kamper etter så mange kamper |
-| `ads.interstitialMinGap` | sekunder | Minste tid mellom to slike reklamer |
+| `ads.testMode` | `true` / `false` | Testreklame (ingen inntekt) – gjelder AdSense og AdMob |
+| `ads.interstitialEvery` | tall | Mellomreklame etter så mange kamper |
+| `ads.interstitialMinGap` | sekunder | Minste tid mellom to mellomreklamer |
+| `ads.interstitialTimer` | sekunder | Mellomreklame ved fanebytte etter så lang tid uten reklame (`0` = av) |
+| `ads.admob` | annonseenhet-ID-er | `iosRewarded`, `iosInterstitial`, `androidRewarded`, `androidInterstitial` (nå Googles test-ID-er) |
 | `payments.provider` | `demo`, `none` | `demo` viser kjøpsflyten uten betaling, `none` skjuler kjøp |
+| `privacyUrl` | adresse | Personvernerklæringen som innstillingene lenker til (`personvern.html`) |
 
 Koden for reklame og kjøp ligger samlet i `src/js/monetize.js`.
 
@@ -255,6 +265,9 @@ tools/
 assets/           fonter (med lisenser) og app-ikoner
 docs/             ferdig bygget app (dette er det som publiseres)
 builds/           ferdige versjoner for CrazyGames og Poki
+app/www/          app-versjonen for Capacitor (lages av npm run build, ikke i git)
+capacitor.config.json oppsett for iOS- og Android-appene (endre appId)
+PUBLISERING.md    guide til å tjene penger og publisere i App Store og Google Play
 monetize.config.json  valg av reklame og kjøp
 online.config.json    valg av leaderboard/innlogging (demo eller Firebase)
 firebase/         sikkerhetsregler og emulatoroppsett for Firebase
@@ -264,7 +277,9 @@ Kommandoer (Node 18+):
 
 ```sh
 npm install          # henter byggeverktøy og kartdata
-npm run build        # bygger docs/ (PWA), builds/crazygames, builds/poki og dist/artifact.html
+npm run build        # bygger docs/ (PWA), builds/crazygames, builds/poki, app/www og dist/artifact.html
+npm run app:ios      # bygger og åpner iOS-appen i Xcode (etter npx cap add ios, på Mac)
+npm run app:android  # bygger og åpner Android-appen i Android Studio (etter npx cap add android)
 npm run maps         # lager src/js/mapdata.js på nytt
 npm run sim          # balanserer spillet på nytt og skriver src/js/balance.js
 CHECK=1 npm run sim  # beholder tallene og viser hvor lang tid hvert område tar

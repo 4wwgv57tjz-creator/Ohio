@@ -2,6 +2,7 @@
 //   docs/                 – installerbar mobil-webapp (PWA) for GitHub Pages. Reklame/kjøp styres av monetize.config.json
 //   dist/artifact.html    – samme spill som ett HTML-fragment (for claude.ai Artifact, alltid demo-reklame)
 //   builds/crazygames/, builds/poki/ – egne versjoner for spillportaler (med portalens reklame-SDK, uten kjøp)
+//   app/www/              – app-versjonen for App Store og Google Play (Capacitor + AdMob, se PUBLISERING.md)
 // Leaderboard/innlogging styres av online.config.json («demo» eller «firebase»).
 // Kjør: npm run build        (SOCIAL_EMULATOR=1 lager også dist/emulator/ for testing mot Firebase-emulatoren)
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
@@ -23,7 +24,8 @@ if (onlineCfg.provider === 'firebase' && !(onlineCfg.firebase && onlineCfg.fireb
   onlineCfg.provider = 'demo';
 }
 const DEMO_SOCIAL = { provider: 'demo', loginProviders: onlineCfg.loginProviders || ['facebook', 'apple'] };
-const bundle = async (cfg, social = onlineCfg) => (await esbuild.build({
+const APP_PKGS = ['@capacitor-community/admob', '@capacitor/core'];
+const bundle = async (cfg, social = onlineCfg, app = false) => (await esbuild.build({
   entryPoints: [p('src/js/main.js').pathname],
   bundle: true,
   minify: true,
@@ -31,10 +33,16 @@ const bundle = async (cfg, social = onlineCfg) => (await esbuild.build({
   target: ['es2020', 'safari14'],
   write: false,
   legalComments: 'none',
-  define: { __MONETIZE__: JSON.stringify(cfg), __SOCIAL__: JSON.stringify(social), __SOCIAL_PROVIDER__: JSON.stringify(social.provider === 'firebase' ? 'firebase' : 'demo') },
+  external: app ? [] : APP_PKGS,
+  define: {
+    __MONETIZE__: JSON.stringify(cfg),
+    __ADS_PROVIDER__: JSON.stringify((cfg.ads && cfg.ads.provider) || 'demo'),
+    __SOCIAL__: JSON.stringify(social),
+    __SOCIAL_PROVIDER__: JSON.stringify(social.provider === 'firebase' ? 'firebase' : 'demo'),
+  },
 })).outputFiles[0].text;
 const js = await bundle(userCfg);
-const demoCfg = { ...userCfg, ads: { ...(userCfg.ads || {}), provider: 'demo' }, payments: { provider: 'demo' } };
+const demoCfg = { ...userCfg, ads: { ...(userCfg.ads || {}), provider: 'demo' }, payments: { provider: 'demo' }, privacyUrl: '' };
 const jsDemo = await bundle(demoCfg, DEMO_SOCIAL);
 
 // 2) CSS + innebygde fonter
@@ -159,7 +167,33 @@ console.log(`JS ${kb(js)} · CSS ${kb(css)} · fonter ${kb(fontCss)}`);
 console.log(`docs/index.html ${kb(pwa)} · dist/artifact.html ${kb(fragment)} · versjon ${hash}`);
 console.log(`Reklame i docs/: ${(userCfg.ads && userCfg.ads.provider) || 'demo'} · kjøp: ${(userCfg.payments && userCfg.payments.provider) || 'demo'} · portalversjoner i builds/crazygames og builds/poki`);
 
-// 6) Testversjon mot Firebase-emulatoren (kun ved SOCIAL_EMULATOR=1)
+// 6) App-versjonen (Capacitor): AdMob-reklame. Kjøp med ekte penger er av til kjøp i appen (StoreKit / Google Play
+//    Billing) er lagt inn, og leaderboardet bruker demo til innlogging i appen er satt opp (se PUBLISERING.md).
+if (existsSync(p('node_modules/@capacitor-community/admob/package.json'))) {
+  const appCfg = { ...userCfg, ads: { ...(userCfg.ads || {}), provider: 'admob' }, payments: { provider: 'none' } };
+  const code = await bundle(appCfg, DEMO_SOCIAL, true);
+  mkdirSync(p('app/www/'), { recursive: true });
+  writeFileSync(p('app/www/index.html'), `<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>${TITLE}</title>
+<meta name="theme-color" content="#7fd3ff">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<style>${fontCss}${css}</style>
+</head>
+<body>
+${loading}
+<script>${safe(code)}</script>
+</body>
+</html>
+`);
+  copyFileSync(p('docs/personvern.html'), p('app/www/personvern.html'));
+  console.log(`app/www/index.html ${kb(code)} JS (AdMob ${userCfg.ads && userCfg.ads.testMode === false ? 'ekte reklame' : 'testreklame'}) – kjør «npx cap sync» for å kopiere til iOS/Android`);
+} else console.log('App-versjonen hoppes over: kjør «npm install» først (Capacitor og AdMob-pakkene mangler).');
+
+// 7) Testversjon mot Firebase-emulatoren (kun ved SOCIAL_EMULATOR=1)
 if (process.env.SOCIAL_EMULATOR) {
   const emu = { provider: 'firebase', loginProviders: ['facebook', 'apple'], firebase: { apiKey: 'demo-key', authDomain: 'localhost', projectId: 'demo-ohio', appId: 'demo-app' }, emulator: { auth: 'http://127.0.0.1:9099', host: '127.0.0.1', firestorePort: 8080 } };
   const code = await bundle(demoCfg, emu);

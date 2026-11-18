@@ -8,9 +8,17 @@
     "maps": "node tools/build-maps.mjs",
     "build": "node tools/build.mjs",
     "sim": "node tools/simulate.mjs",
-    "dev": "node tools/build.mjs && npx --yes http-server docs -p 8080 -c-1"
+    "dev": "node tools/build.mjs && npx --yes http-server docs -p 8080 -c-1",
+    "app:sync": "node tools/build.mjs && npx cap sync",
+    "app:ios": "node tools/build.mjs && npx cap sync ios && npx cap open ios",
+    "app:android": "node tools/build.mjs && npx cap sync android && npx cap open android"
   },
   "devDependencies": {
+    "@capacitor-community/admob": "8.4.2",
+    "@capacitor/android": "8.6.2",
+    "@capacitor/cli": "8.6.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/ios": "8.6.2",
     "d3-geo": "3.1.1",
     "esbuild": "0.24.0",
     "firebase": "10.14.1",

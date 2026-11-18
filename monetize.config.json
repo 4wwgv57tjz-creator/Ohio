@@ -4,7 +4,14 @@
     "adsenseClient": "ca-pub-0000000000000000",
     "testMode": true,
     "interstitialEvery": 2,
-    "interstitialMinGap": 180
+    "interstitialMinGap": 180,
+    "interstitialTimer": 240,
+    "admob": {
+      "iosRewarded": "ca-app-pub-3940256099942544/1712485313",
+      "iosInterstitial": "ca-app-pub-3940256099942544/4411468910",
+      "androidRewarded": "ca-app-pub-3940256099942544/5224354917",
+      "androidInterstitial": "ca-app-pub-3940256099942544/1033173712"
+    }
   },
   "payments": {
     "provider": "demo"

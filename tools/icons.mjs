@@ -27,6 +27,7 @@ for (const [name, size, scale, rounded] of [
   ['icon-192.png', 192, 0.84, true],
   ['icon-maskable-512.png', 512, 0.66, false],
   ['apple-touch-icon.png', 180, 0.8, false],
+  ['app-icon-1024.png', 1024, 0.8, false], // App Store / Google Play: firkantet, uten gjennomsiktighet
 ]) {
   await pg.setViewportSize({ width: size, height: size });
   await pg.setContent(page(size, scale, rounded));

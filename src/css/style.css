@@ -1550,3 +1550,7 @@ main { flex: 1; position: relative; min-height: 0; }
 .dlane-me { gap: 2px; }
 .squad.placed { width: 36px; }
 .squad.placed .sq-art { width: 27px; height: 27px; }
+
+/* personvern */
+.privacy-frame { display: block; width: 100%; height: min(70vh, 640px); border: 3px solid var(--ink); border-radius: 14px; background: #fff8ea; }
+.stats-box .link-btn { display: block; margin-top: 6px; }
