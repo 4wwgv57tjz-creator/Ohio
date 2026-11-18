@@ -1722,3 +1722,10 @@ button.loot-mini { position: relative; display: grid; place-items: center; font:
 .townsfolk .w-in { display: block; padding: 0; background: none; border: 0; cursor: pointer; pointer-events: auto; touch-action: manipulation; }
 .say-pop { position: absolute; left: 50%; bottom: 100%; z-index: 3; padding: 2px 8px; background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 0 2px 0 var(--ink); font-size: 11.5px; font-weight: 800; white-space: nowrap; pointer-events: none; animation: say-pop 1.5s ease-out forwards; }
 @keyframes say-pop { 0% { opacity: 0; transform: translate(-50%, 6px) scale(0.6); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.05); } 80% { opacity: 1; transform: translate(-50%, -2px); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+
+/* utplassering: velg hvor mange av en enhetstype som skal sendes */
+.take-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 8px; font-size: 13px; font-weight: 700; }
+.take-row > span { width: 100%; }
+.take { padding: 5px 12px; background: #fff; border: 2.5px solid var(--ink); border-radius: 999px; box-shadow: 0 2px 0 var(--ink); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+.take.on { background: var(--gold); }
+.take:active { transform: translateY(2px); box-shadow: none; }

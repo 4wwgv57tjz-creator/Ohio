@@ -1305,22 +1305,46 @@ document.addEventListener('click', (e) => {
 // ---------------- UTPLASSERING ----------------
 // Før hver kamp plasserer du troppene i tre korridorer. Fienden har en type i hver korridor (med en svakhet),
 // og du vinner ved å vinne korridorer med over halvparten av fiendens styrke.
-let dep = null; // { r, plan, sel }
+let dep = null; // { r, plan, sel: valgt enhetstype, take: hvor mange deler som skal flyttes }
 let lastPlan = null; // forrige plan (i minnet), så neste angrep går raskere
 function openDeploy(id) {
   const r = REGION_BY_ID[id];
   if (!r || S.conquered[id]) return;
   unlockAudio();
   if (!E.squadsOf(S, r).length) { sfx.nope(); toast(t('no_troops')); return; }
-  dep = { r, plan: {}, sel: null };
+  dep = { r, plan: {}, sel: null, take: 0 };
   const m = openModal('<div class="deploy" id="deploy"></div>', 'deploy-modal', () => { dep = null; });
   renderDeploy();
   wireDeploy(m);
 }
 const laneAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el.closest('#deploy .dlane:not(.empty)') : null; };
-function squadChip(q, placed) {
-  return `<button type="button" class="squad${placed ? ' placed' : ''}${dep && dep.sel === q.key ? ' sel' : ''}" data-key="${q.key}" aria-label="${esc(L(UNIT_BY_ID[q.unit].name))} ×${q.count}">
-    <span class="sq-art">${A.unitArt(q.unit, 'me')}</span><span class="sq-n">×${fmt(q.count)}</span>${placed ? '' : `<span class="sq-p">${ico('cls_' + q.cls)}${fmt(q.power)}</span>`}</button>`;
+// Troppene vises samlet: ett kort per enhetstype i «Dine tropper» og ett per enhetstype i hver korridor.
+// Hver type består av opptil tre deler, så den kan spres på flere korridorer.
+function groupSquads(list) {
+  const map = new Map();
+  for (const q of list) {
+    let g = map.get(q.unit);
+    if (!g) { g = { unit: q.unit, cls: q.cls, keys: [], counts: [], count: 0, power: 0 }; map.set(q.unit, g); }
+    g.keys.push(q.key); g.counts.push(q.count); g.count += q.count; g.power += q.power;
+  }
+  return [...map.values()];
+}
+const unitOfKey = (key) => key.slice(0, key.lastIndexOf(':'));
+function squadChip(g, lane = null) {
+  const placed = lane !== null;
+  const sel = !placed && dep && dep.sel === g.unit;
+  return `<button type="button" class="squad${placed ? ' placed' : ''}${sel ? ' sel' : ''}" data-unit="${g.unit}"${placed ? ` data-lane="${lane}"` : ''} aria-label="${esc(L(UNIT_BY_ID[g.unit].name))} ×${g.count}">
+    <span class="sq-art">${A.unitArt(g.unit, 'me')}</span><span class="sq-n">×${fmt(g.count)}</span>${placed ? '' : `<span class="sq-p">${ico('cls_' + g.cls)}${fmt(g.power)}</span>`}</button>`;
+}
+// Velg hvor mange som skal sendes når en enhetstype har flere deler: alle, to tredjedeler eller en tredjedel
+function takeRowHTML(g) {
+  if (!g || g.keys.length < 2) return '';
+  const opts = [];
+  for (let j = g.keys.length; j >= 1; j--) {
+    const n = g.counts.slice(0, j).reduce((a, x) => a + x, 0);
+    opts.push(`<button type="button" class="take${dep.take === j ? ' on' : ''}" data-take="${j}">${j === g.keys.length ? t('take_all', { n: fmt(n) }) : '×' + fmt(n)}</button>`);
+  }
+  return `<div class="take-row"><span>${t('take_how_many', { u: esc(L(UNIT_BY_ID[g.unit].name)) })}</span>${opts.join('')}</div>`;
 }
 function renderDeploy() {
   const el = $('#deploy');
@@ -1328,7 +1352,9 @@ function renderDeploy() {
   const { r, plan } = dep;
   const ev = E.laneEval(S, r, plan);
   const T = TERRAINS[r.terrain];
-  const free = ev.squads.filter((q) => !Number.isInteger(plan[q.key]));
+  const free = groupSquads(ev.squads.filter((q) => !Number.isInteger(plan[q.key])));
+  const selG = dep.sel ? free.find((g) => g.unit === dep.sel) : null;
+  if (dep.sel && !selG) dep.sel = null;
   const tid = E.tacticId(S);
   const sc = el.closest('.modal')?.scrollTop || 0;
   el.innerHTML = `<div class="modal-head"><h2 class="h2">${t('deploy_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
@@ -1336,13 +1362,13 @@ function renderDeploy() {
     <div class="deploy-field">${ev.lanes.map((ln, l) => {
       if (!ln.share) return `<div class="dlane empty" data-lane="${l}"><div class="dlane-name">${t(LANE_KEYS[l])}</div><div class="dlane-emptytxt">${t('lane_empty')}</div></div>`;
       const LT = LANE_TYPES[ln.type];
-      const mine = ev.squads.filter((q) => plan[q.key] === l);
+      const mine = groupSquads(ev.squads.filter((q) => plan[q.key] === l));
       return `<div class="dlane${dep.sel ? ' armed' : ''}" data-lane="${l}">
         <div class="dlane-name">${t(LANE_KEYS[l])} <small>${Math.round(ln.share * 100)} %</small></div>
         <div class="dlane-foe"><span class="ltype">${ico(LT.icon)}${esc(L(LT.name))}</span><span class="lstr">${ico('skull')}${fmt(ln.D)}</span>
           <span class="lweak">${t('weak_vs')} ${ico('cls_' + LT.weak)}</span>${LT.bad ? `<span class="lbad">${ico('cls_' + LT.bad)}−50 %</span>` : ''}</div>
         <div class="dlane-vs"><span class="lch ${chanceClass(ln.chance)}">${pct(ln.chance)}</span></div>
-        <div class="dlane-me">${mine.map((q) => squadChip(q, true)).join('') || `<span class="dlane-drop">${t('lane_drop')}</span>`}</div>
+        <div class="dlane-me">${mine.map((g) => squadChip(g, l)).join('') || `<span class="dlane-drop">${t('lane_drop')}</span>`}</div>
         <div class="lstr me">${ico('swords')}${fmt(ln.P)}</div>
       </div>`;
     }).join('')}</div>
@@ -1352,7 +1378,8 @@ function renderDeploy() {
       return `<button type="button" class="tactic ${tid === id ? 'on' : ''}" data-dt="${id}"><b>${esc(L(TACTICS[id].name))}</b><span class="tactic-ch ${chanceClass(ch)}">${pct(ch)}</span></button>`;
     }).join('')}</div>
     <div class="deploy-tray-head"><b>${t('your_troops')}</b><span>${free.length ? t('tray_hint') : t('all_placed')}</span></div>
-    <div class="deploy-tray">${free.map((q) => squadChip(q, false)).join('')}</div>
+    ${takeRowHTML(selG)}
+    <div class="deploy-tray">${free.map((g) => squadChip(g)).join('')}</div>
     <div class="deploy-actions">
       <button type="button" class="btn btn-soft" data-dep="auto">${ico('star')} ${t('auto_deploy')}</button>
       ${lastPlan ? `<button type="button" class="btn btn-soft" data-dep="last">${t('last_plan')}</button>` : ''}
@@ -1363,19 +1390,27 @@ function renderDeploy() {
   const md = el.closest('.modal');
   if (md) md.scrollTop = sc;
 }
-function placeSquad(key, l) {
+// Sender take deler av en enhetstype fra «Dine tropper» til korridoren l (alle hvis take mangler)
+function placeGroup(unit, l, take = Infinity) {
   if (!dep) return;
   const lanes = E.enemyLanes(dep.r);
   if (!lanes[l] || !lanes[l].share) return;
-  dep.plan[key] = l;
+  const free = E.squadsOf(S, dep.r).filter((q) => q.unit === unit && !Number.isInteger(dep.plan[q.key]));
+  free.slice(0, take || Infinity).forEach((q) => { dep.plan[q.key] = l; });
   dep.sel = null;
+  dep.take = 0;
   sfx.recruit();
   renderDeploy();
 }
-function unplaceSquad(key) {
-  if (!dep) return;
-  delete dep.plan[key];
-  sfx.click();
+// Flytter hele gruppen av en enhetstype fra én korridor til en annen (to = null: tilbake til «Dine tropper»)
+function moveLaneGroup(unit, from, to) {
+  if (!dep || from === to) return;
+  if (to !== null) { const lanes = E.enemyLanes(dep.r); if (!lanes[to] || !lanes[to].share) return; }
+  for (const [k, l] of Object.entries(dep.plan)) {
+    if (l !== from || unitOfKey(k) !== unit) continue;
+    if (to === null) delete dep.plan[k]; else dep.plan[k] = to;
+  }
+  to === null ? sfx.click() : sfx.recruit();
   renderDeploy();
 }
 function wireDeploy(m) {
@@ -1383,7 +1418,7 @@ function wireDeploy(m) {
   m.addEventListener('pointerdown', (e) => {
     const sq = e.target.closest('.squad');
     if (!sq || !dep) return;
-    drag = { key: sq.dataset.key, x: e.clientX, y: e.clientY, moved: false, ghost: null, placed: sq.classList.contains('placed'), src: sq };
+    drag = { unit: sq.dataset.unit, from: sq.dataset.lane != null ? Number(sq.dataset.lane) : null, x: e.clientX, y: e.clientY, moved: false, ghost: null, src: sq };
     try { sq.setPointerCapture(e.pointerId); } catch { /* pekeren er allerede borte */ }
   });
   m.addEventListener('pointermove', (e) => {
@@ -1409,13 +1444,18 @@ function wireDeploy(m) {
     if (!dep) return;
     if (d.moved) {
       const lane = laneAt(e.clientX, e.clientY);
-      if (lane) placeSquad(d.key, Number(lane.dataset.lane)); else if (d.placed) unplaceSquad(d.key);
+      const to = lane ? Number(lane.dataset.lane) : null;
+      if (d.from !== null) moveLaneGroup(d.unit, d.from, to);
+      else if (to !== null) placeGroup(d.unit, to, dep.sel === d.unit ? dep.take : Infinity);
       return;
     }
-    if (d.placed) { unplaceSquad(d.key); return; }
+    if (d.from !== null) { moveLaneGroup(d.unit, d.from, null); return; }
     const occ = E.enemyLanes(dep.r).map((x, i) => (x.share ? i : -1)).filter((i) => i >= 0);
-    if (occ.length === 1) { placeSquad(d.key, occ[0]); return; }
-    dep.sel = dep.sel === d.key ? null : d.key;
+    if (occ.length === 1) { placeGroup(d.unit, occ[0]); return; }
+    if (dep.sel === d.unit) { dep.sel = null; dep.take = 0; } else {
+      dep.sel = d.unit;
+      dep.take = E.squadsOf(S, dep.r).filter((q) => q.unit === d.unit && !Number.isInteger(dep.plan[q.key])).length; // alle
+    }
     sfx.click();
     renderDeploy();
   };
@@ -1424,9 +1464,10 @@ function wireDeploy(m) {
   m.addEventListener('click', (e) => {
     if (!dep) return;
     const lane = e.target.closest('.dlane:not(.empty)');
-    if (lane && dep.sel && !e.target.closest('.squad')) { placeSquad(dep.sel, Number(lane.dataset.lane)); return; }
-    const b = e.target.closest('[data-dep],[data-dt]');
+    if (lane && dep.sel && !e.target.closest('.squad')) { placeGroup(dep.sel, Number(lane.dataset.lane), dep.take); return; }
+    const b = e.target.closest('[data-dep],[data-dt],[data-take]');
     if (!b) return;
+    if (b.dataset.take) { dep.take = Number(b.dataset.take); sfx.click(); renderDeploy(); return; }
     if (b.dataset.dt) {
       if (TACTICS[b.dataset.dt]) { S.settings.tactic = b.dataset.dt; persist(); sfx.click(); renderDeploy(); }
       return;

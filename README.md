@@ -22,7 +22,10 @@ tegneseriestil, og lydene lages direkte i nettleseren – det er ingen bilde- el
    sikker. Taper du, blir fienden svekket – men svekkelsen bygges opp igjen over tid, og ingen fiende kan svekkes under
    40 %.
 5. **Plasser troppene**: før hver kamp fordeler du troppene på tre korridorer – venstre flanke, midten og høyre flanke.
-   Trykk på en tropp og så på en korridor, eller dra den dit. Fienden har en type i hver korridor, og hver type er svak
+   Trykk på en tropp og så på en korridor, eller dra den dit. Alle enhetstypene dine er med, og hver type vises
+   samlet på ett kort – både i «Dine tropper» og i hver korridor. Har en type flere deler, velger du hvor mange som skal
+   sendes (alle, to tredjedeler eller en tredjedel), så du kan spre den på flere korridorer. Trykk på en type i en
+   korridor for å ta den tilbake. Fienden har en type i hver korridor, og hver type er svak
    mot én av klassene dine (+50 %): infanteri mot kjøretøy, panser mot fly, bunkere mot infanteri, luftvern mot
    kjøretøy (og fly gjør bare halv skade der), kystbatteri mot skip og fly mot fly. Du vinner ved å vinne korridorer som
    til sammen har over halvparten av fiendens styrke, så det kan lønne seg å samle styrken og ofre en korridor. Tropper du

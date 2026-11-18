@@ -289,7 +289,7 @@ export function battleDef(s, r, now = Date.now()) {
 // ---------- utplassering i tre korridorer ----------
 export const LANES = 3;
 export const COUNTER = 1.5, BAD = 0.5;
-export const SQUAD_TYPES = 5; // de fem sterkeste enhetstypene deles i tropper som kan plasseres
+export const SQUAD_PARTS = 3; // hver enhetstype deles i opptil tre deler, så den kan spres på flere korridorer
 const strHash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const seededRnd = (seed) => () => { seed = (seed + 0x6d2b79f5) >>> 0; let x = seed; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
 const laneCache = {};
@@ -317,8 +317,8 @@ export function squadsOf(s, r) {
   for (const u of UNITS) { const n = s.units[u.id] || 0; if (n > 0) types.push({ u, n, p: unitPower(s, u, n) * (classMult(s, u.cls) + terrainBonus(r, u.cls)) }); }
   types.sort((a, b) => b.p - a.p);
   const out = [];
-  for (const { u, n, p } of types.slice(0, SQUAD_TYPES)) {
-    const k = Math.min(3, n);
+  for (const { u, n, p } of types) { // alle enhetstypene du har, sterkeste først
+    const k = Math.min(SQUAD_PARTS, n);
     for (let i = 0; i < k; i++) {
       const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
       out.push({ key: u.id + ':' + i, unit: u.id, cls: u.cls, count: cnt, power: (p * cnt) / n });
