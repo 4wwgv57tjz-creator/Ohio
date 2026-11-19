@@ -266,6 +266,67 @@ export const SKINS = [
   K('flag_goose', 'flag', 'common', 'Gåseflagg', 'Goose Flag', { design: 'goose', own: '#a3e394' }),
   K('flag_spiral', 'flag', 'rare', 'Hypnose', 'Hypnosis', { design: 'spiral', own: '#e0e0e0' }),
   K('flag_eye', 'flag', 'epic', 'Øyet', 'The Eye', { design: 'eye', own: '#c9a6ff' }),
+  // ---- enda flere vanlige skins ----
+  K('army_sand', 'army', 'common', 'Sand', 'Sand', { team: team('#d9c08a', '#a8905a', '#f4e6c2', '#7a5c2e') }),
+  K('army_slate', 'army', 'common', 'Skifergrå', 'Slate Grey', { team: team('#6b7a8f', '#46536a', '#a9b4c6', '#ffd23f') }),
+  K('army_rust', 'army', 'common', 'Rust', 'Rust', { team: team('#b5562e', '#7d3519', '#e59a72', '#ffd23f') }),
+  K('army_grass', 'army', 'common', 'Gressgrønn', 'Grass Green', { team: team('#5cc94a', '#3a9a2c', '#b5f0a8', '#ffffff') }),
+  K('army_honey', 'army', 'common', 'Honning', 'Honey', { team: team('#f0b030', '#c4861a', '#ffe09a', '#7a4b22') }),
+  K('army_lavender', 'army', 'common', 'Lavendelhæren', 'Lavender Army', { team: team('#b9a2f0', '#8a6fd0', '#e6dcff', '#ffffff') }),
+  K('army_peach', 'army', 'common', 'Fersken', 'Peach', { team: team('#ffb38a', '#e0845a', '#ffe0cf', '#4fae3c') }),
+  K('army_teal', 'army', 'common', 'Blågrønn', 'Teal', { team: team('#20a8a0', '#147a74', '#9fe8e2', '#ffd23f') }),
+  K('army_cocoa', 'army', 'common', 'Kakao', 'Cocoa', { team: team('#8a5a3c', '#5a3820', '#d0a080', '#ffe9c2') }),
+  K('army_burgundy', 'army', 'common', 'Burgunder', 'Burgundy', { team: team('#8a2a3c', '#5a1424', '#d07a8a', '#ffd23f') }),
+  K('army_stone', 'army', 'common', 'Steingrå', 'Stone', { team: team('#9a9a92', '#6a6a62', '#d0d0c8', '#e5484d') }),
+  K('army_icebl', 'army', 'common', 'Isblå', 'Ice Blue', { team: team('#9fd4f0', '#5aa8d0', '#e0f4ff', '#3559d6') }),
+  K('army_tomato', 'army', 'common', 'Tomat', 'Tomato', { team: team('#f05a3c', '#b8341c', '#ffaa98', '#4fae3c') }),
+  K('army_plum', 'army', 'common', 'Plomme', 'Plum', { team: team('#7a3a8a', '#4e1f5a', '#c890d4', '#ffd23f') }),
+  K('flag_tricolor', 'flag', 'common', 'Tre striper', 'Tricolour', { design: 'tricolor', own: '#b9a2f0' }),
+  K('flag_cross', 'flag', 'common', 'Kryss', 'Cross', { design: 'cross', own: '#a3e394' }),
+  K('flag_dots', 'flag', 'common', 'Prikker', 'Polka Dots', { design: 'dots', own: '#ffb3d9' }),
+  K('flag_diagonal', 'flag', 'common', 'Diagonal', 'Diagonal', { design: 'diagonal', own: '#ffc27a' }),
+  K('flag_triangle', 'flag', 'common', 'Trekant', 'Triangle', { design: 'triangle', own: '#8fe0d8' }),
+  K('flag_circle', 'flag', 'common', 'Sirkel', 'Circle', { design: 'circle', own: '#c9a6ff' }),
+  K('flag_arrow', 'flag', 'common', 'Pil', 'Arrow', { design: 'arrow', own: '#a3e394' }),
+  K('flag_mountain', 'flag', 'common', 'Fjell', 'Mountain', { design: 'mountain', own: '#c4cddb' }),
+  K('flag_tree', 'flag', 'common', 'Grantre', 'Pine Tree', { design: 'tree', own: '#8be06a' }),
+  K('flag_fish', 'flag', 'common', 'Fisk', 'Fish', { design: 'fish', own: '#8fb4ff' }),
+  K('hq_pastel', 'hq', 'common', 'Pastell', 'Pastel', { fx: 'pastel' }),
+  K('hq_seafoam', 'hq', 'common', 'Sjøskum', 'Seafoam', { fx: 'seafoam' }),
+  K('hq_copper', 'hq', 'common', 'Kobbertak', 'Copper Roof', { fx: 'copper' }),
+  K('hq_lemon', 'hq', 'common', 'Sitronhus', 'Lemon House', { fx: 'lemon' }),
+  K('hq_lavender', 'hq', 'common', 'Lavendel', 'Lavender', { fx: 'lavender' }),
+  K('hq_sand', 'hq', 'common', 'Sandslott', 'Sandcastle', { fx: 'sand' }),
+  K('hq_slate', 'hq', 'common', 'Skifer', 'Slate', { fx: 'slate' }),
+  K('hq_berry', 'hq', 'common', 'Bringebær', 'Raspberry', { fx: 'berry' }),
+  K('tap_snow', 'tap', 'common', 'Snøfnugg', 'Snowflakes', { burst: 'snow', ft: 'ft-blue' }),
+  K('tap_leaves', 'tap', 'common', 'Høstløv', 'Autumn Leaves', { burst: 'leaf', ft: 'ft-orange' }),
+  K('tap_clover', 'tap', 'common', 'Kløver', 'Clover', { burst: 'clover', ft: 'ft-green' }),
+  K('tap_donuts', 'tap', 'common', 'Smultringer', 'Donuts', { burst: 'donut', ft: 'ft-pink' }),
+  K('tap_balls', 'tap', 'common', 'Fotballer', 'Footballs', { burst: 'ball', ft: '' }),
+  K('tap_icecream', 'tap', 'common', 'Iskrem', 'Ice Cream', { burst: 'icecream', ft: 'ft-pink' }),
+  K('hat_bucket', 'hat', 'common', 'Bøttehatt', 'Bucket Hat', { hat: 'bucket' }),
+  K('hat_visor', 'hat', 'common', 'Solskjerm', 'Sun Visor', { hat: 'visor' }),
+  K('hat_headphones', 'hat', 'common', 'Hodetelefoner', 'Headphones', { hat: 'headphones' }),
+  K('hat_paper', 'hat', 'common', 'Papirhatt', 'Paper Hat', { hat: 'paper' }),
+  K('hat_bandana', 'hat', 'common', 'Bandana', 'Bandana', { hat: 'bandana' }),
+  K('hat_earmuffs', 'hat', 'common', 'Øreklokker', 'Earmuffs', { hat: 'earmuffs' }),
+  K('drip_grey', 'drip', 'common', 'Grå drip', 'Grey Drip', { look: { jacket: '#8a919e', jacketLine: '#5d6472', jacketHi: '#c8ced8', shirt: '#2b2d42', text: 'CHILL', textC: '#c8ced8', hatC: '#5d6472', hatCuff: '#454b57', hatAcc: '#c8ced8', crest: '#c8ced8' } }),
+  K('drip_olive', 'drip', 'common', 'Oliven-drip', 'Olive Drip', { look: { jacket: '#7a8a3a', jacketLine: '#55621f', jacketHi: '#b5c26e', shirt: '#f4efe0', text: 'FIELD', textC: '#55621f', pants: '#4a5230', pantsLine: '#2f3420', hatC: '#7a8a3a', hatCuff: '#55621f', hatAcc: '#ffd23f' } }),
+  K('drip_sky', 'drip', 'common', 'Himmel-drip', 'Sky Drip', { look: { jacket: '#5fb6ff', jacketLine: '#3a83cc', jacketHi: '#bfe3ff', shirt: '#ffffff', text: 'SKY', textC: '#3a83cc', hatC: '#5fb6ff', hatCuff: '#3a83cc', hatAcc: '#ffffff', crest: '#ffffff' } }),
+  K('drip_peach', 'drip', 'common', 'Fersken-drip', 'Peach Drip', { look: { jacket: '#ffb38a', jacketLine: '#e0845a', jacketHi: '#ffe0cf', shirt: '#4fae3c', text: 'PEACH', textC: '#ffffff', hatC: '#ffb38a', hatCuff: '#e0845a', hatAcc: '#4fae3c' } }),
+  K('drip_purple', 'drip', 'common', 'Lilla drip', 'Purple Drip', { look: { jacket: '#8a4fd6', jacketLine: '#5b2a9a', jacketHi: '#c9a6ff', shirt: '#ffe14d', text: 'WOW', textC: '#5b2a9a', hatC: '#8a4fd6', hatCuff: '#5b2a9a', hatAcc: '#ffe14d', crest: '#ffe14d' } }),
+  K('drip_burgundy', 'drip', 'common', 'Burgunder-drip', 'Burgundy Drip', { look: { jacket: '#8a2a3c', jacketLine: '#5a1424', jacketHi: '#d07a8a', shirt: '#f4efe0', text: 'BOSS', textC: '#8a2a3c', hatC: '#8a2a3c', hatCuff: '#5a1424', hatAcc: '#ffd23f' } }),
+  K('drip_sand', 'drip', 'common', 'Sand-drip', 'Sand Drip', { look: { jacket: '#d9c08a', jacketLine: '#a8905a', jacketHi: '#f4e6c2', shirt: '#7a5c2e', text: 'DUNE', textC: '#f4e6c2', pants: '#a8905a', pantsLine: '#7a6438', hatC: '#d9c08a', hatCuff: '#a8905a', hatAcc: '#7a5c2e' } }),
+  K('drip_teal', 'drip', 'common', 'Blågrønn drip', 'Teal Drip', { look: { jacket: '#20a8a0', jacketLine: '#147a74', jacketHi: '#9fe8e2', shirt: '#ffffff', text: 'WAVE', textC: '#147a74', hatC: '#20a8a0', hatCuff: '#147a74', hatAcc: '#ffd23f', crest: '#ffffff' } }),
+  K('zorg_yellow', 'zorgon', 'common', 'Gul keiser', 'Yellow Emperor', { look: { cape: '#f0c020', capeIn: '#7a5cff', robe: '#c49a10', trim: '#fff6c2' } }),
+  K('zorg_orange', 'zorgon', 'common', 'Oransje keiser', 'Orange Emperor', { look: { cape: '#ff8a3d', capeIn: '#3559d6', robe: '#c4601c' } }),
+  K('zorg_teal', 'zorgon', 'common', 'Blågrønn keiser', 'Teal Emperor', { look: { cape: '#20a8a0', capeIn: '#ffd23f', robe: '#147a74', orb: '#ffd23f' } }),
+  K('zorg_pink', 'zorgon', 'common', 'Rosa keiser', 'Pink Emperor', { look: { cape: '#ff8fc8', capeIn: '#ffffff', robe: '#e0609e', orb: '#ffffff' } }),
+  K('zorg_grey', 'zorgon', 'common', 'Grå keiser', 'Grey Emperor', { look: { cape: '#8a919e', capeIn: '#e5484d', robe: '#5d6472' } }),
+  K('zorg_brown', 'zorgon', 'common', 'Brun keiser', 'Brown Emperor', { look: { cape: '#8a5a3c', capeIn: '#ffd23f', robe: '#5a3820', orb: '#4fae3c' } }),
+  K('zorg_white', 'zorgon', 'common', 'Hvit keiser', 'White Emperor', { look: { cape: '#f4f7fb', capeIn: '#3559d6', robe: '#c8d2e0', trim: '#3559d6' } }),
+  K('zorg_sky', 'zorgon', 'common', 'Himmelkeiser', 'Sky Emperor', { look: { skin: '#9fd4f0', skinDark: '#5aa8d0', cape: '#5fb6ff', capeIn: '#ffffff', robe: '#3a83cc', orb: '#ffffff' } }),
   // ---- eksklusive prestisje-skins (låses opp med prestisjestjerner, finnes ikke i kasser) ----
   K('flag_stars', 'flag', 'prestige', 'Prestisjeflagg', 'Prestige Flag', { design: 'stars', own: '#ffd23f', prestige: 1 }),
   K('hat_prestige', 'hat', 'prestige', 'Prestisjekrone', 'Prestige Crown', { hat: 'prestige', prestige: 2 }),
@@ -283,12 +344,12 @@ export const DEFAULT_SKINS = Object.fromEntries(CATEGORIES.map((c) => [c.id, SKI
 // ---------- lootkasser ----------
 // Sjansene vises for spilleren i butikken (krav i App Store og Google Play).
 export const CRATES = [
-  { id: 'wood', price: 100, items: 1, name: { nb: 'Trekasse', en: 'Wooden Crate' }, odds: { common: 62, rare: 26, epic: 9, legendary: 2.5, mythic: 0.5 } },
-  { id: 'gold', price: 280, items: 3, guarantee: 'rare', name: { nb: 'Gullkasse', en: 'Gold Crate' }, odds: { common: 40, rare: 38, epic: 16, legendary: 5, mythic: 1 } },
-  { id: 'cosmic', price: 700, items: 5, guarantee: 'epic', name: { nb: 'Kosmisk kasse', en: 'Cosmic Crate' }, odds: { common: 15, rare: 40, epic: 30, legendary: 12, mythic: 3 } },
+  { id: 'wood', price: 100, items: 1, name: { nb: 'Trekasse', en: 'Wooden Crate' }, odds: { common: 80, rare: 16, epic: 3.5, legendary: 0.45, mythic: 0.05 } },
+  { id: 'gold', price: 280, items: 3, guarantee: 'rare', name: { nb: 'Gullkasse', en: 'Gold Crate' }, odds: { common: 64, rare: 28, epic: 6.5, legendary: 1.3, mythic: 0.2 } },
+  { id: 'cosmic', price: 700, items: 5, guarantee: 'epic', name: { nb: 'Kosmisk kasse', en: 'Cosmic Crate' }, odds: { common: 40, rare: 40, epic: 16, legendary: 3.5, mythic: 0.5 } },
 ];
 export const CRATE_BY_ID = Object.fromEntries(CRATES.map((c) => [c.id, c]));
-export const PITY = 20; // Legendarisk eller bedre garantert innen så mange skins
+export const PITY = 80; // Legendarisk eller bedre garantert innen så mange skins
 
 export function newCosmetics() {
   const owned = {};
@@ -354,7 +415,7 @@ export function openCrate(s, crateId, { free = false, rnd = Math.random } = {}) 
   for (let i = 0; i < c.items; i++) {
     let rar = rollRarity(c.odds, rnd);
     s.crates.pity = (s.crates.pity || 0) + 1;
-    if (s.crates.pity >= PITY && RARITY[rar].rank < RARITY.legendary.rank) rar = rnd() < 0.85 ? 'legendary' : 'mythic';
+    if (s.crates.pity >= PITY && RARITY[rar].rank < RARITY.legendary.rank) rar = rnd() < 0.95 ? 'legendary' : 'mythic';
     if (RARITY[rar].rank >= RARITY.legendary.rank) s.crates.pity = 0;
     rolls.push(rar);
   }
@@ -372,4 +433,35 @@ export function openCrate(s, crateId, { free = false, rnd = Math.random } = {}) 
   });
   s.crates.opened = (s.crates.opened || 0) + 1;
   return items;
+}
+
+// ---------- byttebua ----------
+// Bytt inn TRADE_COST skins av samme sjeldenhet mot ett tilfeldig skin som er én grad sjeldnere.
+// Skins i bruk, standardskins og prestisjeskins kan ikke byttes. Du får et skin du ikke har fra før, hvis det finnes.
+export const TRADE_COST = 5;
+export const NEXT_RARITY = { common: 'rare', rare: 'epic', epic: 'legendary', legendary: 'mythic' };
+const canTrade = (s, k) => !!k && !!s.skins.owned[k.id] && !k.def && !k.prestige && s.skins.equipped[k.cat] !== k.id;
+// Skinsene du kan bytte inn av en sjeldenhet (eldste først)
+export const tradable = (s, rar) => SKINS.filter((k) => k.rarity === rar && canTrade(s, k)).sort((a, b) => (s.skins.owned[a.id] || 0) - (s.skins.owned[b.id] || 0));
+// Skins av en sjeldenhet (og eventuelt kategori) du ikke har ennå
+export const missingOf = (s, rar, cat = null) => SKINS.filter((k) => k.rarity === rar && !k.def && !k.prestige && (!cat || k.cat === cat) && !s.skins.owned[k.id]);
+export function tradeUp(s, ids, cat = null, rnd = Math.random) {
+  if (!Array.isArray(ids) || ids.length !== TRADE_COST || new Set(ids).size !== ids.length) return null;
+  const ks = ids.map((id) => SKIN_BY_ID[id]);
+  if (ks.some((k) => !canTrade(s, k))) return null;
+  const rar = ks[0].rarity;
+  const next = NEXT_RARITY[rar];
+  if (!next || ks.some((k) => k.rarity !== rar)) return null;
+  const pool = SKINS.filter((k) => k.rarity === next && !k.def && !k.prestige && (!cat || k.cat === cat));
+  if (!pool.length) return null;
+  const fresh = pool.filter((k) => !s.skins.owned[k.id]);
+  const from = fresh.length ? fresh : pool;
+  const skin = from[Math.floor(rnd() * from.length)];
+  for (const id of ids) delete s.skins.owned[id];
+  const dup = !!s.skins.owned[skin.id];
+  const refund = dup ? RARITY[next].refund : 0;
+  if (dup) s.gems = (s.gems || 0) + refund;
+  else s.skins.owned[skin.id] = Date.now();
+  s.stats.trades = (s.stats.trades || 0) + 1;
+  return { skin, rarity: next, dup, refund, traded: ks };
 }

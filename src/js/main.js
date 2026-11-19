@@ -2245,6 +2245,7 @@ function mineHTML() {
   <p class="gen-note">${E.genSwitchLeft(S) > 0 ? t('general_wait', { t: clock(E.genSwitchLeft(S)) }) : t('general_switch_note')}</p>
   <div class="section-title">${t('my_skins')}</div>
   <div class="progress"><div class="progress-fill" style="width:${(own / total) * 100}%"></div><span>${t('collection', { a: own, b: total })}</span></div>
+  <div class="trade-card"><div class="trade-ico">${ico('swap')}</div><div class="trade-body"><b>${t('trade_title')}</b><span>${t('trade_sub', { n: C.TRADE_COST })}</span></div><button type="button" class="btn btn-gold" data-action="trade-open">${t('trade_open')}</button></div>
   <div class="chip-row" role="group">${C.CATEGORIES.map((c) => `<button type="button" class="chip ${c.id === skinCat ? 'on' : ''}" data-action="skincat" data-cat="${c.id}">${esc(L(c.name))} <small>${C.SKINS.filter((k) => k.cat === c.id && S.skins.owned[k.id]).length}</small></button>`).join('')}</div>
   <div class="skin-grid">${list.map((k) => {
     const owned = !!S.skins.owned[k.id];
@@ -2308,12 +2309,16 @@ function openCrateFlow(crateId, { free = false } = {}) {
   if (!items) { sfx.nope(); toast(t('not_enough_gems')); return; }
   persist();
   updateHUD();
+  lootFlow(items, { art: A.crateArt(c.id) });
+}
+// Viser skins man har fått: lukket kasse først (art), eller rett til avsløringen (closed: false, fra byttebua)
+function lootFlow(items, { art = '', closed = true } = {}) {
   modalCount++;
   const ov = document.createElement('div');
   ov.className = 'crate-open';
-  ov.innerHTML = `<div class="crate-stage"><div class="crate-rays"></div><div class="crate-big">${A.crateArt(c.id)}</div><p class="crate-hint">${t('tap_to_open')}</p></div>`;
+  ov.innerHTML = `<div class="crate-stage"><div class="crate-rays"></div>${closed ? `<div class="crate-big">${art}</div><p class="crate-hint">${t('tap_to_open')}</p>` : ''}</div>`;
   $('#overlay-root').appendChild(ov);
-  sfx.crateShake();
+  if (closed) sfx.crateShake();
   updateTutorial();
   const stage = ov.querySelector('.crate-stage');
   let idx = -1; // siste avslørte skin
@@ -2408,6 +2413,77 @@ function openCrateFlow(crateId, { free = false } = {}) {
     idx++;
     reveal(items[idx]);
   });
+  if (!closed) { idx = 0; reveal(items[0]); }
+}
+
+// ----- byttebua: bytt inn 5 skins av samme sjeldenhet mot ett sjeldnere -----
+let trade = null; // { r: sjeldenheten du bytter inn, sel: valgte skins, cat: ønsket kategori (null = alt) }
+function tradeTiersHTML() {
+  return `<div class="modal-head"><h2 class="h2">${ico('swap')} ${t('trade_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <p class="small">${t('trade_sub', { n: C.TRADE_COST })}</p>
+    <div class="trade-tiers">${Object.keys(C.NEXT_RARITY).map((r) => {
+      const n = C.tradable(S, r).length;
+      return `<button type="button" class="trade-tier" data-action="trade-tier" data-r="${r}" ${n < C.TRADE_COST ? 'disabled' : ''}>
+        <span class="tt-row">${C.TRADE_COST} × ${rarityChip(r)} ${ico('swap')} 1 × ${rarityChip(C.NEXT_RARITY[r])}</span>
+        <small>${t('trade_have', { n })}${n < C.TRADE_COST ? ' · ' + t('trade_need', { n: C.TRADE_COST - n }) : ''}</small></button>`;
+    }).join('')}</div>
+    <p class="small trade-note">${t('trade_note')}</p>`;
+}
+function tradePickHTML() {
+  const { r, sel, cat } = trade;
+  const next = C.NEXT_RARITY[r];
+  const list = C.tradable(S, r);
+  const cats = C.CATEGORIES.filter((x) => C.SKINS.some((k) => k.cat === x.id && k.rarity === next && !k.prestige));
+  const full = sel.size === C.TRADE_COST;
+  return `<div class="modal-head"><h2 class="h2">${ico('swap')} ${t('trade_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <div class="trade-head">${C.TRADE_COST} × ${rarityChip(r)} ${ico('swap')} 1 × ${rarityChip(next)}</div>
+    <div class="trade-pick-head"><b>${t('trade_pick', { n: C.TRADE_COST })}</b><span class="trade-count ${full ? 'full' : ''}">${sel.size}/${C.TRADE_COST}</span><button type="button" class="link-btn" data-action="trade-auto">${t('trade_auto')}</button></div>
+    <div class="trade-grid">${list.map((k) => `<button type="button" class="trade-skin r-${k.rarity}${sel.has(k.id) ? ' on' : ''}" data-action="trade-toggle" data-id="${k.id}" aria-pressed="${sel.has(k.id)}">
+      <span class="skin-art">${skinPreview(k)}</span><span class="skin-name">${esc(L(k.name))}</span><span class="ts-cat">${esc(L(C.CATEGORIES.find((x) => x.id === k.cat).name))}</span><span class="ts-tick">${ico('check')}</span></button>`).join('')}</div>
+    <div class="trade-want"><b>${t('trade_want')}</b><div class="chip-row">
+      <button type="button" class="chip ${!cat ? 'on' : ''}" data-action="trade-cat" data-cat="">${t('trade_any')} <small>${C.missingOf(S, next).length}</small></button>
+      ${cats.map((x) => `<button type="button" class="chip ${cat === x.id ? 'on' : ''}" data-action="trade-cat" data-cat="${x.id}">${esc(L(x.name))} <small>${C.missingOf(S, next, x.id).length}</small></button>`).join('')}</div>
+      <p class="small">${t('trade_missing_note')}</p></div>
+    <div class="row2"><button type="button" class="btn btn-soft" data-action="trade-back">${t('trade_back')}</button><button type="button" class="btn btn-gold" data-action="trade-go" ${full ? '' : 'disabled'}>${t('trade_go')}</button></div>`;
+}
+function openTrade() {
+  trade = null;
+  openModal(tradeTiersHTML(), 'trade-modal', () => { trade = null; });
+}
+function renderTrade() {
+  const md = $('.trade-modal');
+  if (!md) return;
+  const sc = md.scrollTop;
+  md.innerHTML = trade ? tradePickHTML() : tradeTiersHTML();
+  md.scrollTop = trade ? sc : 0;
+}
+function tradeAction(a, btn) {
+  if (a === 'open') { openTrade(); return; }
+  if (a === 'tier') { trade = { r: btn.dataset.r, sel: new Set(), cat: null }; sfx.click(); renderTrade(); return; }
+  if (!trade) return;
+  if (a === 'back') { trade = null; sfx.click(); renderTrade(); return; }
+  if (a === 'toggle') {
+    const id = btn.dataset.id;
+    if (trade.sel.has(id)) trade.sel.delete(id);
+    else if (trade.sel.size < C.TRADE_COST) trade.sel.add(id);
+    else { sfx.nope(); return; }
+    sfx.click();
+    renderTrade();
+    return;
+  }
+  if (a === 'auto') { trade.sel = new Set(C.tradable(S, trade.r).slice(0, C.TRADE_COST).map((k) => k.id)); sfx.swish(); renderTrade(); return; }
+  if (a === 'cat') { trade.cat = btn.dataset.cat || null; sfx.click(); renderTrade(); return; }
+  if (a === 'go') {
+    const res = C.tradeUp(S, [...trade.sel], trade.cat);
+    if (!res) { sfx.nope(); toast(t('trade_failed')); return; }
+    persist();
+    sfx.crateOpen();
+    closeModal(btn);
+    trade = null;
+    lootFlow([res], { closed: false });
+    updateHUD();
+    if (tab === 'shop') renderShop();
+  }
 }
 
 // ----- kjøp (demo eller ekte butikk) -----
@@ -3482,6 +3558,7 @@ function onAction(e) {
     }
     case 'event-open': openEvent(); break;
     case 'pick-target': openEnemyPicker(); break;
+    case 'trade-open': case 'trade-tier': case 'trade-back': case 'trade-toggle': case 'trade-auto': case 'trade-cat': case 'trade-go': tradeAction(a.slice(6), btn); break;
     case 'dev-tap': devTap(); break;
     case 'dev-open': openDevPanel(); break;
     case 'dev': devAction(btn.dataset.dev, btn); break;

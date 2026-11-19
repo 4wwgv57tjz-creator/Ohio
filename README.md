@@ -95,17 +95,24 @@ Tips:
 
 ## Butikk, skins, lootkasser og reklame
 
-- **Skins**: hær (49 fargedrakter på alle enhetene), flagg (36 – spillerflagget, fargen på erobret land på kartet og
-  flagget ditt på leaderboardet), hovedkvarter (27), **trykkeffekter** (14 – det som spruter ut når du trykker:
-  mynter, hjerter, pizza, spøkelser, lyn, planeter, regnbue …), og egne skins til hver general: hatter til Buckeye
-  (33, blant annet kasserolle, trafikkjegle og mini-UFO), antrekk til Drip (25, blant annet Ku-drip, Kode-drip og
-  Galakse-drip) og kapper og kroner til Zorgon (23). 207 skins fordelt på Vanlig, Sjelden, Episk, Legendarisk og
-  Mytisk, pluss seks Prestisje-skins. Skins er bare utseende – de gir ingen fordel i kamp.
+- **Skins**: hær (63 fargedrakter på alle enhetene), flagg (46 – spillerflagget, fargen på erobret land på kartet og
+  flagget ditt på leaderboardet), hovedkvarter (35), **trykkeffekter** (20 – det som spruter ut når du trykker:
+  mynter, hjerter, pizza, smultringer, snøfnugg, spøkelser, lyn, planeter, regnbue …), og egne skins til hver general:
+  hatter til Buckeye (39, blant annet kasserolle, trafikkjegle, hodetelefoner og mini-UFO), antrekk til Drip (33,
+  blant annet Ku-drip, Kode-drip og Galakse-drip) og kapper og kroner til Zorgon (31). 267 skins: 118 Vanlige, 54
+  Sjeldne, 51 Episke, 23 Legendariske og 15 Mytiske, pluss seks Prestisje-skins. Skins er bare utseende – de gir ingen
+  fordel i kamp.
 - **Mine ting** (Butikk → Mine ting) viser kassene og skinsene du eier. Kjøpte kasser havner her, så du kan åpne dem
   med en gang eller spare dem til senere. Du får også en gullkasse hver gang du fullfører et kapittel.
 - **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
-  Sjansene vises i spillet («Se sjansene»). Legendarisk eller bedre er garantert minst hvert 20. skin, nye skins
-  prioriteres, og duplikater blir til edelstener. Når kassen er åpnet, kan du trykke på hvert skin du fikk, bla
+  De sjeldne skinsene er vanskelige å få: i en trekasse er sjansen 80 % Vanlig, 16 % Sjelden, 3,5 % Episk, 0,45 %
+  Legendarisk og 0,05 % Mytisk (gullkasse 64 / 28 / 6,5 / 1,3 / 0,2 %, kosmisk kasse 40 / 40 / 16 / 3,5 / 0,5 %).
+  Sjansene vises i spillet («Se sjansene»). Legendarisk eller bedre er garantert minst hvert 80. skin, nye skins
+  prioriteres, og duplikater blir til edelstener.
+- **Byttebua** (Butikk → Mine ting): bytt inn 5 skins av samme sjeldenhet mot ett tilfeldig skin som er én grad
+  sjeldnere (5 Vanlige → 1 Sjelden, 5 Sjeldne → 1 Episk, 5 Episke → 1 Legendarisk, 5 Legendariske → 1 Mytisk). Du
+  velger selv hvilke skins du bytter inn (eller «Velg automatisk») og kan velge hvilken kategori du vil ha. Du får et
+  skin du ikke har fra før, hvis det finnes. Skins i bruk, standardskins og prestisjeskins kan ikke byttes inn. Når kassen er åpnet, kan du trykke på hvert skin du fikk, bla
   gjennom dem med pilene (eller sveipe / bruke piltastene) og ta dem i bruk med en gang med **Bruk**. «Vis alle»
   hopper over avsløringen. Skins til en annen general merkes, og blir brukt når du bytter til den generalen.
 - **Edelstener** tjenes ved å erobre områder, fullføre kapitler, fra forsyningskasser og ved å se reklame – og kan
