@@ -1143,6 +1143,7 @@ const ICONS = {
   palette: `<path d="M12 3a9 9 0 1 0 0 18c1.6 0 2-1.3 1.2-2.4-.8-1.1-.2-2.6 1.3-2.6H17a4 4 0 0 0 4-4c0-5-4-9-9-9z" fill="#fff4d6" ${st(1.8)}/><circle cx="7.5" cy="11" r="1.7" fill="#ef5b5b"/><circle cx="10" cy="7" r="1.7" fill="#ffd23f"/><circle cx="15" cy="7.5" r="1.7" fill="#4fb843"/><circle cx="17.5" cy="11.5" r="1.5" fill="#3559d6"/>`,
   ffwd: `<path d="M3 6l8 6-8 6zM12 6l8 6-8 6z" fill="#8fd3ff" ${st(1.8)}/>`,
   clock: `<circle cx="12" cy="12" r="9" fill="#fff" ${st(1.8)}/><path d="M12 7v5l3.5 2" fill="none" ${st(2)}/>`,
+  wrench: `<path d="M14.5 3.2a5 5 0 0 0-4.9 6.6L3.5 15.9a2 2 0 0 0 2.8 2.8l6.1-6.1a5 5 0 0 0 6.6-4.9l-3 3-2.8-.8-.8-2.8z" fill="#c4cddb" ${st(1.8)}/><circle cx="5.2" cy="17.2" r="1" fill="${INK}"/>`,
   gift: `<rect x="3.5" y="10" width="17" height="11" rx="2" fill="#ff5d8f" ${st(1.8)}/><rect x="2.5" y="7" width="19" height="4" rx="1.5" fill="#ff8fb1" ${st(1.6)}/><path d="M12 7v14" stroke="#ffd23f" stroke-width="3"/><path d="M12 7q-6-6-7.5-1.5T12 7q6-6 7.5-1.5T12 7" fill="none" ${st(1.5)}/>`,
 };
 export const icon = (name, cls = 'ico') => wrap(ICONS[name] || ICONS.star, '0 0 24 24', cls);

@@ -25,6 +25,8 @@ if (onlineCfg.provider === 'firebase' && !(onlineCfg.firebase && onlineCfg.fireb
 }
 const DEMO_SOCIAL = { provider: 'demo', loginProviders: onlineCfg.loginProviders || ['facebook', 'apple'] };
 const APP_PKGS = ['@capacitor-community/admob', '@capacitor/core'];
+// Versjonen som vises i innstillingene: et fingeravtrykk av kildekoden (endres bare når koden endres)
+const BUILD = createHash('sha256').update(readdirSync(p('src/js/')).sort().map((f) => readFileSync(p('src/js/' + f), 'utf8')).join('') + readFileSync(p('src/css/style.css'), 'utf8')).digest('hex').slice(0, 7);
 const bundle = async (cfg, social = onlineCfg, app = false) => (await esbuild.build({
   entryPoints: [p('src/js/main.js').pathname],
   bundle: true,
@@ -39,6 +41,8 @@ const bundle = async (cfg, social = onlineCfg, app = false) => (await esbuild.bu
     __ADS_PROVIDER__: JSON.stringify((cfg.ads && cfg.ads.provider) || 'demo'),
     __SOCIAL__: JSON.stringify(social),
     __SOCIAL_PROVIDER__: JSON.stringify(social.provider === 'firebase' ? 'firebase' : 'demo'),
+    __BUILD__: JSON.stringify(BUILD),
+    __DEV_TOOLS__: JSON.stringify(!app), // utviklermodus finnes ikke i appene i App Store / Google Play
   },
 })).outputFiles[0].text;
 const js = await bundle(userCfg);

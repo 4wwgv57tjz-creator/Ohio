@@ -3,18 +3,44 @@ let ctx = null;
 let enabled = true;
 let master = null;
 
+let meter = null;
+
 export function setSound(on) { enabled = on; }
+// Lydkjeden: alle lyder → master (volum) → høyttaleren
+function build(c) {
+  ctx = c;
+  noiseBuf = null;
+  meter = null;
+  master = ctx.createGain();
+  master.gain.value = 0.32;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -12;
+  comp.knee.value = 10;
+  comp.ratio.value = 5;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.15;
+  master.connect(comp).connect(ctx.destination);
+}
 export function unlockAudio() {
   if (ctx) { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return; }
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    ctx = new AC();
-    master = ctx.createGain();
-    master.gain.value = 0.32;
-    master.connect(ctx.destination);
+    build(new AC());
   } catch { ctx = null; }
 }
+// For utviklermodus og tester: status for lyden, et nivåmål, og lyd inn i en annen lydkontekst (offline-måling)
+export const audioState = () => (ctx ? ctx.state : 'none');
+export function audioLevel() {
+  if (!ctx) return 0;
+  if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 1024; master.connect(meter); }
+  const a = new Float32Array(meter.fftSize);
+  meter.getFloatTimeDomainData(a);
+  let peak = 0;
+  for (const x of a) peak = Math.max(peak, Math.abs(x));
+  return peak;
+}
+export function useAudioContext(c) { build(c); }
 
 function tone(freq, dur, { type = 'square', vol = 0.3, slide = 0, delay = 0, attack = 0.005 } = {}) {
   if (!ctx || !enabled) return;
@@ -34,11 +60,7 @@ function tone(freq, dur, { type = 'square', vol = 0.3, slide = 0, delay = 0, att
 let noiseBuf = null;
 function noise(dur, { vol = 0.4, freq = 900, delay = 0 } = {}) {
   if (!ctx || !enabled) return;
-  if (!noiseBuf) {
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
-    const d = noiseBuf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  }
+  ensureNoise();
   const t0 = ctx.currentTime + delay;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuf;
@@ -54,10 +76,40 @@ function noise(dur, { vol = 0.4, freq = 900, delay = 0 } = {}) {
   src.stop(t0 + dur + 0.02);
 }
 
+function ensureNoise() {
+  if (noiseBuf) return;
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+function burst(dur, { vol = 0.8, freq = 3000, q = 0.8, delay = 0 } = {}) {
+  if (!ctx || !enabled) return;
+  ensureNoise();
+  const t0 = ctx.currentTime + delay;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.value = freq;
+  f.Q.value = q;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(master);
+  src.start(t0, Math.random() * 0.25);
+  src.stop(t0 + dur + 0.02);
+}
+// Et skudd: knall (støy i diskanten) + kropp (tone med overtoner som faller) + hale for store våpen
+function shot(o = {}) {
+  const d = o.delay || 0;
+  burst(o.crackDur ?? 0.05, { vol: o.crackVol ?? 0.9, freq: o.crack ?? 3500, q: o.q ?? 0.8, delay: d });
+  if (o.body) tone(o.body, o.bodyDur ?? 0.12, { type: o.bodyType || 'square', vol: o.bodyVol ?? 0.18, slide: (o.bodyTo ?? o.body * 0.3) - o.body, delay: d, attack: 0.002 });
+  if (o.tail) burst(o.tail, { vol: o.tailVol ?? 0.5, freq: o.tailFreq ?? 1200, q: 0.6, delay: d + 0.015 });
+}
 // Båndpass-filtrert støy som sveiper fra én frekvens til en annen (sus, vind og «whoosh»)
 function sweep(dur, { vol = 0.25, from = 400, to = 3000, delay = 0, q = 1.2 } = {}) {
   if (!ctx || !enabled) return;
-  noise(0.001, { vol: 0.0001 }); // sørger for at støybufferen finnes
+  ensureNoise();
   const t0 = ctx.currentTime + delay;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuf;
@@ -136,28 +188,29 @@ export const sfx = {
   laser() { tone(2200, 0.7, { type: 'sawtooth', vol: 0.08, slide: -1900 }); tone(1100, 0.7, { type: 'square', vol: 0.05, slide: -900 }); },
   nuts() { for (let i = 0; i < 8; i++) { tone(300 + Math.random() * 400, 0.04, { type: 'square', vol: 0.09, delay: i * 0.05 }); noise(0.03, { vol: 0.15, freq: 2000, delay: i * 0.05 }); } },
   bribe() { noise(0.05, { vol: 0.2, freq: 3000 }); tone(1568, 0.1, { type: 'square', vol: 0.1, delay: 0.05 }); tone(2093, 0.3, { type: 'triangle', vol: 0.12, delay: 0.12 }); },
-  // skytelyd for hver troppetype (og fiendens skudd)
+  // skytelyd for hver troppetype (og fiendens skudd). Laget for å høres også på små mobilhøyttalere:
+  // knallet ligger i diskanten, og kroppen er en tone med overtoner i stedet for dyp bass.
   gun(unit) {
     switch (unit) {
-      case 'militia': noise(0.09, { vol: 0.22, freq: 1600 }); tone(240, 0.08, { type: 'square', vol: 0.06, slide: -140 }); break; // gammelt gevær
-      case 'hunter': noise(0.2, { vol: 0.3, freq: 2600 }); tone(120, 0.15, { type: 'sine', vol: 0.18, slide: -60 }); break; // hagle
-      case 'truck': for (let i = 0; i < 5; i++) noise(0.035, { vol: 0.2, freq: 2200, delay: i * 0.055 }); break; // maskingevær
-      case 'soldier': for (let i = 0; i < 3; i++) { noise(0.04, { vol: 0.2, freq: 3500, delay: i * 0.08 }); tone(900, 0.03, { type: 'square', vol: 0.04, slide: -600, delay: i * 0.08 }); } break; // automatgevær
-      case 'tank': tone(70, 0.4, { type: 'sine', vol: 0.32, slide: -35 }); noise(0.35, { vol: 0.32, freq: 900 }); break; // kanon
-      case 'heli': for (let i = 0; i < 9; i++) noise(0.022, { vol: 0.16, freq: 3000, delay: i * 0.032 }); break; // minigun
-      case 'jet': sweep(0.3, { vol: 0.16, from: 600, to: 3200 }); noise(0.18, { vol: 0.24, freq: 1800, delay: 0.26 }); break; // rakett
-      case 'ship': tone(55, 0.6, { type: 'sine', vol: 0.32, slide: -20 }); noise(0.5, { vol: 0.3, freq: 700 }); tone(110, 0.3, { type: 'triangle', vol: 0.1, slide: -50 }); break; // skipskanon
-      case 'drone': tone(520, 0.14, { type: 'square', vol: 0.07, slide: 700 }); tone(1300, 0.08, { type: 'sawtooth', vol: 0.06, slide: -900, delay: 0.1 }); break; // summende zap
-      case 'carrier': sweep(0.5, { vol: 0.18, from: 400, to: 4000 }); tone(180, 0.5, { type: 'sawtooth', vol: 0.04, slide: 300 }); break; // fly letter
-      case 'mech': tone(90, 0.12, { type: 'square', vol: 0.12, slide: -40 }); tone(70, 0.35, { type: 'sine', vol: 0.28, slide: -30, delay: 0.12 }); noise(0.3, { vol: 0.28, freq: 1100, delay: 0.12 }); break; // skritt og kanon
-      case 'rocket': sweep(0.55, { vol: 0.2, from: 200, to: 2400 }); noise(0.3, { vol: 0.3, freq: 1500, delay: 0.5 }); break; // rakettbatteri
-      case 'spacemarine': tone(1800, 0.09, { type: 'square', vol: 0.07, slide: -1200 }); tone(1700, 0.09, { type: 'square', vol: 0.07, slide: -1100, delay: 0.11 }); break; // lasergevær
-      case 'spacefighter': for (let i = 0; i < 3; i++) tone(1300, 0.08, { type: 'sawtooth', vol: 0.06, slide: -1000, delay: i * 0.09 }); break; // blaster
-      case 'laser': tone(880, 0.4, { type: 'sawtooth', vol: 0.06, slide: 120 }); tone(1760, 0.4, { type: 'sine', vol: 0.06, slide: -200 }); break; // laserkanon
-      case 'megamech': tone(45, 0.7, { type: 'sine', vol: 0.34, slide: -15 }); noise(0.55, { vol: 0.34, freq: 1200 }); tone(1500, 0.2, { type: 'square', vol: 0.04, delay: 0.05 }); break; // megakanon
-      case 'ohiostar': sweep(0.4, { vol: 0.14, from: 3000, to: 600 }); [784, 988, 1175].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.06, delay: 0.05 + i * 0.05 })); break; // kosmisk stråle
-      case 'foe': noise(0.08, { vol: 0.14, freq: 700 }); tone(160, 0.08, { type: 'square', vol: 0.04, slide: -60 }); break; // fiendens skudd
-      default: noise(0.08, { vol: 0.2, freq: 2000 });
+      case 'militia': shot({ crack: 2600, crackVol: 1.0, crackDur: 0.06, body: 320, bodyTo: 90, bodyVol: 0.2, bodyDur: 0.1, tail: 0.18, tailVol: 0.45, tailFreq: 1300 }); break; // gammelt gevær
+      case 'hunter': shot({ crack: 2200, crackVol: 1.3, crackDur: 0.09, q: 0.5, body: 240, bodyTo: 60, bodyType: 'sawtooth', bodyVol: 0.25, bodyDur: 0.16, tail: 0.3, tailVol: 0.7, tailFreq: 1600 }); break; // hagle
+      case 'truck': for (let i = 0; i < 6; i++) shot({ delay: i * 0.065, crack: 3000, crackVol: 0.8, crackDur: 0.035, body: 520, bodyTo: 180, bodyVol: 0.12, bodyDur: 0.045 }); break; // maskingevær
+      case 'soldier': for (let i = 0; i < 3; i++) shot({ delay: i * 0.09, crack: 4200, crackVol: 0.9, crackDur: 0.04, body: 700, bodyTo: 220, bodyVol: 0.13, bodyDur: 0.05, tail: 0.06, tailVol: 0.3, tailFreq: 2000 }); break; // automatgevær
+      case 'tank': shot({ crack: 1600, crackVol: 1.3, crackDur: 0.1, q: 0.6, body: 300, bodyTo: 55, bodyType: 'sawtooth', bodyVol: 0.3, bodyDur: 0.36, tail: 0.42, tailVol: 0.7, tailFreq: 900 }); break; // kanon
+      case 'heli': for (let i = 0; i < 12; i++) shot({ delay: i * 0.032, crack: 3600, crackVol: 0.6, crackDur: 0.022, body: 900, bodyTo: 500, bodyVol: 0.06, bodyDur: 0.02 }); break; // minigun
+      case 'jet': sweep(0.3, { vol: 0.5, from: 700, to: 3800 }); shot({ delay: 0.26, crack: 1900, crackVol: 1.1, crackDur: 0.08, body: 260, bodyTo: 70, bodyType: 'sawtooth', bodyVol: 0.22, bodyDur: 0.25, tail: 0.3, tailVol: 0.6, tailFreq: 1300 }); break; // rakett
+      case 'ship': shot({ crack: 1300, crackVol: 1.4, crackDur: 0.14, q: 0.5, body: 200, bodyTo: 40, bodyType: 'sawtooth', bodyVol: 0.32, bodyDur: 0.5, tail: 0.5, tailVol: 0.75, tailFreq: 750 }); burst(0.22, { vol: 0.3, freq: 1000, q: 0.6, delay: 0.22 }); break; // skipskanon med ekko
+      case 'drone': tone(900, 0.08, { type: 'square', vol: 0.14, slide: 1500 }); tone(2400, 0.1, { type: 'sawtooth', vol: 0.12, slide: -1800, delay: 0.08 }); burst(0.03, { vol: 0.5, freq: 6000, delay: 0.08 }); break; // summende zap
+      case 'carrier': sweep(0.55, { vol: 0.6, from: 400, to: 5000 }); tone(300, 0.5, { type: 'sawtooth', vol: 0.08, slide: 700 }); break; // flyene letter
+      case 'mech': tone(160, 0.1, { type: 'square', vol: 0.25, slide: -90 }); burst(0.06, { vol: 0.8, freq: 800 }); shot({ delay: 0.12, crack: 1800, crackVol: 1.2, crackDur: 0.09, body: 300, bodyTo: 60, bodyType: 'sawtooth', bodyVol: 0.28, bodyDur: 0.3, tail: 0.32, tailVol: 0.65, tailFreq: 1000 }); break; // skritt og kanon
+      case 'rocket': sweep(0.5, { vol: 0.55, from: 300, to: 3200 }); for (let i = 0; i < 5; i++) burst(0.02, { vol: 0.5, freq: 4000, delay: 0.05 + i * 0.08 }); shot({ delay: 0.5, crack: 1700, crackVol: 1.2, crackDur: 0.09, body: 280, bodyTo: 60, bodyType: 'sawtooth', bodyVol: 0.26, bodyDur: 0.3, tail: 0.4, tailVol: 0.8, tailFreq: 1100 }); break; // rakettbatteri
+      case 'spacemarine': for (let i = 0; i < 2; i++) { tone(2200, 0.1, { type: 'square', vol: 0.16, slide: -1500, delay: i * 0.12 }); tone(3400, 0.08, { type: 'sine', vol: 0.1, slide: -2200, delay: i * 0.12 }); } break; // lasergevær
+      case 'spacefighter': for (let i = 0; i < 3; i++) { tone(1600, 0.09, { type: 'sawtooth', vol: 0.16, slide: -1200, delay: i * 0.085 }); burst(0.02, { vol: 0.4, freq: 6000, delay: i * 0.085 }); } break; // blaster
+      case 'laser': tone(600, 0.45, { type: 'sawtooth', vol: 0.12, slide: 60 }); tone(612, 0.45, { type: 'sawtooth', vol: 0.12, slide: 40 }); tone(1200, 0.45, { type: 'sine', vol: 0.1, slide: -300 }); burst(0.4, { vol: 0.25, freq: 3000, q: 2 }); break; // laserkanon
+      case 'megamech': shot({ crack: 1400, crackVol: 1.5, crackDur: 0.15, q: 0.5, body: 260, bodyTo: 35, bodyType: 'sawtooth', bodyVol: 0.34, bodyDur: 0.6, tail: 0.55, tailVol: 0.8, tailFreq: 800 }); tone(1500, 0.25, { type: 'square', vol: 0.08, delay: 0.04 }); tone(2250, 0.25, { type: 'triangle', vol: 0.08, delay: 0.04 }); break; // megakanon
+      case 'ohiostar': sweep(0.45, { vol: 0.5, from: 3800, to: 700 }); [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.12, delay: 0.05 + i * 0.05 })); sparkle(6, 0.1); break; // kosmisk stråle
+      case 'foe': shot({ crack: 1500, crackVol: 0.55, crackDur: 0.05, body: 260, bodyTo: 100, bodyVol: 0.1, bodyDur: 0.07 }); break; // fiendens skudd
+      default: shot({});
     }
   },
   star(i = 1) { const k = Math.pow(1.26, i - 1); tone(880 * k, 0.18, { type: 'triangle', vol: 0.16 }); tone(1760 * k, 0.12, { type: 'triangle', vol: 0.06, delay: 0.03 }); },

@@ -19,7 +19,7 @@ tegneseriestil, og lydene lages direkte i nettleseren – det er ingen bilde- el
    skip.
 4. **Velg fiende**: du bestemmer selv hvem du kriger mot – alle fiendene i kapittelet du er i, i den rekkefølgen du
    vil. Trykk **Bytt fiende** på kortet «Neste mål» på Base for en liste med vinnersjanse, forsvar, terreng og belønning,
-   eller trykk på et område på kartet. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent og gjelder for en
+   eller trykk på et område på kartet (eller **Bytt fiende** i områdearket). Du kan bytte så mange ganger du vil. **Kart**: velg et område, velg taktikk og trykk **Angrip!** Vinnersjansen vises i prosent og gjelder for en
    automatisk plassering der du ikke gjør noe i kampen. Først med 1,8 ganger så stor hær som forsvaret er seieren
    sikker. Taper du, blir fienden svekket – men svekkelsen bygges opp igjen over tid, og ingen fiende kan svekkes under
    40 %.
@@ -328,6 +328,17 @@ Balansen er laget med en simulator: den spiller spillet med en fornuftig strateg
 justerer forsvaret til hvert område slik at hver erobring tar omtrent ønsket tid, fra cirka 30 sekunder for
 første by til et par minutter i verdensrommet. Nye bygninger og enheter i hvert kapittel prises ut fra
 inntekten spilleren har når kapitlet starter. Ønsket tempo står øverst i `tools/simulate.mjs`.
+
+**Utviklermodus** (for å lete etter feil): åpne innstillingene og trykk 7 ganger på versjonslinja nederst (eller åpne
+spillet med `#dev` på slutten av adressen). Da kommer en verktøyknapp nede til venstre med snarveier: penger,
+edelstener, medaljer, kasser, powerups og alle skins; hær (beste enhet, nok til 100 % eller nesten ingenting) og «ta
+valgt fiende nå»; hopp til et hvilket som helst kapittel, fullfør kapittelet og prestisje; start en bestemt eller
+tilfeldig hendelse, daglig bonus igjen eller dag 7, forsyningskasse, kombo og tvunget kritisk treff eller megakritt,
+«borte i 1 eller 8 timer»; bytt general uten ventetid; test mellomreklame og belønningsreklame og slå reklamefri av
+og på; et lydbrett med alle lydene (blant annet alle skytelydene) og en nivåmåler som viser om lyden faktisk spilles;
+bytt språk, vis alle skins og et info-overlay med FPS; og kopier, lim inn eller nullstill lagringen. Lagringer der
+verktøyene er brukt, sendes ikke til det globale leaderboardet. Utviklermodus finnes ikke i app-versjonene. Versjonen
+i innstillingene viser hvilken versjon av spillet du har, så du ser om en oppdatering er lastet inn.
 
 For testing: åpne spillet med `#debug` på slutten av adressen. Da finnes `window.__ohio` i konsollen med
 hjelpere som `give(1e6)`, `gems(500)`, `power(100)`, `win()`, `era(4)`, `event('hunger')` (start en hendelse),

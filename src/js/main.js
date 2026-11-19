@@ -12,7 +12,7 @@ import { formatCode } from './social-common.js';
 import { MAPS } from './mapdata.js';
 import * as A from './art.js';
 import { t, L, fmt, money, duration, setLang, getLang } from './i18n.js';
-import { sfx, unlockAudio, setSound, buzz } from './audio.js';
+import { sfx, unlockAudio, setSound, buzz, audioState, audioLevel } from './audio.js';
 
 const SAVE_KEY = 'totw-ohio-save-v1';
 const MODES = [1, 10, 100, 'max'];
@@ -40,6 +40,16 @@ let combo = 0, lastTapAt = 0, comboShownTier = 0;
 let dailyAutoShown = false, nextQuip = performance.now() + 18000, sayTimer = 0, sayId = 0;
 // #noauto (for tester): ingen automatiske hendelser eller daglig bonus-vindu
 const NOAUTO = /[?#&]noauto/.test(location.href);
+// Utviklermodus: slås på ved å trykke 7 ganger på versjonen i innstillingene (eller #dev i adressen)
+/* global __BUILD__, __DEV_TOOLS__ */
+const BUILD = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
+const DEV_OK = typeof __DEV_TOOLS__ === 'undefined' || __DEV_TOOLS__;
+const DEV_KEY = 'totw-ohio-dev';
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* privat modus */ } };
+let devOn = DEV_OK && (lsGet(DEV_KEY) === '1' || /[?#&]dev\b/.test(location.href));
+let devHud = devOn && lsGet(DEV_KEY + '-hud') === '1';
+let devTaps = 0, devTapAt = 0, devCrit = 0, fpsAvg = 60;
 const AD_GEMS = 30;
 const AD_GEMS_PER_DAY = 8;
 const FREE_CRATE_COOLDOWN = 30 * 60 * 1000;
@@ -438,7 +448,7 @@ function targetCardHTML() {
   const fill = Math.min(100, (P / (D * E.SAFE_RATIO)) * 100);
   return `<div class="tc-head"><div class="tc-art">${enemyArtFor(r)}</div>
     <div class="tc-info"><div class="eyebrow">${S.target === r.id ? t('chosen_enemy') : t('next_target')}</div><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p>
-    ${S.tut >= 5 && E.eraProgress(S).total - E.eraProgress(S).done > 1 ? `<button type="button" class="link-btn pick-enemy" data-action="pick-target">${ico('swords')} ${t('switch_enemy', { n: E.eraProgress(S).total - E.eraProgress(S).done })}</button>` : ''}</div></div>
+    ${S.tut >= 5 && E.eraProgress(S).total - E.eraProgress(S).done > 1 ? `<button type="button" class="link-btn pick-enemy" data-action="pick-target">${ico('swords')} ${t('switch_enemy')}</button>` : ''}</div></div>
     <div class="vs-row"><span class="vs-me">${ico('swords')}<b>${fmt(P)}</b></span><span class="vs-mid">${t('vs')}</span><span class="vs-foe"><b>${fmt(D)}</b>${ico('skull')}</span></div>
     <div class="meter"><div class="meter-fill ${chanceClass(ch)}" style="width:${fill}%"></div><span>${pct(ch)} ${t('win_chance')}</span></div>
     ${terrainHTML(r)}
@@ -640,7 +650,8 @@ function onTap(e) {
   if (now - lastTapAt > E.COMBO_GAP * 3) combo = 0;
   combo = Math.floor(combo) + 1;
   lastTapAt = now;
-  const r = E.doTap(S, Date.now(), combo);
+  const r = E.doTap(S, Date.now(), combo, devCrit ? (devCrit === 2 ? () => 0 : () => 0.004) : Math.random);
+  devCrit = 0;
   const skin = C.equippedSkin(S, 'tap');
   const hq = $('#hq');
   if (hq && hq.animate) hq.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06,.9)' }, { transform: 'scale(.97,1.05)' }, { transform: 'scale(1)' }], { duration: 240, easing: 'ease-out' });
@@ -986,7 +997,9 @@ function sheetHTML() {
     ${lanesPreviewHTML(r)}`;
   }
   const P = E.battlePower(S, r), D = E.battleDef(S, r), ch = E.winChance(P, D);
-  return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p></div></div>
+  const left = E.eraProgress(S).total - E.eraProgress(S).done;
+  return `<div class="sheet-top"><div class="sheet-art">${enemyArtFor(r)}</div><div class="sheet-info"><h3>${esc(L(r.name))}</h3><p class="flavor">${esc(L(r.flavor))}</p>
+    ${left > 1 ? `<button type="button" class="link-btn pick-enemy" data-action="pick-target">${ico('swords')} ${t('switch_enemy')}</button>` : ''}</div></div>
     <div class="vs-row"><span class="vs-me">${ico('swords')}<b>${fmt(P)}</b></span><span class="vs-mid">${t('vs')}</span><span class="vs-foe"><b>${fmt(D)}</b>${ico('skull')}${S.damage[id] ? `<em>${t('weakened')}</em>` : ''}</span></div>
     <div class="meter"><div class="meter-fill ${chanceClass(ch)}" style="width:${ch * 100}%"></div><span>${pct(ch)} ${t('win_chance')} · ${chanceLabel(ch)}</span></div>
     ${terrainHTML(r)}
@@ -1073,7 +1086,7 @@ function zoomToRegion(id) {
   const g = m.regions[id];
   if (!g) return;
   const [x0, y0, x1, y1] = g.b;
-  let w = Math.max((x1 - x0) * 1.7, (y1 - y0) * 1.7 * (m.w / m.h), m.w * 0.3);
+  let w = Math.max((x1 - x0) * 2.4, (y1 - y0) * 2.4 * (m.w / m.h), m.w * 0.5); // nabolandene skal fortsatt synes
   w = Math.min(w, m.w);
   const h = w * (m.h / m.w);
   animateViewBox([(x0 + x1) / 2 - w / 2, (y0 + y1) / 2 - h / 2, w, h]);
@@ -1976,6 +1989,7 @@ function showIntro() {
   $('#village-name', m).addEventListener('keydown', (e) => { if (e.key === 'Enter') startGame(); });
 }
 function startGame() {
+  setTimeout(devChrome, 0);
   unlockAudio();
   const input = $('#village-name');
   const name = (input && input.value.trim()) || t('intro_placeholder');
@@ -2141,7 +2155,9 @@ function showSettings() {
         <span>${t('stat_prestige')}</span><b>${S.prestige ? pBadge(S.prestige) : '–'}</b>
       </div></div>
     <div class="danger-zone" id="danger"><button type="button" class="btn btn-danger" data-action="reset">${t('reset')}</button></div>
-    <p class="credits">${t('credits')}</p>`, 'settings');
+    ${devOn ? `<div class="stats-box dev-box"><b>${ico('wrench')} ${t('dev_title')}</b><p class="small">${t('dev_note')}</p><div class="row2"><button type="button" class="btn btn-gold" data-action="dev-open">${t('dev_open')}</button><button type="button" class="btn btn-soft" data-action="dev" data-dev="off">${t('dev_turn_off')}</button></div></div>` : ''}
+    <p class="credits">${t('credits')}</p>
+    <button type="button" class="version-line" data-action="dev-tap">${t('version')} ${esc(BUILD)}${devOn ? ' · ' + t('dev_title') : ''}</button>`, 'settings');
 }
 
 
@@ -2754,13 +2770,229 @@ function socialSettingsHTML() {
   </div>`;
 }
 
+// ---------------- utviklermodus ----------------
+// Snarveier for å gå rundt i spillet og lete etter feil. Lagringen merkes (flags.dev), så den holdes unna det
+// globale leaderboardet.
+const DEV_SOUNDS = [
+  ['Skudd', [...UNITS.map((u) => 'gun:' + u.id), 'gun:foe']],
+  ['Kamp', ['hit', 'pew', 'boom', 'alarm', 'shield', 'shieldUp', 'laser', 'nuts', 'bribe', 'star:1', 'star:3', 'march', 'victory', 'defeat', 'fanfare']],
+  ['Kasser', ['crateShake', 'crateOpen', 'reveal:0', 'reveal:1', 'reveal:2', 'reveal:3', 'reveal:4', 'equip', 'swish', 'crate']],
+  ['Basen', ['tap', 'crit', 'crit:mega', 'comboUp:2', 'talk:drip', 'talk:buckeye', 'talk:zorgon', 'citizen:goose', 'citizen:robot', 'citizen:alien', 'citizen:kid', 'citizen:granny', 'citizen:farmer', 'citizen:chef', 'citizen:soldier', 'citizen:mayor', 'citizen:scientist', 'event', 'good', 'bad', 'daily', 'drop', 'powerup', 'expire']],
+  ['Grensesnitt', ['click', 'tab', 'pop', 'whoosh', 'buy', 'recruit', 'coin', 'nope', 'milestone', 'warn']],
+];
+const soundLabel = (k) => { const [a, b] = k.split(':'); return a === 'gun' ? (b === 'foe' ? 'Fiende' : L(UNIT_BY_ID[b].name)) : b ? `${a} ${b}` : a; };
+function playSound(k) {
+  const [a, b] = k.split(':');
+  if (!sfx[a]) return;
+  unlockAudio();
+  sfx[a](b === undefined ? undefined : b === 'mega' ? true : /^\d+$/.test(b) ? Number(b) : b);
+}
+function devInfoHTML() {
+  const ev = S.ev && S.ev.cur ? 'venter' : S.ev && S.ev.next ? Math.max(0, Math.round((S.ev.next - Date.now()) / 1000)) + ' s' : '–';
+  const dl = D.dailyStatus(S);
+  return `<span>Kapittel <b>${S.era + 1}</b></span><span>Opplæring <b>${S.tut}</b></span><span>Spilt <b>${duration(S.stats.playTime)}</b></span>
+    <span>Penger <b>${money(S.money)}</b></span><span>Inntekt <b>${money(E.incomePerSec(S))}/s</b></span><span>Styrke <b>${fmt(E.armyPower(S))}</b></span>
+    <span>Edelstener <b>${fmt(S.gems)}</b></span><span>Medaljer <b>${S.medals || 0}</b></span><span>Prestisje <b>${S.prestige || 0}</b></span>
+    <span>Hendelse <b>${ev}</b></span><span>Daglig <b>${dl.claimed ? 'hentet' : 'dag ' + (dl.idx + 1)}</b></span><span>Lyd <b>${audioState()}</b></span>
+    <span>FPS <b>${Math.round(fpsAvg)}</b></span><span>Valgt fiende <b>${esc(E.chosenTarget(S) ? L(E.chosenTarget(S).name) : '–')}</b></span>`;
+}
+function devPanelHTML() {
+  const sec = (title, body) => `<div class="dev-sec"><b>${title}</b><div class="dev-grid">${body}</div></div>`;
+  const btn = (id, label, extra = '') => `<button type="button" class="dev-btn" data-action="dev" data-dev="${id}"${extra}>${label}</button>`;
+  return `<div class="modal-head"><h2 class="h2">${ico('wrench')} ${t('dev_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <div class="dev-info" id="dev-info">${devInfoHTML()}</div>
+    ${sec('Ressurser', btn('money1h', '+1 time inntekt') + btn('money1d', '+1 døgn inntekt') + btn('gems', '+1000 edelstener') + btn('medals', '+10 medaljer') + btn('crates', '+3 av hver kasse') + btn('pus', 'Alle powerups ×3') + btn('skins', 'Alle skins') + btn('tapmax', 'Maks trykk-kraft'))}
+    ${sec('Hær og kamp', btn('army10', '+10 beste enhet') + btn('army100', '+100 beste enhet') + btn('armywin', 'Nok hær til 100 %') + btn('armyweak', 'Nesten ingen hær') + btn('conquer', 'Ta valgt fiende nå'))}
+    ${sec('Kapittel', ERAS.map((e, i) => btn('era', `${i + 1}. ${esc(L(e.name))}`, ` data-n="${i}"`)).join('') + btn('winall1', 'Ta alle unntatt én') + btn('finishera', 'Fullfør kapittelet') + btn('prestige', 'Klar for prestisje') + btn('prestigeplus', 'Prestisje +1'))}
+    ${sec('Basen', `<select id="dev-ev" class="dev-select" aria-label="Hendelse">${EV.EVENTS.map((x) => `<option value="${x.id}">${esc(L(x.title))}</option>`).join('')}</select>` + btn('event', 'Start hendelsen') + btn('eventrnd', 'Tilfeldig hendelse') + btn('daily', 'Daglig bonus igjen') + btn('daily7', 'Dag 7 i dag') + btn('crate', 'Forsyningskasse') + btn('quip', 'Generalen sier noe') + btn('combo', 'Kombo ×3') + btn('crit', 'Neste trykk: kritisk') + btn('mega', 'Neste trykk: mega') + btn('away1', 'Borte i 1 time') + btn('away8', 'Borte i 8 timer'))}
+    ${sec('Generaler', C.GENERALS.map((g) => btn('gen', esc(L(g.name)), ` data-g="${g.id}"`)).join(''))}
+    ${sec('Reklame', btn('adinter', 'Vis mellomreklame') + btn('adreward', 'Vis belønningsreklame') + btn('adfree', S.adFree ? 'Reklamefri: på' : 'Reklamefri: av') + btn('adreset', 'Nullstill reklametidtakere'))}
+    <div class="dev-sec"><b>Lyd</b><div class="dev-audio"><span>Status: <b id="dev-astate">${audioState()}</b></span><span class="dev-meter"><i id="dev-level"></i></span>${btn('unlock', 'Lås opp lyd')}</div>
+      ${DEV_SOUNDS.map(([g, list]) => `<div class="dev-sub">${g}</div><div class="dev-grid snd">${list.map((k) => `<button type="button" class="dev-btn" data-action="dev" data-dev="snd" data-snd="${k}">${esc(soundLabel(k))}</button>`).join('')}</div>`).join('')}</div>
+    ${sec('Visning', btn('lang', getLang() === 'nb' ? 'English' : 'Norsk') + btn('allskins', showAllSkins ? 'Alle skins i butikken: på' : 'Alle skins i butikken: av') + btn('hud', devHud ? 'Info-overlay: på' : 'Info-overlay: av'))}
+    ${sec('Lagring', btn('export', 'Kopier lagringen') + btn('import', 'Lim inn en lagring') + btn('tut', 'Opplæringen på nytt') + btn('reset', 'Nytt spill'))}
+    <div class="dev-save-box" id="dev-save-box" hidden><textarea id="dev-save" class="dev-save" spellcheck="false"></textarea>${btn('importgo', 'Last inn lagringen')}</div>
+    <p class="small dev-foot">${t('dev_note')} ${t('version')} ${esc(BUILD)}</p>`;
+}
+function openDevPanel() {
+  if (!devOn) return;
+  $$('.dev-modal').forEach((x) => closeModal(x));
+  openModal(devPanelHTML(), 'dev-modal');
+}
+function refreshDevPanel() {
+  const md = $('.dev-modal');
+  if (!md) return;
+  const sc = md.scrollTop;
+  const ev = $('#dev-ev', md)?.value;
+  md.innerHTML = devPanelHTML();
+  if (ev && $('#dev-ev', md)) $('#dev-ev', md).value = ev;
+  md.scrollTop = sc;
+}
+function updateDevLive() {
+  const info = $('#dev-info');
+  if (info) info.innerHTML = devInfoHTML();
+  const lv = $('#dev-level');
+  if (lv) lv.style.width = Math.min(100, audioLevel() * 300) + '%';
+  const as = $('#dev-astate');
+  if (as) as.textContent = audioState();
+  const hud = $('#dev-hud');
+  if (hud) hud.textContent = `FPS ${Math.round(fpsAvg)} · ${money(S.money)} · +${money(E.incomePerSec(S))}/s · ⚔ ${fmt(E.armyPower(S))} · kap ${S.era + 1} · tut ${S.tut} · ${tab}`;
+}
+function devChrome() {
+  $('#dev-fab')?.remove();
+  $('#dev-hud')?.remove();
+  if (!devOn || !S) return;
+  const fab = document.createElement('button');
+  fab.type = 'button';
+  fab.id = 'dev-fab';
+  fab.className = 'dev-fab';
+  fab.dataset.action = 'dev-open';
+  fab.setAttribute('aria-label', t('dev_title'));
+  fab.innerHTML = ico('wrench');
+  $('#app').appendChild(fab);
+  if (devHud) { const h = document.createElement('div'); h.id = 'dev-hud'; h.className = 'dev-hud'; $('#app').appendChild(h); }
+}
+function devTap() {
+  if (!DEV_OK) return;
+  const now = Date.now();
+  devTaps = now - devTapAt < 1500 ? devTaps + 1 : 1;
+  devTapAt = now;
+  if (devOn) return;
+  if (devTaps >= 7) {
+    devOn = true;
+    devTaps = 0;
+    lsSet(DEV_KEY, '1');
+    sfx.milestone();
+    toast(t('dev_on'), 'gold');
+    devChrome();
+    closeModal($('.modal.settings'));
+    showSettings();
+  } else if (devTaps >= 3) toast(t('dev_taps', { n: 7 - devTaps }));
+}
+const bestUnitNow = () => UNITS.filter((u) => u.era <= S.era).pop();
+function devEra(e) {
+  for (const r of REGIONS) {
+    if (r.era < e) S.conquered[r.id] = true;
+    else delete S.conquered[r.id];
+  }
+  S.era = e;
+  S.finished = false;
+  S.target = '';
+  if (S.tut < 5) S.tut = 9;
+  S.seenIntro = e;
+  mapEra = e;
+  viewBox = null;
+  selected = null;
+  applyTheme();
+}
+function devAction(id, btn) {
+  if (!devOn || !S) return;
+  const cheat = !['snd', 'unlock', 'hud', 'lang', 'allskins', 'export', 'import', 'importgo', 'off', 'reset'].includes(id);
+  if (cheat) S.flags.dev = true;
+  let close = false;
+  switch (id) {
+    case 'money1h': case 'money1d': { const v = Math.max(1000, E.incomePerSec(S) * (id === 'money1h' ? 3600 : 86400)); S.money += v; S.totalEarned += v; toast('+' + money(v)); break; }
+    case 'gems': S.gems += 1000; break;
+    case 'medals': S.medals = (S.medals || 0) + 10; S.medalsEarned = (S.medalsEarned || 0) + 10; break;
+    case 'crates': for (const c of C.CRATES) C.addCrate(S, c.id, 3); break;
+    case 'pus': for (const q of PU.POWERUPS) S.pu.inv[q.id] = (S.pu.inv[q.id] || 0) + 3; refreshPu(); break;
+    case 'skins': for (const k of C.SKINS) S.skins.owned[k.id] = S.skins.owned[k.id] || Date.now(); toast(C.SKINS.length + ' skins'); break;
+    case 'tapmax': S.tapLevel = E.TAP_MAX; break;
+    case 'army10': case 'army100': { const u = bestUnitNow(); S.units[u.id] = (S.units[u.id] || 0) + (id === 'army10' ? 10 : 100); toast(`+${id === 'army10' ? 10 : 100} ${L(u.name)}`); break; }
+    case 'armywin': {
+      const r = E.chosenTarget(S);
+      if (!r) break;
+      const u = bestUnitNow();
+      for (let n = 1, i = 0; i < 40 && E.chanceFor(S, r) < 1; i++, n *= 2) S.units[u.id] = (S.units[u.id] || 0) + n;
+      toast(`${pct(E.chanceFor(S, r))} mot ${L(r.name)}`);
+      break;
+    }
+    case 'armyweak': S.units = { militia: 1 }; break;
+    case 'conquer': {
+      const r = E.chosenTarget(S);
+      if (!r) break;
+      S.conquered[r.id] = true;
+      S.stars[r.id] = 3;
+      delete S.damage[r.id];
+      S.target = '';
+      toast('✓ ' + L(r.name));
+      if (E.eraComplete(S) && !S.finished) { close = true; setTimeout(showEraComplete, 120); }
+      break;
+    }
+    case 'era': devEra(Number(btn.dataset.n)); break;
+    case 'winall1': { const rs = regionsOfEra(S.era); rs.slice(0, rs.length - 1).forEach((r) => { S.conquered[r.id] = true; }); break; }
+    case 'finishera': regionsOfEra(S.era).forEach((r) => { S.conquered[r.id] = true; }); close = true; setTimeout(showEraComplete, 120); break;
+    case 'prestige': devEra(ERAS.length - 1); regionsOfEra(S.era).forEach((r) => { S.conquered[r.id] = true; }); S.finished = true; close = true; setTab('base'); break;
+    case 'prestigeplus': S.prestige = (S.prestige || 0) + 1; break;
+    case 'event': case 'eventrnd': {
+      if (S.tut < 5) S.tut = 9;
+      EV.startEvent(S, Date.now(), Math.random, id === 'event' ? $('#dev-ev')?.value : null);
+      close = true;
+      setTab('base');
+      setTimeout(() => { onEventSpawn(); openEvent(); }, 150);
+      break;
+    }
+    case 'daily': S.daily = { ...S.daily, last: D.prevDay(new Date()) }; refreshDailyBtn(); break;
+    case 'daily7': S.daily = { last: D.prevDay(new Date()), streak: 6, total: S.daily.total || 0 }; refreshDailyBtn(); close = true; setTimeout(openDaily, 150); break;
+    case 'crate': nextCrate = 0; close = true; break;
+    case 'quip': nextQuip = 0; close = true; setTab('base'); setTimeout(() => maybeQuip(performance.now()), 200); break;
+    case 'combo': close = true; setTab('base'); setTimeout(() => { combo = 120; lastTapAt = performance.now() + 2500; updateCombo(); }, 150); break;
+    case 'crit': devCrit = 1; close = true; setTab('base'); toast('Trykk på hovedkvarteret'); break;
+    case 'mega': devCrit = 2; close = true; setTab('base'); toast('Trykk på hovedkvarteret'); break;
+    case 'away1': case 'away8': S.lastSeen = Date.now() - (id === 'away1' ? 3600 : 8 * 3600) * 1000; close = true; setTimeout(checkOffline, 150); break;
+    case 'gen': S.general = btn.dataset.g; S.genSwitchAt = 0; applySkins(); break;
+    case 'adinter': close = true; setTimeout(() => M.interstitialAd('dev'), 150); break;
+    case 'adreward': close = true; setTimeout(() => watchAd('dev', () => toast('Belønning gitt!', 'boost')), 150); break;
+    case 'adfree': S.adFree = !S.adFree; break;
+    case 'adreset': S.ads.freeCrateAt = 0; S.ads.gemCount = 0; S.ads.lastInterstitial = 0; S.ads.battlesSince = 0; break;
+    case 'unlock': unlockAudio(); setTimeout(() => sfx.coin(), 60); break;
+    case 'snd': playSound(btn.dataset.snd); return;
+    case 'lang': { const l = getLang() === 'nb' ? 'en' : 'nb'; S.settings.lang = l; setLang(l); renderShellText(); break; }
+    case 'allskins': showAllSkins = !showAllSkins; break;
+    case 'hud': devHud = !devHud; lsSet(DEV_KEY + '-hud', devHud ? '1' : null); devChrome(); break;
+    case 'export': {
+      const box = $('#dev-save-box'), ta = $('#dev-save');
+      if (!box || !ta) break;
+      box.hidden = false;
+      ta.value = JSON.stringify(S);
+      ta.focus(); ta.select();
+      try { navigator.clipboard.writeText(ta.value).then(() => toast('Kopiert!'), () => toast('Merk teksten og kopier den')); } catch { toast('Merk teksten og kopier den'); }
+      return;
+    }
+    case 'import': { const box = $('#dev-save-box'), ta = $('#dev-save'); if (box && ta) { box.hidden = false; ta.value = ''; ta.focus(); } return; }
+    case 'importgo': {
+      try {
+        const data = JSON.parse($('#dev-save').value);
+        S = E.restore(data);
+        S.flags.dev = true;
+        persist();
+        location.reload();
+      } catch { sfx.nope(); toast('Det var ikke en gyldig lagring'); }
+      return;
+    }
+    case 'tut': S.tut = 0; S.stats.taps = 0; setTab('base'); close = true; break;
+    case 'reset': if (window.confirm(t('reset_confirm'))) { lsSet(SAVE_KEY, null); window.onpagehide = null; location.reload(); } return;
+    case 'off': devOn = false; devHud = false; lsSet(DEV_KEY, null); lsSet(DEV_KEY + '-hud', null); devChrome(); $$('.dev-modal').forEach((x) => closeModal(x)); toast(t('dev_off')); if ($('.modal.settings')) { closeModal($('.modal.settings')); showSettings(); } return;
+    default: return;
+  }
+  sfx.click();
+  persist();
+  updateHUD();
+  updateBadges();
+  lastSig = {};
+  renderTab();
+  updateTutorial();
+  if (close) $$('.dev-modal').forEach((x) => closeModal(x));
+  else refreshDevPanel();
+}
+
 // ---------------- velg fiende ----------------
 // Alle fiendene i kapittelet du er i (samme nivå). Ta dem i den rekkefølgen du vil.
 function openEnemyPicker() {
   const cur = E.chosenTarget(S);
   const list = regionsOfEra(S.era).filter((r) => !S.conquered[r.id]).sort((a, b) => E.regionDef(S, a) - E.regionDef(S, b));
   openModal(`<div class="modal-head"><h2 class="h2">${t('pick_enemy')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
-    <p class="small">${t('pick_enemy_sub', { n: S.era + 1 })}</p>
+    <p class="small">${t('pick_enemy_sub', { n: list.length, c: S.era + 1 })}</p>
     <div class="enemy-list">${list.map((r) => {
       const ch = E.chanceFor(S, r);
       const T = TERRAINS[r.terrain];
@@ -2781,6 +3013,7 @@ function setTarget(btn) {
   sfx.click();
   closeModal(btn);
   lastSig.target = null;
+  if (tab === 'map') { mapEra = S.era; selectRegion(r.id); }
   const c = $('#target-card');
   if (c) { c.innerHTML = targetCardHTML(); c.classList.remove('picked'); void c.offsetWidth; c.classList.add('picked'); }
   toast(t('enemy_set', { r: L(r.name) }));
@@ -3028,6 +3261,7 @@ function updateLive() {
 function frame(now) {
   const dt = Math.min(1, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
+  if (dt > 0) fpsAvg = fpsAvg * 0.95 + (1 / dt) * 0.05;
   if (S) {
     E.tick(S, dt);
     liveAcc += dt; saveAcc += dt; badgeAcc += dt;
@@ -3041,6 +3275,7 @@ function frame(now) {
       badgeAcc = 0;
       if (!NOAUTO && EV.eventDue(S)) { EV.startEvent(S); persist(); onEventSpawn(); }
       if (tab === 'base') { updateEvBuffs(); maybeQuip(now); maybeAutoDaily(); }
+      if (devOn) updateDevLive();
       updateBadges();
       if (S.tut === 2) updateTutorial();
       const gone = PU.expirePowerups(S);
@@ -3247,6 +3482,9 @@ function onAction(e) {
     }
     case 'event-open': openEvent(); break;
     case 'pick-target': openEnemyPicker(); break;
+    case 'dev-tap': devTap(); break;
+    case 'dev-open': openDevPanel(); break;
+    case 'dev': devAction(btn.dataset.dev, btn); break;
     case 'set-target': setTarget(btn); break;
     case 'citizen': pokeCitizen(btn); break;
     case 'ev-answer': answerEvent(btn); break;
@@ -3322,6 +3560,7 @@ function boot(hotData) {
     checkOffline();
     if (S.seenIntro < 0) showEraIntro(S.era);
     if (E.eraComplete(S) && !S.finished) showEraComplete();
+    devChrome();
   }
   requestAnimationFrame(frame);
   if (/[?#&]debug/.test(location.href)) {

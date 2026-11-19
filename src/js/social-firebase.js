@@ -151,6 +151,7 @@ export function createFirebaseBackend(cfg, { getState, scoreOf, emit }) {
     async submit(force = false) {
       const s = getState();
       if (!s || !st.user) return;
+      if (s.flags && s.flags.dev) return; // utviklermodus er brukt – ikke på det globale leaderboardet
       const e = scoreOf(s);
       const pr = st.profile || {};
       e.score = Math.max(e.score, pr.score || 0);
