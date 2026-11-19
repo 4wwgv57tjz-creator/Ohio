@@ -107,12 +107,20 @@ Tips:
 - **Lootkasser**: trekasse (1 skin), gullkasse (3 skins, minst Sjelden) og kosmisk kasse (5 skins, minst Episk).
   De sjeldne skinsene er vanskelige å få: i en trekasse er sjansen 80 % Vanlig, 16 % Sjelden, 3,5 % Episk, 0,45 %
   Legendarisk og 0,05 % Mytisk (gullkasse 64 / 28 / 6,5 / 1,3 / 0,2 %, kosmisk kasse 40 / 40 / 16 / 3,5 / 0,5 %).
-  Sjansene vises i spillet («Se sjansene»). Legendarisk eller bedre er garantert minst hvert 80. skin, nye skins
-  prioriteres, og duplikater blir til edelstener.
+  Sjansene vises i spillet («Se sjansene»). Legendarisk eller bedre er garantert minst hvert 80. skin, og nye skins
+  prioriteres.
+- **Lageret og duplikater**: får du et skin du har fra før, havner duplikatet på lageret (Butikk → Mine ting viser
+  ×2, ×3 … på skinnet). Trykk på et skin for å ta det i bruk eller **selge** det for edelstener (Vanlig 10, Sjelden 25,
+  Episk 60, Legendarisk 150, Mytisk 400 per stykk). Har du flere, velger du hvor mange du vil selge (− / +, «Bare
+  duplikatene» eller «Alle»). Duplikatene selges først, og skinnet du har i bruk, standardskins og prestisjeskins kan
+  ikke selges. «Selg alle duplikater» selger alle ekstraeksemplarene på én gang og lar deg beholde ett av hvert, og et
+  duplikat kan også selges rett fra kasseåpningen.
 - **Byttebua** (Butikk → Mine ting): bytt inn 5 skins av samme sjeldenhet mot ett tilfeldig skin som er én grad
   sjeldnere (5 Vanlige → 1 Sjelden, 5 Sjeldne → 1 Episk, 5 Episke → 1 Legendarisk, 5 Legendariske → 1 Mytisk). Du
-  velger selv hvilke skins du bytter inn (eller «Velg automatisk») og kan velge hvilken kategori du vil ha. Du får et
-  skin du ikke har fra før, hvis det finnes. Skins i bruk, standardskins og prestisjeskins kan ikke byttes inn. Når kassen er åpnet, kan du trykke på hvert skin du fikk, bla
+  velger selv hvilke skins du bytter inn (eller «Velg automatisk») og kan velge hvilken kategori du vil ha. Duplikater
+  kan byttes inn – trykk flere ganger på et skin for å velge flere eksemplarer, og «Velg automatisk» bruker
+  duplikatene først. Du får et skin du ikke har fra før, hvis det finnes. Skins i bruk, standardskins og
+  prestisjeskins kan ikke byttes inn. Når kassen er åpnet, kan du trykke på hvert skin du fikk, bla
   gjennom dem med pilene (eller sveipe / bruke piltastene) og ta dem i bruk med en gang med **Bruk**. «Vis alle»
   hopper over avsløringen. Skins til en annen general merkes, og blir brukt når du bytter til den generalen.
 - **Edelstener** tjenes ved å erobre områder, fullføre kapitler, fra forsyningskasser og ved å se reklame – og kan

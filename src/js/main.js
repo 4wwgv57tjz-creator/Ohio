@@ -2245,12 +2245,15 @@ function mineHTML() {
   <p class="gen-note">${E.genSwitchLeft(S) > 0 ? t('general_wait', { t: clock(E.genSwitchLeft(S)) }) : t('general_switch_note')}</p>
   <div class="section-title">${t('my_skins')}</div>
   <div class="progress"><div class="progress-fill" style="width:${(own / total) * 100}%"></div><span>${t('collection', { a: own, b: total })}</span></div>
+  ${(() => { const d = C.dupeTotals(S); return d.n ? `<div class="dupe-card"><span>${ico('swap')} ${t('dupes_summary', { n: d.n })}</span><button type="button" class="btn btn-soft" data-action="sell-dupes">${ico('gem')} ${t('sell_all_dupes', { g: fmt(d.gems) })}</button></div>` : ''; })()}
   <div class="trade-card"><div class="trade-ico">${ico('swap')}</div><div class="trade-body"><b>${t('trade_title')}</b><span>${t('trade_sub', { n: C.TRADE_COST })}</span></div><button type="button" class="btn btn-gold" data-action="trade-open">${t('trade_open')}</button></div>
   <div class="chip-row" role="group">${C.CATEGORIES.map((c) => `<button type="button" class="chip ${c.id === skinCat ? 'on' : ''}" data-action="skincat" data-cat="${c.id}">${esc(L(c.name))} <small>${C.SKINS.filter((k) => k.cat === c.id && S.skins.owned[k.id]).length}</small></button>`).join('')}</div>
   <div class="skin-grid">${list.map((k) => {
     const owned = !!S.skins.owned[k.id];
     const on = S.skins.equipped[k.cat] === k.id;
-    return `<button type="button" class="skin-card r-${k.rarity} ${owned ? '' : 'locked'} ${on ? 'on' : ''}" data-action="${owned ? 'equip' : 'skin-locked'}" data-id="${k.id}">
+    const n = C.copiesOf(S, k.id);
+    return `<button type="button" class="skin-card r-${k.rarity} ${owned ? '' : 'locked'} ${on ? 'on' : ''}" data-action="${owned ? 'skin-open' : 'skin-locked'}" data-id="${k.id}">
+      ${n > 1 ? `<span class="skin-copies">×${n}</span>` : ''}
       <span class="skin-art">${skinPreview(k)}</span>
       <span class="skin-name">${esc(L(k.name))}</span>
       ${rarityChip(k.rarity)}
@@ -2335,7 +2338,7 @@ function lootFlow(items, { art = '', closed = true } = {}) {
       ${rarityChip(it.rarity)}
       <h3>${esc(L(it.skin.name))}</h3>
       <p class="loot-cat">${esc(L(catOf(it.skin).name))}</p>
-      ${it.dup ? `<p class="loot-dup">${ico('gem')} ${t('duplicate', { n: it.refund })}</p>` : ''}
+      ${it.dup ? `<p class="loot-dup">${it.sold ? `${ico('gem')} ${t('sold_label', { g: C.sellValue(it.skin) })}` : `${ico('swap')} ${t('dupe_stored', { n: C.copiesOf(S, it.skin.id) })}`}</p>` : ''}
     </div>`;
   const keys = (e) => {
     if (e.key === 'Escape') { close(); return; }
@@ -2362,8 +2365,18 @@ function lootFlow(items, { art = '', closed = true } = {}) {
       <p class="lb-hint">${cur + 1} / ${n} · ${t('loot_browse_hint')}</p>` : ''}
       <div class="loot-actions">
         <div class="row2">${isOn(it.skin) ? `<span class="lb-on">${ico('check')} ${t('equipped')}</span>` : `<button type="button" class="btn btn-gold" data-crate="equip">${t('equip')}</button>`}<button type="button" class="btn btn-soft" data-crate="done">${t('done')}</button></div>
+        ${it.dup && !it.sold && C.dupesOf(S, it.skin.id) > 0 ? `<button type="button" class="link-btn lb-sell" data-crate="sell">${ico('gem')} ${t('sell_dupe_crate', { g: C.sellValue(it.skin) })}</button>` : ''}
         ${g ? `<p class="lb-note">${t('skin_for_gen', { g: esc(L(g.name)) })}</p>` : ''}
       </div>`;
+  };
+  const sellCur = () => {
+    const it = items[cur];
+    const g = it.dup && !it.sold && C.dupesOf(S, it.skin.id) > 0 ? C.sellSkin(S, it.skin.id, 1) : 0;
+    if (!g) { sfx.nope(); return; }
+    it.sold = true;
+    persist(); sfx.coin(); updateHUD();
+    toast(t('sold_toast', { n: 1, name: L(it.skin.name), g }), 'boost');
+    show(cur, true);
   };
   const equipCur = () => {
     const it = items[cur];
@@ -2400,6 +2413,7 @@ function lootFlow(items, { art = '', closed = true } = {}) {
     if (b && b.dataset.nav) { show(cur + Number(b.dataset.nav)); return; }
     if (b && b.dataset.pick) { show(Number(b.dataset.pick)); return; }
     if (b && b.dataset.crate === 'equip') { equipCur(); return; }
+    if (b && b.dataset.crate === 'sell') { sellCur(); return; }
     if (b && b.dataset.crate === 'done') { close(); return; }
     if (b && b.dataset.crate === 'all') { idx = items.length - 1; show(0); return; }
     if (browsing || busy || b) return;
@@ -2416,13 +2430,80 @@ function lootFlow(items, { art = '', closed = true } = {}) {
   if (!closed) { idx = 0; reveal(items[0]); }
 }
 
+// ----- et skin på lageret: ta i bruk, eller selg for edelstener (velg hvor mange) -----
+let skinSheet = null; // { id, n }
+function skinSheetHTML() {
+  const k = C.SKIN_BY_ID[skinSheet.id];
+  const own = !!S.skins.owned[k.id];
+  const on = S.skins.equipped[k.cat] === k.id;
+  const total = C.copiesOf(S, k.id), d = C.dupesOf(S, k.id), spare = C.spareCopies(S, k);
+  const cat = C.CATEGORIES.find((x) => x.id === k.cat);
+  const g = cat.gen && cat.gen !== S.general ? C.GENERAL_BY_ID[cat.gen] : null;
+  const n = Math.max(1, Math.min(spare, skinSheet.n || 1));
+  const val = C.sellValue(k);
+  return `<div class="modal-head"><h2 class="h2">${esc(L(k.name))}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <div class="ss-top r-${k.rarity}"><div class="ss-art">${skinPreview(k)}</div>
+      <div class="ss-info">${rarityChip(k.rarity)}<span class="ss-cat">${esc(L(cat.name))}</span>
+        <b class="ss-have">${d === 1 ? t('skin_have_d1', { n: total }) : d ? t('skin_have_d', { n: total, d }) : t('skin_have', { n: total })}</b>
+        ${val ? `<span class="ss-val">${ico('gem')} ${t('sell_each', { g: val })}</span>` : ''}</div></div>
+    <div class="ss-equip">${!own ? '' : on ? `<span class="lb-on">${ico('check')} ${t('equipped')}</span>` : `<button type="button" class="btn btn-gold big" data-action="equip" data-id="${k.id}">${t('equip')}</button>`}
+      ${g ? `<p class="small">${t('skin_for_gen', { g: esc(L(g.name)) })}</p>` : ''}</div>
+    ${spare && val ? `<div class="ss-sell"><b>${t('sell_title')}</b>
+      ${spare > 1 ? `<div class="ss-qty"><button type="button" class="qty-btn" data-action="sell-qty" data-d="-1" aria-label="−" ${n <= 1 ? 'disabled' : ''}>−</button><span class="qty-n">${n}</span><button type="button" class="qty-btn" data-action="sell-qty" data-d="1" aria-label="+" ${n >= spare ? 'disabled' : ''}>+</button>
+        ${d && d < spare ? `<button type="button" class="chip ${n === d ? 'on' : ''}" data-action="sell-qty" data-set="${d}">${t('sell_dupes_only', { n: d })}</button>` : ''}<button type="button" class="chip ${n === spare ? 'on' : ''}" data-action="sell-qty" data-set="${spare}">${t('sell_all', { n: spare })}</button></div>` : ''}
+      <button type="button" class="btn btn-gem big" data-action="sell-go">${t('sell_btn', { n, g: fmt(n * val) })} ${ico('gem')}</button>
+      <p class="small">${spare < total ? t('sell_keep_note') : t('sell_last_note')}</p></div>` : `<p class="small ss-nosell">${k.prestige ? t('sell_prestige') : k.def ? t('sell_default') : on ? t('sell_equipped') : ''}</p>`}
+    ${C.NEXT_RARITY[k.rarity] && spare ? `<button type="button" class="link-btn" data-action="trade-open" data-r="${k.rarity}">${ico('swap')} ${t('to_trade')}</button>` : ''}`;
+}
+function openSkinSheet(id) {
+  if (!C.SKIN_BY_ID[id] || !S.skins.owned[id]) return;
+  skinSheet = { id, n: 1 };
+  sfx.click();
+  openModal(skinSheetHTML(), 'skin-sheet', () => { skinSheet = null; });
+}
+function renderSkinSheet() {
+  const md = $('.skin-sheet');
+  if (!md || !skinSheet) return;
+  if (!S.skins.owned[skinSheet.id]) { closeModal(md); return; }
+  md.innerHTML = skinSheetHTML();
+}
+function sellQty(btn) {
+  if (!skinSheet) return;
+  const k = C.SKIN_BY_ID[skinSheet.id];
+  const spare = C.spareCopies(S, k);
+  skinSheet.n = btn.dataset.set ? Number(btn.dataset.set) : Math.max(1, Math.min(spare, (skinSheet.n || 1) + Number(btn.dataset.d)));
+  sfx.click();
+  renderSkinSheet();
+}
+function sellGo() {
+  if (!skinSheet) return;
+  const k = C.SKIN_BY_ID[skinSheet.id];
+  const n = Math.max(1, Math.min(C.spareCopies(S, k), skinSheet.n || 1));
+  const g = C.sellSkin(S, k.id, n);
+  if (!g) { sfx.nope(); return; }
+  persist(); sfx.coin(); if (S.settings.vibrate) buzz(15);
+  updateHUD();
+  toast(t('sold_toast', { n, name: L(k.name), g }), 'boost');
+  skinSheet.n = 1;
+  renderSkinSheet();
+  if (tab === 'shop') { const sc = $('#scr-shop').scrollTop; renderShop(); $('#scr-shop').scrollTop = sc; }
+}
+function sellAllDupesFlow() {
+  const d = C.dupeTotals(S);
+  if (!d.n) return;
+  openModal(`<div class="modal-head"><h2 class="h2">${ico('gem')} ${t('sell_all_dupes', { g: fmt(d.gems) })}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
+    <p class="speech">${t('sell_all_confirm', { n: d.n, g: fmt(d.gems) })}</p>
+    <div class="row2"><button type="button" class="btn btn-soft" data-action="close">${t('cancel')}</button><button type="button" class="btn btn-gem" data-action="sell-dupes-go">${t('confirm_sell')}</button></div>`, 'sell-confirm');
+}
+
 // ----- byttebua: bytt inn 5 skins av samme sjeldenhet mot ett sjeldnere -----
-let trade = null; // { r: sjeldenheten du bytter inn, sel: valgte skins, cat: ønsket kategori (null = alt) }
+let trade = null; // { r: sjeldenheten du bytter inn, sel: Map(skin → antall eksemplarer), cat: ønsket kategori (null = alt) }
+const tradeSelCount = () => (trade ? [...trade.sel.values()].reduce((a, n) => a + n, 0) : 0);
 function tradeTiersHTML() {
   return `<div class="modal-head"><h2 class="h2">${ico('swap')} ${t('trade_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
     <p class="small">${t('trade_sub', { n: C.TRADE_COST })}</p>
     <div class="trade-tiers">${Object.keys(C.NEXT_RARITY).map((r) => {
-      const n = C.tradable(S, r).length;
+      const n = C.tradableCopies(S, r);
       return `<button type="button" class="trade-tier" data-action="trade-tier" data-r="${r}" ${n < C.TRADE_COST ? 'disabled' : ''}>
         <span class="tt-row">${C.TRADE_COST} × ${rarityChip(r)} ${ico('swap')} 1 × ${rarityChip(C.NEXT_RARITY[r])}</span>
         <small>${t('trade_have', { n })}${n < C.TRADE_COST ? ' · ' + t('trade_need', { n: C.TRADE_COST - n }) : ''}</small></button>`;
@@ -2434,12 +2515,18 @@ function tradePickHTML() {
   const next = C.NEXT_RARITY[r];
   const list = C.tradable(S, r);
   const cats = C.CATEGORIES.filter((x) => C.SKINS.some((k) => k.cat === x.id && k.rarity === next && !k.prestige));
-  const full = sel.size === C.TRADE_COST;
+  const count = tradeSelCount();
+  const full = count === C.TRADE_COST;
   return `<div class="modal-head"><h2 class="h2">${ico('swap')} ${t('trade_title')}</h2><button type="button" class="icon-btn" data-action="close" aria-label="${t('close')}">${ico('close')}</button></div>
     <div class="trade-head">${C.TRADE_COST} × ${rarityChip(r)} ${ico('swap')} 1 × ${rarityChip(next)}</div>
-    <div class="trade-pick-head"><b>${t('trade_pick', { n: C.TRADE_COST })}</b><span class="trade-count ${full ? 'full' : ''}">${sel.size}/${C.TRADE_COST}</span><button type="button" class="link-btn" data-action="trade-auto">${t('trade_auto')}</button></div>
-    <div class="trade-grid">${list.map((k) => `<button type="button" class="trade-skin r-${k.rarity}${sel.has(k.id) ? ' on' : ''}" data-action="trade-toggle" data-id="${k.id}" aria-pressed="${sel.has(k.id)}">
-      <span class="skin-art">${skinPreview(k)}</span><span class="skin-name">${esc(L(k.name))}</span><span class="ts-cat">${esc(L(C.CATEGORIES.find((x) => x.id === k.cat).name))}</span><span class="ts-tick">${ico('check')}</span></button>`).join('')}</div>
+    <div class="trade-pick-head"><b>${t('trade_pick', { n: C.TRADE_COST })}</b><span class="trade-count ${full ? 'full' : ''}">${count}/${C.TRADE_COST}</span><button type="button" class="link-btn" data-action="trade-auto">${t('trade_auto')}</button>${count ? `<button type="button" class="link-btn" data-action="trade-clear">${t('trade_clear')}</button>` : ''}</div>
+    <p class="small trade-tap-note">${t('trade_tap_note')}</p>
+    <div class="trade-grid">${list.map((k) => {
+      const have = C.spareCopies(S, k), pick = sel.get(k.id) || 0;
+      return `<button type="button" class="trade-skin r-${k.rarity}${pick ? ' on' : ''}" data-action="trade-toggle" data-id="${k.id}" aria-pressed="${!!pick}">
+      ${have > 1 ? `<span class="skin-copies">×${have}</span>` : ''}
+      <span class="skin-art">${skinPreview(k)}</span><span class="skin-name">${esc(L(k.name))}</span><span class="ts-cat">${esc(L(C.CATEGORIES.find((x) => x.id === k.cat).name))}</span><span class="ts-tick${pick > 1 ? ' num' : ''}">${pick > 1 ? pick : ico('check')}</span></button>`;
+    }).join('')}</div>
     <div class="trade-want"><b>${t('trade_want')}</b><div class="chip-row">
       <button type="button" class="chip ${!cat ? 'on' : ''}" data-action="trade-cat" data-cat="">${t('trade_any')} <small>${C.missingOf(S, next).length}</small></button>
       ${cats.map((x) => `<button type="button" class="chip ${cat === x.id ? 'on' : ''}" data-action="trade-cat" data-cat="${x.id}">${esc(L(x.name))} <small>${C.missingOf(S, next, x.id).length}</small></button>`).join('')}</div>
@@ -2458,23 +2545,40 @@ function renderTrade() {
   md.scrollTop = trade ? sc : 0;
 }
 function tradeAction(a, btn) {
-  if (a === 'open') { openTrade(); return; }
-  if (a === 'tier') { trade = { r: btn.dataset.r, sel: new Set(), cat: null }; sfx.click(); renderTrade(); return; }
+  if (a === 'open') {
+    $$('.skin-sheet').forEach((x) => closeModal(x));
+    openTrade();
+    if (btn.dataset.r && C.tradableCopies(S, btn.dataset.r) >= C.TRADE_COST) { trade = { r: btn.dataset.r, sel: new Map(), cat: null }; renderTrade(); }
+    return;
+  }
+  if (a === 'tier') { trade = { r: btn.dataset.r, sel: new Map(), cat: null }; sfx.click(); renderTrade(); return; }
   if (!trade) return;
   if (a === 'back') { trade = null; sfx.click(); renderTrade(); return; }
   if (a === 'toggle') {
+    // hvert trykk legger til ett eksemplar (duplikater først); når alle er valgt, nullstilles skinnet
     const id = btn.dataset.id;
-    if (trade.sel.has(id)) trade.sel.delete(id);
-    else if (trade.sel.size < C.TRADE_COST) trade.sel.add(id);
+    const have = C.spareCopies(S, C.SKIN_BY_ID[id]);
+    const cur = trade.sel.get(id) || 0;
+    if (cur < have && tradeSelCount() < C.TRADE_COST) trade.sel.set(id, cur + 1);
+    else if (cur) trade.sel.delete(id);
     else { sfx.nope(); return; }
     sfx.click();
     renderTrade();
     return;
   }
-  if (a === 'auto') { trade.sel = new Set(C.tradable(S, trade.r).slice(0, C.TRADE_COST).map((k) => k.id)); sfx.swish(); renderTrade(); return; }
+  if (a === 'clear') { trade.sel = new Map(); sfx.click(); renderTrade(); return; }
+  if (a === 'auto') {
+    trade.sel = new Map();
+    for (const id of C.autoPick(S, trade.r)) trade.sel.set(id, (trade.sel.get(id) || 0) + 1);
+    sfx.swish();
+    renderTrade();
+    return;
+  }
   if (a === 'cat') { trade.cat = btn.dataset.cat || null; sfx.click(); renderTrade(); return; }
   if (a === 'go') {
-    const res = C.tradeUp(S, [...trade.sel], trade.cat);
+    const ids = [];
+    for (const [id, n] of trade.sel) for (let i = 0; i < n; i++) ids.push(id);
+    const res = C.tradeUp(S, ids, trade.cat);
     if (!res) { sfx.nope(); toast(t('trade_failed')); return; }
     persist();
     sfx.crateOpen();
@@ -3511,7 +3615,8 @@ function onAction(e) {
       if (C.equip(S, btn.dataset.id)) {
         applySkins(); persist(); sfx.equip();
         toast(t('skin_equipped_toast', { name: L(C.SKIN_BY_ID[btn.dataset.id].name) }));
-        renderShop();
+        const sc = $('#scr-shop').scrollTop; renderShop(); $('#scr-shop').scrollTop = sc;
+        renderSkinSheet();
       }
       break;
     }
@@ -3558,7 +3663,19 @@ function onAction(e) {
     }
     case 'event-open': openEvent(); break;
     case 'pick-target': openEnemyPicker(); break;
-    case 'trade-open': case 'trade-tier': case 'trade-back': case 'trade-toggle': case 'trade-auto': case 'trade-cat': case 'trade-go': tradeAction(a.slice(6), btn); break;
+    case 'trade-open': case 'trade-tier': case 'trade-back': case 'trade-toggle': case 'trade-auto': case 'trade-clear': case 'trade-cat': case 'trade-go': tradeAction(a.slice(6), btn); break;
+    case 'skin-open': openSkinSheet(btn.dataset.id); break;
+    case 'sell-qty': sellQty(btn); break;
+    case 'sell-go': sellGo(); break;
+    case 'sell-dupes': sellAllDupesFlow(); break;
+    case 'sell-dupes-go': {
+      const d = C.sellAllDupes(S);
+      persist(); sfx.coin(); updateHUD();
+      closeModal(btn);
+      toast(t('sold_all_toast', { n: d.n, g: fmt(d.gems) }), 'boost');
+      if (tab === 'shop') { const sc = $('#scr-shop').scrollTop; renderShop(); $('#scr-shop').scrollTop = sc; }
+      break;
+    }
     case 'dev-tap': devTap(); break;
     case 'dev-open': openDevPanel(); break;
     case 'dev': devAction(btn.dataset.dev, btn); break;
@@ -3659,6 +3776,7 @@ function boot(hotData) {
       gen: (g) => { S.general = g; applySkins(); renderTab(); },
       quip: () => { nextQuip = 0; maybeQuip(performance.now()); return $('#gen-say')?.textContent; },
       sounds: () => ({ ...played }),
+      ownAll: () => { for (const k of C.SKINS) if (!k.prestige) S.skins.owned[k.id] = S.skins.owned[k.id] || 1; },
     };
     // teller hvilke lyder som spilles (for automatiske tester)
     const played = {};

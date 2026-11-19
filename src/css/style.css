@@ -1834,3 +1834,35 @@ button.loot-mini { position: relative; display: grid; place-items: center; font:
 .trade-want .chip-row { margin-top: 6px; }
 .trade-modal .row2 .btn { width: 100%; }
 .modal-head .h2 > .ico { width: 30px; height: 30px; margin-right: 2px; vertical-align: -5px; }
+
+/* lageret: duplikater og salg */
+.skin-card { position: relative; }
+.skin-copies { position: absolute; right: -6px; top: -6px; z-index: 1; min-width: 26px; padding: 1px 6px; background: var(--gold); border: 2.5px solid var(--ink); border-radius: 999px; box-shadow: 0 2px 0 var(--ink); font-size: 12px; font-weight: 800; line-height: 18px; text-align: center; }
+.dupe-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 0; padding: 8px 10px; background: #fff; border: 3px dashed var(--ink); border-radius: 14px; font-weight: 800; font-size: 13.5px; }
+.dupe-card .ico, .lb-sell .ico, .ss-val .ico { width: 18px; height: 18px; vertical-align: -4px; }
+.dupe-card .btn { padding: 6px 10px; font-size: 13px; }
+.lb-sell { position: relative; color: #fff; text-decoration: underline; }
+.ss-top { display: flex; align-items: center; gap: 12px; padding: 10px; background: linear-gradient(180deg, var(--rc2), #fff); border: 3px solid var(--ink); border-radius: 18px; }
+.ss-art { flex: none; display: grid; place-items: center; width: 96px; height: 96px; }
+.ss-art > svg, .ss-art .hq-prev svg { width: 100%; height: 100%; }
+.ss-art .flag-prev { width: 100%; height: auto; }
+.ss-info { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.ss-cat { color: var(--ink-soft); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+.ss-have { font-size: 15px; }
+.ss-val { font-size: 13px; font-weight: 700; }
+.ss-equip { margin: 12px 0 0; }
+.ss-equip .btn { width: 100%; }
+.ss-sell { margin: 14px 0 6px; padding: 10px; background: #f4efff; border: 3px solid var(--ink); border-radius: 16px; }
+.ss-sell > b { display: block; margin-bottom: 8px; }
+.ss-sell .btn { width: 100%; }
+.ss-qty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.qty-btn { display: grid; place-items: center; width: 42px; height: 42px; padding: 0 0 3px; background: #fff; border: 3px solid var(--ink); border-radius: 12px; box-shadow: 0 3px 0 var(--ink); color: var(--ink); font: 400 26px/1 var(--font-display); cursor: pointer; }
+.qty-btn:disabled { opacity: 0.4; cursor: default; }
+.qty-n { min-width: 34px; font-family: var(--font-display); font-size: 26px; text-align: center; }
+.ss-nosell { margin-top: 10px; }
+.trade-skin .skin-copies { right: auto; left: -6px; }
+.trade-skin .ts-tick.num { font-weight: 800; font-size: 13px; line-height: 18px; text-align: center; color: #fff; background: var(--green-deep); border: 2px solid var(--ink); border-radius: 50%; }
+.trade-tap-note { margin: -2px 0 8px; }
+.ss-val { display: inline-flex; align-items: center; gap: 4px; }
+.ss-sell .btn-gem { flex-direction: row; gap: 6px; }
+.ss-sell .btn-gem .ico { width: 22px; height: 22px; }

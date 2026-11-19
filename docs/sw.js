@@ -1,5 +1,5 @@
-// Service worker: gjør spillet spillbart uten nett. Versjon 0032b4d615
-const CACHE = 'totw-ohio-0032b4d615';
+// Service worker: gjør spillet spillbart uten nett. Versjon fdc8113480
+const CACHE = 'totw-ohio-fdc8113480';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

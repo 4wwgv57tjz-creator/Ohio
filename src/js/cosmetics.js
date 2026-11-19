@@ -354,7 +354,7 @@ export const PITY = 80; // Legendarisk eller bedre garantert innen så mange ski
 export function newCosmetics() {
   const owned = {};
   for (const id of Object.values(DEFAULT_SKINS)) owned[id] = 1;
-  return { owned, equipped: { ...DEFAULT_SKINS } };
+  return { owned, equipped: { ...DEFAULT_SKINS }, dupes: {} };
 }
 export function restoreCosmetics(c) {
   const base = newCosmetics();
@@ -366,7 +366,57 @@ export function restoreCosmetics(c) {
     if (id && owned[id] && SKIN_BY_ID[id] && SKIN_BY_ID[id].cat === cat) equipped[cat] = id;
   }
   for (const id of Object.keys(owned)) if (!SKIN_BY_ID[id]) delete owned[id];
-  return { owned, equipped };
+  // duplikater på lageret: id → antall ekstra eksemplarer
+  const dupes = {};
+  for (const [id, n] of Object.entries((c.dupes && typeof c.dupes === 'object' && c.dupes) || {})) {
+    if (owned[id] && SKIN_BY_ID[id] && !SKIN_BY_ID[id].prestige && Number.isFinite(n) && n >= 1) dupes[id] = Math.min(9999, Math.floor(n));
+  }
+  return { owned, equipped, dupes };
+}
+
+// ---------- lageret: duplikater, salg og eksemplarer man kan bytte inn ----------
+export const dupesOf = (s, id) => (s.skins.dupes && s.skins.dupes[id]) || 0;
+export const copiesOf = (s, id) => (s.skins.owned[id] ? 1 : 0) + dupesOf(s, id);
+// Det første eksemplaret kan selges/byttes bare hvis det ikke er i bruk, ikke er et standardskin og ikke prestisje
+const baseFree = (s, k) => !!k && !!s.skins.owned[k.id] && !k.def && !k.prestige && s.skins.equipped[k.cat] !== k.id;
+export const spareCopies = (s, k) => (k && !k.prestige ? dupesOf(s, k.id) + (baseFree(s, k) ? 1 : 0) : 0);
+export const sellValue = (k) => (k && !k.prestige ? RARITY[k.rarity].refund : 0);
+function addCopy(s, k) {
+  if (s.skins.owned[k.id]) { s.skins.dupes = s.skins.dupes || {}; s.skins.dupes[k.id] = dupesOf(s, k.id) + 1; return true; }
+  s.skins.owned[k.id] = Date.now();
+  return false;
+}
+// Tar bort n eksemplarer: duplikatene først, så det første eksemplaret
+function takeCopies(s, k, n) {
+  const d = dupesOf(s, k.id);
+  const fromD = Math.min(d, n);
+  if (fromD) { if (d - fromD) s.skins.dupes[k.id] = d - fromD; else delete s.skins.dupes[k.id]; }
+  if (n > fromD) delete s.skins.owned[k.id];
+}
+// Selger n eksemplarer av et skin for edelstener. Returnerer edelstenene, eller 0 hvis det ikke gikk.
+export function sellSkin(s, id, n = 1) {
+  const k = SKIN_BY_ID[id];
+  if (!k || !Number.isInteger(n) || n < 1 || n > spareCopies(s, k) || !sellValue(k)) return 0;
+  takeCopies(s, k, n);
+  const gems = sellValue(k) * n;
+  s.gems = (s.gems || 0) + gems;
+  s.stats = s.stats || {};
+  s.stats.sold = (s.stats.sold || 0) + n;
+  return gems;
+}
+export function dupeTotals(s) {
+  let n = 0, gems = 0;
+  for (const [id, d] of Object.entries(s.skins.dupes || {})) { const k = SKIN_BY_ID[id]; if (k && d > 0) { n += d; gems += sellValue(k) * d; } }
+  return { n, gems };
+}
+// Selger alle duplikatene og beholder ett av hvert skin
+export function sellAllDupes(s) {
+  const tot = dupeTotals(s);
+  s.skins.dupes = {};
+  s.gems = (s.gems || 0) + tot.gems;
+  s.stats = s.stats || {};
+  s.stats.sold = (s.stats.sold || 0) + tot.n;
+  return tot;
 }
 
 export const equippedSkin = (s, cat) => SKIN_BY_ID[s.skins.equipped[cat]] || SKIN_BY_ID[DEFAULT_SKINS[cat]];
@@ -425,11 +475,8 @@ export function openCrate(s, crateId, { free = false, rnd = Math.random } = {}) 
     const fresh = pool.filter((k) => !s.skins.owned[k.id]);
     const from = fresh.length && rnd() < 0.75 ? fresh : pool; // nye skins prioriteres
     const skin = from[Math.floor(rnd() * from.length)];
-    const dup = !!s.skins.owned[skin.id];
-    const refund = dup ? RARITY[rar].refund : 0;
-    if (dup) s.gems = (s.gems || 0) + refund;
-    else s.skins.owned[skin.id] = Date.now();
-    return { skin, rarity: rar, dup, refund };
+    const dup = addCopy(s, skin); // duplikater havner på lageret
+    return { skin, rarity: rar, dup, copies: copiesOf(s, skin.id) };
   });
   s.crates.opened = (s.crates.opened || 0) + 1;
   return items;
@@ -440,28 +487,37 @@ export function openCrate(s, crateId, { free = false, rnd = Math.random } = {}) 
 // Skins i bruk, standardskins og prestisjeskins kan ikke byttes. Du får et skin du ikke har fra før, hvis det finnes.
 export const TRADE_COST = 5;
 export const NEXT_RARITY = { common: 'rare', rare: 'epic', epic: 'legendary', legendary: 'mythic' };
-const canTrade = (s, k) => !!k && !!s.skins.owned[k.id] && !k.def && !k.prestige && s.skins.equipped[k.cat] !== k.id;
-// Skinsene du kan bytte inn av en sjeldenhet (eldste først)
-export const tradable = (s, rar) => SKINS.filter((k) => k.rarity === rar && canTrade(s, k)).sort((a, b) => (s.skins.owned[a.id] || 0) - (s.skins.owned[b.id] || 0));
+// Skinsene du har eksemplarer av som kan byttes inn (de med duplikater først, så de eldste)
+export const tradable = (s, rar) => SKINS.filter((k) => k.rarity === rar && spareCopies(s, k) > 0)
+  .sort((a, b) => dupesOf(s, b.id) - dupesOf(s, a.id) || (s.skins.owned[a.id] || 0) - (s.skins.owned[b.id] || 0));
+export const tradableCopies = (s, rar) => tradable(s, rar).reduce((a, k) => a + spareCopies(s, k), 0);
+// Velger eksemplarer automatisk: duplikatene først, så det første eksemplaret av de eldste
+export function autoPick(s, rar, n = TRADE_COST) {
+  const out = [];
+  const list = tradable(s, rar);
+  for (const k of list) for (let i = 0; i < dupesOf(s, k.id) && out.length < n; i++) out.push(k.id);
+  for (const k of list) if (out.length < n && spareCopies(s, k) > dupesOf(s, k.id)) out.push(k.id);
+  return out;
+}
 // Skins av en sjeldenhet (og eventuelt kategori) du ikke har ennå
 export const missingOf = (s, rar, cat = null) => SKINS.filter((k) => k.rarity === rar && !k.def && !k.prestige && (!cat || k.cat === cat) && !s.skins.owned[k.id]);
+// ids kan inneholde samme skin flere ganger (flere eksemplarer, for eksempel duplikater)
 export function tradeUp(s, ids, cat = null, rnd = Math.random) {
-  if (!Array.isArray(ids) || ids.length !== TRADE_COST || new Set(ids).size !== ids.length) return null;
-  const ks = ids.map((id) => SKIN_BY_ID[id]);
-  if (ks.some((k) => !canTrade(s, k))) return null;
+  if (!Array.isArray(ids) || ids.length !== TRADE_COST) return null;
+  const counts = {};
+  for (const id of ids) counts[id] = (counts[id] || 0) + 1;
+  const ks = Object.keys(counts).map((id) => SKIN_BY_ID[id]);
+  if (ks.some((k) => !k)) return null;
   const rar = ks[0].rarity;
   const next = NEXT_RARITY[rar];
-  if (!next || ks.some((k) => k.rarity !== rar)) return null;
+  if (!next || ks.some((k) => k.rarity !== rar || counts[k.id] > spareCopies(s, k))) return null;
   const pool = SKINS.filter((k) => k.rarity === next && !k.def && !k.prestige && (!cat || k.cat === cat));
   if (!pool.length) return null;
   const fresh = pool.filter((k) => !s.skins.owned[k.id]);
   const from = fresh.length ? fresh : pool;
   const skin = from[Math.floor(rnd() * from.length)];
-  for (const id of ids) delete s.skins.owned[id];
-  const dup = !!s.skins.owned[skin.id];
-  const refund = dup ? RARITY[next].refund : 0;
-  if (dup) s.gems = (s.gems || 0) + refund;
-  else s.skins.owned[skin.id] = Date.now();
+  for (const k of ks) takeCopies(s, k, counts[k.id]);
+  const dup = addCopy(s, skin);
   s.stats.trades = (s.stats.trades || 0) + 1;
-  return { skin, rarity: next, dup, refund, traded: ks };
+  return { skin, rarity: next, dup, copies: copiesOf(s, skin.id), traded: ks };
 }
